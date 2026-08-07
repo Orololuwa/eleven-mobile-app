@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Wall, StatTile } from '../components';
 import { colors, typography, spacing } from '../theme';
 
@@ -76,7 +76,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
           </View>
 
-          {/* Start Session Button */}
+          {/* Start Session Button   */}
           <Button
             title={isFirstTime ? 'Start Session' : 'Start Session'}
             onPress={onStartSession}

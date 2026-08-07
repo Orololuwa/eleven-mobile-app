@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandMark, Button } from '../components';
 import { colors, typography, spacing } from '../theme';
 

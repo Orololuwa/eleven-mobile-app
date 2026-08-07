@@ -1,6 +1,10 @@
 export { SignInScreen } from './SignInScreen';
+export { EmailSignInScreen } from './EmailSignInScreen';
 export { ProfileSetupScreen } from './ProfileSetupScreen';
 export { HomeScreen } from './HomeScreen';
 export { SessionTypeSheet } from './SessionTypeSheet';
+export { PitchSetupScreen } from './PitchSetupScreen';
 export { ActiveSessionScreen } from './ActiveSessionScreen';
 export { SessionSummaryScreen } from './SessionSummaryScreen';
+export { HistoryScreen } from './HistoryScreen';
+export { SessionDetailScreen } from './SessionDetailScreen';
