@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '../theme';
+import { colors, typography, spacing } from '../../theme';
 
 type Step = 'email' | 'code';
 
@@ -72,12 +72,7 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          {/* Status bar */}
-          <View style={styles.statusBar}>
-            <Text style={styles.time}>9:41</Text>
-            <Text style={styles.statusIcons}>▮▮▮ ⌁ ▰</Text>
-          </View>
+        >         
 
           {/* Back */}
           <TouchableOpacity style={styles.backRow} onPress={onBack}>

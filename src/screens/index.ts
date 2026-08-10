@@ -1,5 +1,5 @@
-export { SignInScreen } from './SignInScreen';
-export { EmailSignInScreen } from './EmailSignInScreen';
+export { SignInScreen } from './auth/sign-in-screen';
+export { EmailSignInScreen } from './auth/email-sign-in-screen';
 export { ProfileSetupScreen } from './ProfileSetupScreen';
 export { HomeScreen } from './HomeScreen';
 export { SessionTypeSheet } from './SessionTypeSheet';
