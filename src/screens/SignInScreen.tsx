@@ -1,8 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BrandMark, Button } from '../components';
+import { LinearGradient } from 'expo-linear-gradient';
+import { LogoText, Button } from '../components';
 import { colors, typography, spacing } from '../theme';
+
+const WOODSMOKE = colors.background.primary; // #060706
 
 type SignInScreenProps = {
   onContinueWithApple: () => void;
@@ -16,97 +19,87 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   onUseEmail,
 }) => {
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        {/* Header */}
+    <View style={styles.container}>
+      <Image
+        source={require('../../assets/hero-bg.png')}
+        style={styles.heroBackground}
+        resizeMode="cover"
+      />
+      <View style={styles.heroOverlay} pointerEvents="none" />
+
+      <SafeAreaView style={styles.content}>
         <View style={styles.header}>
-          <BrandMark size="medium" variant="light" withText />
+          <LogoText width={139} />
         </View>
 
-        {/* Hero Section */}
-        <View style={styles.hero}>
-          <View style={styles.heroBackground}>
-            <Text style={styles.heroPlaceholder}>
-              [ FULL-BLEED PHOTO ]{'\n'}
-              NIGHT FLOODLIGHTS, 5-A-SIDE CAGE
-            </Text>
-          </View>
-          <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>
-              Everyone sees{'\n'}the match.
-            </Text>
-            <Text style={styles.heroTitleAccent}>
-              Nobody sees{'\n'}the work.
-            </Text>
-          </View>
+        <View style={styles.heroText}>
+          <Text style={styles.heroTitle}>
+            Everyone sees{'\n'}the match.
+          </Text>
+          <Text style={styles.heroTitleAccent}>
+            Nobody sees{'\n'}the work.
+          </Text>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <Button
-            title="Continue with Apple"
-            onPress={onContinueWithApple}
-            variant="primary"
-            style={styles.appleButton}
-          />
-          <Button
-            title="Continue with Google"
-            onPress={onContinueWithGoogle}
-            variant="secondary"
-          />
-          <Button
-            title="Use Email Instead"
-            onPress={onUseEmail}
-            variant="ghost"
-          />
-          <Text style={styles.footer}>JOIN PROJECT ELEVEN</Text>
-        </View>
-      </View>
-    </SafeAreaView>
+        <LinearGradient
+          colors={['transparent', 'transparent']}
+          locations={[0, 1]}
+          style={styles.actionsGradient}
+        >
+          <View style={styles.actions}>
+            <Button
+              title="Continue with Apple"
+              onPress={onContinueWithApple}
+              variant="primary"
+              style={styles.appleButton}
+            />
+            <Button
+              title="Continue with Google"
+              onPress={onContinueWithGoogle}
+              variant="secondary"
+            />
+            <Button
+              title="Continue with email"
+              onPress={onUseEmail}
+              variant="ghost"
+            />
+            <Text style={styles.footer}>JOIN PROJECT ELEVEN</Text>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.primary,
+    backgroundColor: WOODSMOKE,
+    overflow: 'hidden',
+  },
+  heroBackground: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none',
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.overlay.light,
   },
   content: {
     flex: 1,
+    justifyContent: 'space-between',
   },
   header: {
     paddingHorizontal: spacing[8],
     paddingTop: spacing[7],
   },
-  hero: {
-    flex: 1,
-    position: 'relative',
-  },
-  heroBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // Add pattern background
-    opacity: 0.8,
-  },
-  heroPlaceholder: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.18 * 11,
-    color: colors.text.disabled,
-    textAlign: 'center',
-    lineHeight: 1.9 * 11,
-  },
   heroText: {
-    position: 'absolute',
-    bottom: spacing[8],
-    left: spacing[8],
-    right: spacing[8],
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: spacing[8],
+    paddingBottom: spacing[6],
     gap: 12,
   },
   heroTitle: {
@@ -125,12 +118,13 @@ const styles = StyleSheet.create({
     lineHeight: 44 * 0.95,
     color: colors.brand.primary,
   },
+  actionsGradient: {
+    paddingTop: spacing[10],
+  },
   actions: {
     paddingHorizontal: spacing[6],
     paddingBottom: spacing[9],
     gap: 12,
-    backgroundColor: colors.background.secondary,
-    paddingTop: spacing[7],
   },
   appleButton: {
     backgroundColor: colors.text.primary,

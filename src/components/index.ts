@@ -1,4 +1,8 @@
 export { BrandMark } from './BrandMark';
+export { LogoText } from './LogoText';
+export { LogoAlt } from './LogoAlt';
+export { LogoPrimary } from './LogoPrimary';
+export { LogoWb } from './LogoWb';
 export { Button } from './Button';
 export { Chip } from './Chip';
 export { SegmentedControl } from './SegmentedControl';
