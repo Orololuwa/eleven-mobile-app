@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogoText, Button } from '../../components';
-import { colors, typography, spacing } from '../../theme';
+import { LogoText, Button } from '@/components';
+import { colors, typography, spacing } from '@/theme';
 
 const WOODSMOKE = colors.background.primary; // #060706
 
@@ -21,7 +21,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   return (
     <View style={styles.container}>
       <Image
-        source={require('../../assets/hero-bg.png')}
+        source={require('@assets/hero-bg.png')}
         style={styles.heroBackground}
         resizeMode="cover"
       />

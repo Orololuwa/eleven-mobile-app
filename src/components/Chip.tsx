@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, typography } from '../theme';
+import { colors, typography } from '@/theme';
 
 type ChipVariant = 'filter' | 'milestone' | 'position';
 

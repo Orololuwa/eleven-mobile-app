@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '../theme';
+import { colors, typography, spacing } from '@/theme';
 
 type SessionDetailTab = 'HEATMAP' | 'SPRINTS' | 'SPEED' | 'STATS';
 

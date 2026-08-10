@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { colors, typography } from '../theme';
+import { colors, typography } from '@/theme';
 
 type SegmentedControlProps = {
   options: string[];

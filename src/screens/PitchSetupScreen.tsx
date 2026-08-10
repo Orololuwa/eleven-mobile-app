@@ -7,7 +7,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '../theme';
+import { colors, typography, spacing } from '@/theme';
 
 type PitchSetupScreenProps = {
   sessionType: string;

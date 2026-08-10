@@ -6,8 +6,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, StatTile, Wall } from '../components';
-import { colors, typography, spacing } from '../theme';
+import { Button, StatTile, Wall } from '@/components';
+import { colors, typography, spacing } from '@/theme';
 
 type SessionSummaryScreenProps = {
   sessionData: {

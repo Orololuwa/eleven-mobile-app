@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, StatusPill } from '../components';
-import { colors, typography, spacing } from '../theme';
+import { Button, StatusPill } from '@/components';
+import { colors, typography, spacing } from '@/theme';
 
 type ActiveSessionScreenProps = {
   sessionType: string;

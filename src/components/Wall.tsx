@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '../theme';
+import { colors } from '@/theme';
 
 type WallProps = {
   total: number;

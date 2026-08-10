@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors, typography } from '../theme';
+import { colors, typography } from '@/theme';
 
 type BrandMarkProps = {
   size?: 'small' | 'medium' | 'large';

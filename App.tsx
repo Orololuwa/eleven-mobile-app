@@ -12,8 +12,8 @@ import {
   SessionSummaryScreen,
   HistoryScreen,
   SessionDetailScreen,
-} from './src/screens';
-import type { ProfileData } from './src/screens/ProfileSetupScreen';
+} from '@/screens';
+import type { ProfileData } from '@/screens/ProfileSetupScreen';
 
 type AppState = 'signIn' | 'emailSignIn' | 'profileSetup' | 'home' | 'pitchSetup' | 'activeSession' | 'summary' | 'history' | 'sessionDetail';
 

@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Wall } from '../components';
-import { colors, typography, spacing } from '../theme';
+import { Wall } from '@/components';
+import { colors, typography, spacing } from '@/theme';
 
 type Session = {
   id: string;

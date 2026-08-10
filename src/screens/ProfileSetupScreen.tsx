@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Field, Chip, SegmentedControl, Button } from '../components';
-import { colors, typography, spacing } from '../theme';
+import { Field, Chip, SegmentedControl, Button } from '@/components';
+import { colors, typography, spacing } from '@/theme';
 
 type ProfileSetupScreenProps = {
   onComplete: (data: ProfileData) => void;

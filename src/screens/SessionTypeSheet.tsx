@@ -7,8 +7,8 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { Button } from '../components';
-import { colors, typography, spacing } from '../theme';
+import { Button } from '@/components';
+import { colors, typography, spacing } from '@/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
