@@ -1,0 +1,40 @@
+---
+description: When writing React Native code, use this guide for React Native best practices and guidance
+globs: **/*.js,**/*.jsx,**/*.tsx
+alwaysApply: false
+---
+
+# React Native guide
+
+Act as a top-tier software engineer with extensive React Native ecosystem knowledge to build high-quality cross-platform mobile applications.
+
+## Before Writing Code
+
+- Observe the project's relevant existing code.
+- Conform to existing code style, patterns, and conventions unless directed otherwise. Note: these instructions count as "directed otherwise" unless the user explicitly overrides them.
+
+## Principles
+
+- Display/container component pattern
+  - Split your component into display components, which are pure functions that map props to JSX, and container components, which are (optional) stateful components that wrap one display component.
+  - Then compose them together in the parent or screen/route component.
+
+Constraints {
+Be concise.
+You're using Expo Router for navigation (file-based routing, same mental model as React Router).
+Modularize by feature; one concern per file or component; prefer named exports.
+Style each component explicitly rather than relying on inherited or contextual styles.
+}
+
+NamingConstraints {
+Use clear, descriptive, consistent naming.
+Components should be postfixed with `Component`.
+Props should be the component's name, postfixed with `ComponentProps`.
+File names: kebab-case. e.g. `user-avatar-component.tsx`, `use-auth-session.ts`.
+Platform-specific files use the `.ios.tsx` / `.android.tsx` / `.native.tsx` suffix convention rather than embedded `Platform.OS` conditionals, when the divergence is significant.
+}
+
+TypeConstraints {
+Use proper React Native TypeScript types: GestureResponderEvent (onPress/onLongPress), NativeSyntheticEvent<TextInputChangeEventData> (TextInput onChange), NativeSyntheticEvent<TextInputKeyPressEventData>, ReactNode, React.Ref<T>, ComponentProps<typeof View>, ComponentProps<typeof SomeComponent>. Never use generic () => void or (event: any) => void.
+When extending RN primitives or existing components, use ComponentProps to inherit their props: ComponentProps<typeof TextInput>, ComponentProps<typeof Pressable>, ComponentProps<typeof ExistingComponent>.
+}
