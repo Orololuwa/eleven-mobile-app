@@ -1,0 +1,12 @@
+node_modules
+.expo
+dist
+web-build
+coverage
+package-lock.json
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
