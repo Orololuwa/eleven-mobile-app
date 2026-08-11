@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Field, Chip, SegmentedControl, Button } from '@/components';
 import { colors, typography, spacing } from '@/theme';
@@ -24,10 +18,7 @@ export type ProfileData = {
 const POSITIONS = ['GK', 'DEF', 'MID', 'WING', 'FWD'];
 const FOOT_OPTIONS = ['LEFT', 'RIGHT', 'BOTH'];
 
-export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
-  onComplete,
-  onSkip,
-}) => {
+export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComplete, onSkip }) => {
   const [firstName, setFirstName] = useState('');
   const [selectedPosition, setSelectedPosition] = useState(2); // MID
   const [selectedFoot, setSelectedFoot] = useState(0); // LEFT
@@ -50,10 +41,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
             {[0, 1, 2].map((index) => (
               <View
                 key={index}
-                style={[
-                  styles.progressSegment,
-                  index < progress && styles.progressSegmentFilled,
-                ]}
+                style={[styles.progressSegment, index < progress && styles.progressSegmentFilled]}
               />
             ))}
           </View>
@@ -108,11 +96,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
           <Text style={styles.footerText}>
             Height, weight and club can wait. You can play first.
           </Text>
-          <Button
-            title="Into the App"
-            onPress={handleComplete}
-            disabled={!firstName.trim()}
-          />
+          <Button title="Into the App" onPress={handleComplete} disabled={!firstName.trim()} />
         </View>
       </View>
     </SafeAreaView>

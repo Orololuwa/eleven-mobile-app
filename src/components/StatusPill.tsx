@@ -8,11 +8,7 @@ type StatusPillProps = {
   style?: ViewStyle;
 };
 
-export const StatusPill: React.FC<StatusPillProps> = ({
-  label,
-  status = 'live',
-  style,
-}) => {
+export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', style }) => {
   const getIndicatorStyle = () => {
     switch (status) {
       case 'live':
@@ -52,9 +48,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({
   return (
     <View style={[styles.container, style]}>
       {indicatorStyle && <View style={indicatorStyle} />}
-      <Text style={[styles.text, { color: getTextColor() }]}>
-        {label.toUpperCase()}
-      </Text>
+      <Text style={[styles.text, { color: getTextColor() }]}>{label.toUpperCase()}</Text>
     </View>
   );
 };

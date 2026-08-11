@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 
@@ -147,7 +141,7 @@ const HeatmapTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
         <View style={styles.legend}>
           <Text style={styles.legendLabel}>LOW</Text>
           <View style={styles.legendBar}>
-            {[0.14, 0.34, 0.58, 0.80, 1].map((op, i) => (
+            {[0.14, 0.34, 0.58, 0.8, 1].map((op, i) => (
               <View
                 key={i}
                 style={[styles.legendSegment, { backgroundColor: `rgba(200,242,78,${op})` }]}
@@ -164,11 +158,7 @@ const HeatmapTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
       {/* Half selector */}
       <View style={styles.halfSelector}>
         {(['1ST', '2ND', 'FULL'] as const).map((h) => (
-          <TouchableOpacity
-            key={h}
-            style={styles.halfOption}
-            onPress={() => setHalf(h)}
-          >
+          <TouchableOpacity key={h} style={styles.halfOption} onPress={() => setHalf(h)}>
             <Text style={styles.halfOptionLabel}>{h} HALF</Text>
             <Text style={[styles.halfOptionAction, half === h && styles.halfOptionShowing]}>
               {half === h ? 'SHOWING' : 'SHOW'}
@@ -180,9 +170,8 @@ const HeatmapTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
       {/* Analysis */}
       <View style={styles.analysis}>
         <Text style={styles.analysisText}>
-          You held the{' '}
-          <Text style={{ color: colors.brand.primary }}>left half-space</Text>
-          {' '}— 41% of your minutes in the middle third, drifting wide when the ball turned over.
+          You held the <Text style={{ color: colors.brand.primary }}>left half-space</Text> — 41% of
+          your minutes in the middle third, drifting wide when the ball turned over.
         </Text>
       </View>
     </View>
@@ -199,18 +188,18 @@ const HeatBlobs: React.FC<{ half: string }> = ({ half }) => {
           { left: '10%', top: '65%', size: 45, opacity: 0.5 },
         ]
       : half === '2ND'
-      ? [
-          { left: '55%', top: '30%', size: 80, opacity: 0.9 },
-          { left: '65%', top: '55%', size: 60, opacity: 0.7 },
-          { left: '45%', top: '45%', size: 50, opacity: 0.6 },
-          { left: '70%', top: '25%', size: 45, opacity: 0.5 },
-        ]
-      : [
-          { left: '20%', top: '35%', size: 90, opacity: 0.9 },
-          { left: '50%', top: '50%', size: 70, opacity: 0.7 },
-          { left: '35%', top: '60%', size: 55, opacity: 0.6 },
-          { left: '65%', top: '30%', size: 50, opacity: 0.5 },
-        ];
+        ? [
+            { left: '55%', top: '30%', size: 80, opacity: 0.9 },
+            { left: '65%', top: '55%', size: 60, opacity: 0.7 },
+            { left: '45%', top: '45%', size: 50, opacity: 0.6 },
+            { left: '70%', top: '25%', size: 45, opacity: 0.5 },
+          ]
+        : [
+            { left: '20%', top: '35%', size: 90, opacity: 0.9 },
+            { left: '50%', top: '50%', size: 70, opacity: 0.7 },
+            { left: '35%', top: '60%', size: 55, opacity: 0.6 },
+            { left: '65%', top: '30%', size: 50, opacity: 0.5 },
+          ];
 
   return (
     <>
@@ -267,8 +256,8 @@ const SprintsTab: React.FC<{ data: SessionDetailData }> = ({ data }) => (
     <View style={styles.analysis}>
       <Text style={styles.analysisText}>
         Most of your sprints came in the{' '}
-        <Text style={{ color: colors.brand.primary }}>second half</Text>
-        {' '}— 17 of {data.sprints}. You finished stronger than you started.
+        <Text style={{ color: colors.brand.primary }}>second half</Text> — 17 of {data.sprints}. You
+        finished stronger than you started.
       </Text>
     </View>
   </View>
@@ -331,7 +320,10 @@ const ZoneBar: React.FC<{ label: string; percent: number; isHighlight?: boolean 
 const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
   // Generate speed trace bars
   const bars = Array.from({ length: 46 }, (_, i) => {
-    const v = 18 + Math.round(52 * Math.abs(Math.sin(i * 0.9) * Math.cos(i * 0.31))) + (i % 7 === 0 ? 44 : 0);
+    const v =
+      18 +
+      Math.round(52 * Math.abs(Math.sin(i * 0.9) * Math.cos(i * 0.31))) +
+      (i % 7 === 0 ? 44 : 0);
     const height = Math.min(v, 118);
     const hot = height > 80;
     return { height, hot };
@@ -353,9 +345,7 @@ const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
                 styles.speedBar,
                 {
                   height: bar.height,
-                  backgroundColor: bar.hot
-                    ? colors.brand.primary
-                    : 'rgba(242,241,236,0.22)',
+                  backgroundColor: bar.hot ? colors.brand.primary : 'rgba(242,241,236,0.22)',
                 },
               ]}
             />
@@ -383,8 +373,8 @@ const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
       <View style={styles.analysis}>
         <Text style={styles.analysisText}>
           Your peak speed of{' '}
-          <Text style={{ color: colors.brand.primary }}>{data.topSpeed} km/h</Text>
-          {' '}was hit in the second half — consistent with your sprint data.
+          <Text style={{ color: colors.brand.primary }}>{data.topSpeed} km/h</Text> was hit in the
+          second half — consistent with your sprint data.
         </Text>
       </View>
     </View>

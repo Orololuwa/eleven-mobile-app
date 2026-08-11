@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions } from 'react-native';
 import { Button } from '@/components';
 import { colors, typography, spacing } from '@/theme';
 
@@ -63,24 +56,12 @@ export const SessionTypeSheet: React.FC<SessionTypeSheetProps> = ({
 
     switch (icon) {
       case 'match':
-        return (
-          <View style={[styles.iconCircle, isSelected && styles.iconCircleSelected]} />
-        );
+        return <View style={[styles.iconCircle, isSelected && styles.iconCircleSelected]} />;
       case 'training':
         return (
           <View style={styles.iconTraining}>
-            <View
-              style={[
-                styles.iconBar,
-                { height: 22, backgroundColor: iconColor },
-              ]}
-            />
-            <View
-              style={[
-                styles.iconBar,
-                { height: 34, backgroundColor: iconColor },
-              ]}
-            />
+            <View style={[styles.iconBar, { height: 22, backgroundColor: iconColor }]} />
+            <View style={[styles.iconBar, { height: 34, backgroundColor: iconColor }]} />
           </View>
         );
       case 'futsal':
@@ -100,12 +81,7 @@ export const SessionTypeSheet: React.FC<SessionTypeSheetProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1} />
         <View style={styles.sheet}>
@@ -117,37 +93,23 @@ export const SessionTypeSheet: React.FC<SessionTypeSheetProps> = ({
               return (
                 <TouchableOpacity
                   key={type.id}
-                  style={[
-                    styles.option,
-                    isSelected && styles.optionSelected,
-                  ]}
+                  style={[styles.option, isSelected && styles.optionSelected]}
                   onPress={() => setSelectedType(type.id)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.iconContainer}>
-                    {renderIcon(type.icon, isSelected)}
-                  </View>
+                  <View style={styles.iconContainer}>{renderIcon(type.icon, isSelected)}</View>
                   <View style={styles.optionText}>
                     <Text style={styles.optionTitle}>{type.title}</Text>
                     <Text style={styles.optionSubtitle}>{type.subtitle}</Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.optionArrow,
-                      isSelected && styles.optionArrowSelected,
-                    ]}
-                  >
+                  <Text style={[styles.optionArrow, isSelected && styles.optionArrowSelected]}>
                     ▶
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
-          <Button
-            title={`Start ${selectedType}`}
-            onPress={handleStartSession}
-            size="large"
-          />
+          <Button title={`Start ${selectedType}`} onPress={handleStartSession} size="large" />
           <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
             <Text style={styles.cancelText}>CANCEL</Text>
           </TouchableOpacity>

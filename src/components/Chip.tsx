@@ -91,9 +91,7 @@ export const Chip: React.FC<ChipProps> = ({
     };
   };
 
-  const displayLabel = variant === 'milestone'
-    ? (completed ? `✓ ${label}` : `○ ${label}`)
-    : label;
+  const displayLabel = variant === 'milestone' ? (completed ? `✓ ${label}` : `○ ${label}`) : label;
 
   return (
     <TouchableOpacity

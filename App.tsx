@@ -15,7 +15,16 @@ import {
 } from '@/screens';
 import type { ProfileData } from '@/screens/profile/profile-setup-screen';
 
-type AppState = 'signIn' | 'emailSignIn' | 'profileSetup' | 'home' | 'pitchSetup' | 'activeSession' | 'summary' | 'history' | 'sessionDetail';
+type AppState =
+  | 'signIn'
+  | 'emailSignIn'
+  | 'profileSetup'
+  | 'home'
+  | 'pitchSetup'
+  | 'activeSession'
+  | 'summary'
+  | 'history'
+  | 'sessionDetail';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('signIn');
@@ -25,14 +34,17 @@ export default function App() {
   const [sessionCount, setSessionCount] = useState(0);
 
   // Mock session data
-  const mockLastSession = sessionCount > 0 ? {
-    title: 'Sunday Match',
-    date: '03 AUG',
-    location: 'Lekki',
-    type: '7-A-SIDE',
-    distance: 8.4,
-    topSpeed: 31,
-  } : undefined;
+  const mockLastSession =
+    sessionCount > 0
+      ? {
+          title: 'Sunday Match',
+          date: '03 AUG',
+          location: 'Lekki',
+          type: '7-A-SIDE',
+          distance: 8.4,
+          topSpeed: 31,
+        }
+      : undefined;
 
   const mockWeeklyStats = {
     sessions: sessionCount > 0 ? 4 : 0,

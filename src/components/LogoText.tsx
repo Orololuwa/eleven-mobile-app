@@ -10,21 +10,11 @@ type LogoTextProps = {
 
 const ASPECT = 139 / 34;
 
-export const LogoText: React.FC<LogoTextProps> = ({
-  width = 139,
-  height,
-  style,
-}) => {
+export const LogoText: React.FC<LogoTextProps> = ({ width = 139, height, style }) => {
   const resolvedHeight = height ?? width / ASPECT;
 
   return (
-    <Svg
-      width={width}
-      height={resolvedHeight}
-      viewBox="0 0 139 34"
-      fill="none"
-      style={style}
-    >
+    <Svg width={width} height={resolvedHeight} viewBox="0 0 139 34" fill="none" style={style}>
       <Rect width="34" height="34" fill="#C8F24E" />
       <Rect
         width="6"

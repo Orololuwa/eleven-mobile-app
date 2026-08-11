@@ -112,12 +112,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[
-        styles.button,
-        getButtonStyle(),
-        fullWidth && styles.fullWidth,
-        style,
-      ]}
+      style={[styles.button, getButtonStyle(), fullWidth && styles.fullWidth, style]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}

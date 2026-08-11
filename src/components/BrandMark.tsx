@@ -23,19 +23,17 @@ export const BrandMark: React.FC<BrandMarkProps> = ({
 }) => {
   const sizeConfig = sizes[size];
 
-  const containerBg = variant === 'light'
-    ? colors.brand.primary
-    : variant === 'dark'
-    ? colors.background.secondary
-    : colors.text.primary;
+  const containerBg =
+    variant === 'light'
+      ? colors.brand.primary
+      : variant === 'dark'
+        ? colors.background.secondary
+        : colors.text.primary;
 
-  const barColor = variant === 'light'
-    ? colors.background.secondary
-    : colors.brand.primary;
+  const barColor = variant === 'light' ? colors.background.secondary : colors.brand.primary;
 
-  const containerStyle = variant === 'outline'
-    ? { borderWidth: 1, borderColor: colors.border.strong }
-    : {};
+  const containerStyle =
+    variant === 'outline' ? { borderWidth: 1, borderColor: colors.border.strong } : {};
 
   return (
     <View style={[styles.wrapper, style]}>
@@ -72,9 +70,7 @@ export const BrandMark: React.FC<BrandMarkProps> = ({
           ]}
         />
       </View>
-      {withText && (
-        <Text style={styles.text}>ELEVEN</Text>
-      )}
+      {withText && <Text style={styles.text}>ELEVEN</Text>}
     </View>
   );
 };

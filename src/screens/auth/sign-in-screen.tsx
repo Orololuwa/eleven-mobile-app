@@ -33,12 +33,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
         </View>
 
         <View style={styles.heroText}>
-          <Text style={styles.heroTitle}>
-            Everyone sees{'\n'}the match.
-          </Text>
-          <Text style={styles.heroTitleAccent}>
-            Nobody sees{'\n'}the work.
-          </Text>
+          <Text style={styles.heroTitle}>Everyone sees{'\n'}the match.</Text>
+          <Text style={styles.heroTitleAccent}>Nobody sees{'\n'}the work.</Text>
         </View>
 
         <LinearGradient
@@ -58,11 +54,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               onPress={onContinueWithGoogle}
               variant="secondary"
             />
-            <Button
-              title="Continue with email"
-              onPress={onUseEmail}
-              variant="ghost"
-            />
+            <Button title="Continue with email" onPress={onUseEmail} variant="ghost" />
             <Text style={styles.footer}>JOIN PROJECT ELEVEN</Text>
           </View>
         </LinearGradient>

@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
 
@@ -104,7 +98,8 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
         {/* Bottom Actions */}
         <View style={styles.actions}>
           <Text style={styles.hint}>
-            Stand on the corner flag, then mark. Your heatmap is only as honest as these four points.
+            Stand on the corner flag, then mark. Your heatmap is only as honest as these four
+            points.
           </Text>
 
           {nextCorner ? (
@@ -183,10 +178,7 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
 
         {/* Flip Button */}
         <View style={styles.flipContainer}>
-          <TouchableOpacity
-            style={styles.flipButton}
-            onPress={() => setAttackRight((v) => !v)}
-          >
+          <TouchableOpacity style={styles.flipButton} onPress={() => setAttackRight((v) => !v)}>
             <Text style={styles.flipButtonText}>⇄ FLIP DIRECTION</Text>
           </TouchableOpacity>
         </View>
@@ -216,9 +208,7 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
         <Text style={styles.savedPitchMeta}>SAVED AS · LEKKI ASTRO · 64 × 42 M</Text>
         <TouchableOpacity style={styles.kickOffButton} onPress={onComplete}>
           <Text style={styles.kickOffLabel}>KICK OFF</Text>
-          <Text style={styles.kickOffSub}>
-            {sessionType.toUpperCase()} · BRICK 54
-          </Text>
+          <Text style={styles.kickOffSub}>{sessionType.toUpperCase()} · BRICK 54</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -227,12 +217,11 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
 
 const CornerMarker: React.FC<{ number: number; marked: boolean }> = ({ number, marked }) => (
   <View
-    style={[
-      styles.cornerMarker,
-      marked ? styles.cornerMarkerFilled : styles.cornerMarkerEmpty,
-    ]}
+    style={[styles.cornerMarker, marked ? styles.cornerMarkerFilled : styles.cornerMarkerEmpty]}
   >
-    <Text style={[styles.cornerNumber, marked ? styles.cornerNumberFilled : styles.cornerNumberEmpty]}>
+    <Text
+      style={[styles.cornerNumber, marked ? styles.cornerNumberFilled : styles.cornerNumberEmpty]}
+    >
       {number}
     </Text>
   </View>

@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, StatusPill } from '@/components';
 import { colors, typography, spacing } from '@/theme';
@@ -63,10 +57,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
             styles.traceBar,
             {
               height,
-              backgroundColor:
-                height > 80
-                  ? colors.brand.primary
-                  : colors.border.strong,
+              backgroundColor: height > 80 ? colors.brand.primary : colors.border.strong,
             },
           ]}
         />
@@ -126,7 +117,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
             <View style={styles.secondaryStat}>
               <Text style={styles.secondaryStatLabel}>AVG</Text>
               <Text style={styles.secondaryStatValue}>
-                {distance > 0 ? ((elapsed / 60) / distance).toFixed(1) : '0.0'}
+                {distance > 0 ? (elapsed / 60 / distance).toFixed(1) : '0.0'}
               </Text>
             </View>
           </View>
@@ -135,11 +126,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
 
       {/* Action Buttons */}
       <View style={styles.actions}>
-        <Button
-          title="Pause — Half Time"
-          onPress={onPause}
-          variant="secondary"
-        />
+        <Button title="Pause — Half Time" onPress={onPause} variant="secondary" />
         <TouchableOpacity
           style={styles.endButton}
           onPressIn={() => {
@@ -157,17 +144,10 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
           onPressOut={() => setHoldProgress(0)}
           activeOpacity={1}
         >
-          <View
-            style={[
-              styles.endButtonProgress,
-              { width: `${holdProgress}%` },
-            ]}
-          />
+          <View style={[styles.endButtonProgress, { width: `${holdProgress}%` }]} />
           <Text style={styles.endButtonText}>HOLD TO END SESSION</Text>
         </TouchableOpacity>
-        <Text style={styles.endButtonHint}>
-          HOLD 3 SECONDS · NO ACCIDENTAL STOPS
-        </Text>
+        <Text style={styles.endButtonHint}>HOLD 3 SECONDS · NO ACCIDENTAL STOPS</Text>
       </View>
     </SafeAreaView>
   );

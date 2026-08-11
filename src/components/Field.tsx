@@ -34,11 +34,7 @@ export const Field: React.FC<FieldProps> = ({
         ]}
       >
         <TextInput
-          style={[
-            styles.input,
-            hasValue && styles.inputFilled,
-            !hasValue && styles.inputEmpty,
-          ]}
+          style={[styles.input, hasValue && styles.inputFilled, !hasValue && styles.inputEmpty]}
           value={value}
           placeholder={placeholder}
           placeholderTextColor={colors.text.quaternary}

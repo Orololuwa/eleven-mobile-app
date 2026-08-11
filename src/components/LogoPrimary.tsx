@@ -8,21 +8,11 @@ type LogoPrimaryProps = {
   style?: ViewStyle;
 };
 
-export const LogoPrimary: React.FC<LogoPrimaryProps> = ({
-  width = 44,
-  height,
-  style,
-}) => {
+export const LogoPrimary: React.FC<LogoPrimaryProps> = ({ width = 44, height, style }) => {
   const resolvedHeight = height ?? width;
 
   return (
-    <Svg
-      width={width}
-      height={resolvedHeight}
-      viewBox="0 0 44 44"
-      fill="none"
-      style={style}
-    >
+    <Svg width={width} height={resolvedHeight} viewBox="0 0 44 44" fill="none" style={style}>
       <Rect width="44" height="44" fill="#C8F24E" />
       <Rect
         width="7"

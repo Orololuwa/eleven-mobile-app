@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Wall } from '@/components';
 import { colors, typography, spacing } from '@/theme';
@@ -29,18 +23,58 @@ type HistoryScreenProps = {
 };
 
 const MOCK_SESSIONS: Session[] = [
-  { id: '1', title: 'Sunday Match', date: '09 AUG', location: 'LEKKI', type: 'MATCH', distance: 8.4, topSpeed: 31.2 },
-  { id: '2', title: 'Evening Training', date: '07 AUG', location: 'SURULERE', type: 'TRAINING', distance: 5.1, topSpeed: 24.6 },
-  { id: '3', title: 'Futsal Night', date: '05 AUG', location: 'IKOYI', type: 'FUTSAL', distance: 3.8, topSpeed: 26.1 },
-  { id: '4', title: 'Sunday Match', date: '02 AUG', location: 'LEKKI', type: 'MATCH', distance: 7.9, topSpeed: 30.4 },
-  { id: '5', title: 'Sprint Work', date: '31 JUL', location: 'YABA', type: 'TRAINING', distance: 4.2, topSpeed: 29.8 },
+  {
+    id: '1',
+    title: 'Sunday Match',
+    date: '09 AUG',
+    location: 'LEKKI',
+    type: 'MATCH',
+    distance: 8.4,
+    topSpeed: 31.2,
+  },
+  {
+    id: '2',
+    title: 'Evening Training',
+    date: '07 AUG',
+    location: 'SURULERE',
+    type: 'TRAINING',
+    distance: 5.1,
+    topSpeed: 24.6,
+  },
+  {
+    id: '3',
+    title: 'Futsal Night',
+    date: '05 AUG',
+    location: 'IKOYI',
+    type: 'FUTSAL',
+    distance: 3.8,
+    topSpeed: 26.1,
+  },
+  {
+    id: '4',
+    title: 'Sunday Match',
+    date: '02 AUG',
+    location: 'LEKKI',
+    type: 'MATCH',
+    distance: 7.9,
+    topSpeed: 30.4,
+  },
+  {
+    id: '5',
+    title: 'Sprint Work',
+    date: '31 JUL',
+    location: 'YABA',
+    type: 'TRAINING',
+    distance: 4.2,
+    topSpeed: 29.8,
+  },
 ];
 
 // Days of month that have sessions (for the grid)
 const SESSION_DAYS = [2, 5, 7, 9];
 
 const FILTERS = ['ALL', 'MATCH', 'TRAINING', 'FUTSAL'] as const;
-type Filter = typeof FILTERS[number];
+type Filter = (typeof FILTERS)[number];
 
 export const HistoryScreen: React.FC<HistoryScreenProps> = ({
   sessions,
@@ -52,11 +86,11 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
   const [activeFilter, setActiveFilter] = useState<Filter>('ALL');
 
   const allSessions = sessions.length > 0 ? sessions : MOCK_SESSIONS;
-  const isEmpty = sessions.length === 0 && allSessions === MOCK_SESSIONS ? false : sessions.length === 0;
+  const isEmpty =
+    sessions.length === 0 && allSessions === MOCK_SESSIONS ? false : sessions.length === 0;
 
-  const filtered = activeFilter === 'ALL'
-    ? allSessions
-    : allSessions.filter((s) => s.type === activeFilter);
+  const filtered =
+    activeFilter === 'ALL' ? allSessions : allSessions.filter((s) => s.type === activeFilter);
 
   if (isEmpty) {
     return (
@@ -72,11 +106,10 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
           <View style={styles.emptyWall}>
             <Wall total={56} built={0} />
           </View>
-          <Text style={styles.emptyTitle}>
-            Nothing here yet —{'\n'}and that's the point.
-          </Text>
+          <Text style={styles.emptyTitle}>Nothing here yet —{'\n'}and that's the point.</Text>
           <Text style={styles.emptyDesc}>
-            Your history starts the first time you press Start Session. Match, training or futsal — it all counts.
+            Your history starts the first time you press Start Session. Match, training or futsal —
+            it all counts.
           </Text>
           <TouchableOpacity style={styles.startFirstButton} onPress={onStartSession}>
             <Text style={styles.startFirstText}>START YOUR FIRST</Text>
@@ -164,12 +197,7 @@ const MonthGrid: React.FC<{ sessionDays: number[] }> = ({ sessionDays }) => {
     <View style={styles.monthGrid}>
       {days.map((day) => {
         const hasSession = sessionDays.includes(day);
-        return (
-          <View
-            key={day}
-            style={[styles.dayCell, hasSession && styles.dayCellActive]}
-          />
-        );
+        return <View key={day} style={[styles.dayCell, hasSession && styles.dayCellActive]} />;
       })}
     </View>
   );

@@ -18,13 +18,9 @@ type EmailSignInScreenProps = {
   onVerified: () => void;
 };
 
-const isValidEmail = (email: string) =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
-  onBack,
-  onVerified,
-}) => {
+export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, onVerified }) => {
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -72,8 +68,7 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >         
-
+        >
           {/* Back */}
           <TouchableOpacity style={styles.backRow} onPress={onBack}>
             <Text style={styles.backText}>◂ BACK</Text>
@@ -122,11 +117,7 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
                 SEND CODE
               </Text>
             </TouchableOpacity>
-            {!valid && (
-              <Text style={styles.disabledNote}>
-                DISABLED UNTIL THE ADDRESS IS VALID
-              </Text>
-            )}
+            {!valid && <Text style={styles.disabledNote}>DISABLED UNTIL THE ADDRESS IS VALID</Text>}
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -153,8 +144,7 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
       <View style={styles.emailHeader}>
         <Text style={styles.screenTitle}>Check your inbox.</Text>
         <Text style={styles.screenDesc}>
-          Six digits sent to{' '}
-          <Text style={styles.emailHighlight}>{email}</Text>
+          Six digits sent to <Text style={styles.emailHighlight}>{email}</Text>
         </Text>
       </View>
 
@@ -210,26 +200,17 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
 
       {/* Custom numpad */}
       <View style={styles.numPad}>
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(
-          (key, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[styles.numKey, key === '' && styles.numKeyEmpty]}
-              onPress={() => key !== '' && handleNumPad(key)}
-              disabled={key === ''}
-              activeOpacity={key === '' ? 1 : 0.6}
-            >
-              <Text
-                style={[
-                  styles.numKeyText,
-                  key === '⌫' && styles.numKeyBackspace,
-                ]}
-              >
-                {key}
-              </Text>
-            </TouchableOpacity>
-          )
-        )}
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((key, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[styles.numKey, key === '' && styles.numKeyEmpty]}
+            onPress={() => key !== '' && handleNumPad(key)}
+            disabled={key === ''}
+            activeOpacity={key === '' ? 1 : 0.6}
+          >
+            <Text style={[styles.numKeyText, key === '⌫' && styles.numKeyBackspace]}>{key}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </SafeAreaView>
   );

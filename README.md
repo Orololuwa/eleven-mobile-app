@@ -80,51 +80,37 @@ npm run android
 All components are built to be reusable and follow the Eleven Design System:
 
 ### BrandMark
+
 ```tsx
 <BrandMark size="medium" variant="light" withText />
 ```
 
 ### Button
+
 ```tsx
-<Button
-  title="Start Session"
-  onPress={handlePress}
-  variant="primary"
-  size="large"
-/>
+<Button title="Start Session" onPress={handlePress} variant="primary" size="large" />
 ```
 
 ### Chip
+
 ```tsx
-<Chip
-  label="MATCH"
-  selected={isSelected}
-  onPress={handlePress}
-  variant="filter"
-/>
+<Chip label="MATCH" selected={isSelected} onPress={handlePress} variant="filter" />
 ```
 
 ### Field
+
 ```tsx
-<Field
-  label="Full Name"
-  value={name}
-  onChangeText={setName}
-  placeholder="Enter your name"
-/>
+<Field label="Full Name" value={name} onChangeText={setName} placeholder="Enter your name" />
 ```
 
 ### StatTile
+
 ```tsx
-<StatTile
-  label="Top Speed"
-  value={31.2}
-  subtitle="NEW PERSONAL BEST"
-  isRecord
-/>
+<StatTile label="Top Speed" value={31.2} subtitle="NEW PERSONAL BEST" isRecord />
 ```
 
 ### Wall
+
 ```tsx
 <Wall total={56} built={sessionCount} />
 ```

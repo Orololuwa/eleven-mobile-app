@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Wall, StatTile } from '@/components';
 import { colors, typography, spacing } from '@/theme';
@@ -63,15 +57,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Hero Title */}
           <View style={styles.heroSection}>
             {isFirstTime ? (
-              <Text style={styles.heroTitle}>
-                Day one.{'\n'}Lay the first brick.
-              </Text>
+              <Text style={styles.heroTitle}>Day one.{'\n'}Lay the first brick.</Text>
             ) : (
               <View style={styles.heroRow}>
                 <Text style={styles.heroTitle}>Sunday again.</Text>
-                {streak && (
-                  <Text style={styles.heroStreak}>{streak}-WEEK STREAK</Text>
-                )}
+                {streak && <Text style={styles.heroStreak}>{streak}-WEEK STREAK</Text>}
               </View>
             )}
           </View>
@@ -83,17 +73,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             size="large"
             style={styles.startButton}
           />
-          {!isFirstTime && (
-            <Text style={styles.startButtonSubtitle}>BRICK {sessionCount + 1}</Text>
-          )}
+          {!isFirstTime && <Text style={styles.startButtonSubtitle}>BRICK {sessionCount + 1}</Text>}
 
           {/* The Wall */}
           <View style={styles.wallSection}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionLabel}>THE WALL</Text>
-              {!isFirstTime && (
-                <Text style={styles.sectionValue}>{sessionCount} BRICKS</Text>
-              )}
+              {!isFirstTime && <Text style={styles.sectionValue}>{sessionCount} BRICKS</Text>}
             </View>
             <Wall total={56} built={sessionCount} />
             {isFirstTime && (
@@ -144,11 +130,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 value={weeklyStats?.distance ?? 0.0}
                 style={styles.statTile}
               />
-              <StatTile
-                label="Minutes"
-                value={weeklyStats?.minutes ?? 0}
-                style={styles.statTile}
-              />
+              <StatTile label="Minutes" value={weeklyStats?.minutes ?? 0} style={styles.statTile} />
             </View>
           </View>
         </View>

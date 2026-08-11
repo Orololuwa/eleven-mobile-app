@@ -22,8 +22,6 @@
       },
       "package": "com.eleven.app"
     },
-    "plugins": [
-      "expo-location"
-    ]
+    "plugins": ["expo-location"]
   }
 }

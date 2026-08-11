@@ -8,21 +8,11 @@ type LogoAltProps = {
   style?: ViewStyle;
 };
 
-export const LogoAlt: React.FC<LogoAltProps> = ({
-  width = 44,
-  height,
-  style,
-}) => {
+export const LogoAlt: React.FC<LogoAltProps> = ({ width = 44, height, style }) => {
   const resolvedHeight = height ?? width;
 
   return (
-    <Svg
-      width={width}
-      height={resolvedHeight}
-      viewBox="0 0 44 44"
-      fill="none"
-      style={style}
-    >
+    <Svg width={width} height={resolvedHeight} viewBox="0 0 44 44" fill="none" style={style}>
       <Rect width="44" height="44" fill="#0F1211" />
       <Rect
         width="7"

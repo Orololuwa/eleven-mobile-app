@@ -18,19 +18,11 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
       {options.map((option, index) => (
         <TouchableOpacity
           key={index}
-          style={[
-            styles.segment,
-            index === selectedIndex && styles.segmentSelected,
-          ]}
+          style={[styles.segment, index === selectedIndex && styles.segmentSelected]}
           onPress={() => onSelect(index)}
           activeOpacity={0.7}
         >
-          <Text
-            style={[
-              styles.text,
-              index === selectedIndex && styles.textSelected,
-            ]}
-          >
+          <Text style={[styles.text, index === selectedIndex && styles.textSelected]}>
             {option.toUpperCase()}
           </Text>
         </TouchableOpacity>

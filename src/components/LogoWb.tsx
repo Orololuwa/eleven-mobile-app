@@ -8,21 +8,11 @@ type LogoWbProps = {
   style?: ViewStyle;
 };
 
-export const LogoWb: React.FC<LogoWbProps> = ({
-  width = 44,
-  height,
-  style,
-}) => {
+export const LogoWb: React.FC<LogoWbProps> = ({ width = 44, height, style }) => {
   const resolvedHeight = height ?? width;
 
   return (
-    <Svg
-      width={width}
-      height={resolvedHeight}
-      viewBox="0 0 44 44"
-      fill="none"
-      style={style}
-    >
+    <Svg width={width} height={resolvedHeight} viewBox="0 0 44 44" fill="none" style={style}>
       <Rect width="44" height="44" fill="#F2F1EC" />
       <Rect
         width="7"
