@@ -22,10 +22,7 @@ export default function ProfileRoute() {
         <TouchableOpacity style={styles.tab} onPress={() => router.push('/(app)/(tabs)')}>
           <Text style={styles.tabText}>HOME</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() => router.push('/(app)/(tabs)/history')}
-        >
+        <TouchableOpacity style={styles.tab} onPress={() => router.push('/(app)/(tabs)/history')}>
           <Text style={styles.tabText}>HISTORY</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.tab}>
