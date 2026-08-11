@@ -3,20 +3,14 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Field, Chip, SegmentedControl, Button } from '@/components';
 import { colors, typography, spacing } from '@/theme';
+import { FOOT_OPTIONS, POSITIONS, type ProfileData } from '@/types/profile';
+
+export type { ProfileData };
 
 type ProfileSetupScreenProps = {
   onComplete: (data: ProfileData) => void;
   onSkip: () => void;
 };
-
-export type ProfileData = {
-  firstName: string;
-  position: string;
-  preferredFoot: string;
-};
-
-const POSITIONS = ['GK', 'DEF', 'MID', 'WING', 'FWD'];
-const FOOT_OPTIONS = ['LEFT', 'RIGHT', 'BOTH'];
 
 export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComplete, onSkip }) => {
   const [firstName, setFirstName] = useState('');
@@ -27,6 +21,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
   const handleComplete = () => {
     onComplete({
       firstName,
+      fullName: firstName.trim(),
       position: POSITIONS[selectedPosition],
       preferredFoot: FOOT_OPTIONS[selectedFoot],
     });
@@ -83,11 +78,11 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>PREFERRED FOOT</Text>
-            <SegmentedControl
-              options={FOOT_OPTIONS}
-              selectedIndex={selectedFoot}
-              onSelect={setSelectedFoot}
-            />
+          <SegmentedControl
+            options={[...FOOT_OPTIONS]}
+            selectedIndex={selectedFoot}
+            onSelect={setSelectedFoot}
+          />
           </View>
         </ScrollView>
 

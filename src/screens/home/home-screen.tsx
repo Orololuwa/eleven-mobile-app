@@ -10,6 +10,8 @@ type HomeScreenProps = {
   onStartSession: () => void;
   onNavigateToHistory: () => void;
   onNavigateToProfile: () => void;
+  showEmptyWallBanner?: boolean;
+  onFindWall?: () => void;
   weeklyStats?: {
     sessions: number;
     distance: number;
@@ -32,6 +34,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onStartSession,
   onNavigateToHistory,
   onNavigateToProfile,
+  showEmptyWallBanner = false,
+  onFindWall,
   weeklyStats,
   lastSession,
   streak,
@@ -51,6 +55,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <View style={styles.avatarPlaceholder} />
           </TouchableOpacity>
         </View>
+
+        {showEmptyWallBanner && onFindWall ? (
+          <TouchableOpacity style={styles.emptyWallBanner} onPress={onFindWall}>
+            <View style={styles.emptyWallCopy}>
+              <Text style={styles.emptyWallTitle}>EMPTY WALL?</Text>
+              <Text style={styles.emptyWallBody}>
+                Played before? Apple sign-in starts a new account.
+              </Text>
+            </View>
+            <Text style={styles.emptyWallChevron}>▸</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Main Content */}
         <View style={styles.main}>
@@ -195,6 +211,37 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     flex: 1,
     backgroundColor: colors.background.tertiary,
+  },
+  emptyWallBanner: {
+    marginHorizontal: spacing[6],
+    marginBottom: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyWallCopy: {
+    flex: 1,
+    gap: 6,
+  },
+  emptyWallTitle: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    letterSpacing: 0.14 * 11,
+    color: colors.brand.primary,
+  },
+  emptyWallBody: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    lineHeight: 14 * 1.4,
+    color: colors.text.secondary,
+  },
+  emptyWallChevron: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 16,
+    color: colors.text.secondary,
   },
   main: {
     paddingHorizontal: spacing[6],

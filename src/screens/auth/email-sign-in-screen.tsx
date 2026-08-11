@@ -19,12 +19,16 @@ type EmailSignInScreenProps = {
 };
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const VALID_DEMO_CODE = '111111';
+const MAX_TRIES = 3;
 
 export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, onVerified }) => {
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [resendCountdown, setResendCountdown] = useState(24);
+  const [triesLeft, setTriesLeft] = useState(MAX_TRIES);
+  const [codeRejected, setCodeRejected] = useState(false);
 
   const emailInputRef = useRef<TextInput>(null);
   const codeInputRef = useRef<TextInput>(null);
@@ -39,25 +43,49 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
 
   // Auto-verify when 6 digits entered
   useEffect(() => {
-    if (code.length === 6) {
-      // Small delay so user sees the last digit
+    if (code.length !== 6) return;
+
+    if (code === VALID_DEMO_CODE) {
       const t = setTimeout(() => onVerified(), 400);
       return () => clearTimeout(t);
     }
-  }, [code]);
+
+    const t = setTimeout(() => {
+      setCodeRejected(true);
+      setTriesLeft((left) => Math.max(0, left - 1));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [code, onVerified]);
 
   const handleSendCode = () => {
     if (!isValidEmail(email)) return;
     setStep('code');
     setResendCountdown(24);
+    setCode('');
+    setCodeRejected(false);
+    setTriesLeft(MAX_TRIES);
     setTimeout(() => codeInputRef.current?.focus(), 300);
+  };
+
+  const handleResend = () => {
+    if (resendCountdown > 0) return;
+    setResendCountdown(24);
+    setCode('');
+    setCodeRejected(false);
+    setTriesLeft(MAX_TRIES);
   };
 
   const handleNumPad = (digit: string) => {
     if (digit === '⌫') {
+      setCodeRejected(false);
       setCode((v) => v.slice(0, -1));
     } else if (code.length < 6) {
-      setCode((v) => v + digit);
+      if (codeRejected) {
+        setCodeRejected(false);
+        setCode(digit);
+      } else {
+        setCode((v) => v + digit);
+      }
     }
   };
 
@@ -129,12 +157,6 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Status bar */}
-      <View style={styles.statusBar}>
-        <Text style={styles.time}>9:41</Text>
-        <Text style={styles.statusIcons}>▮▮▮ ⌁ ▰</Text>
-      </View>
-
       {/* Back */}
       <TouchableOpacity style={styles.backRow} onPress={() => setStep('email')}>
         <Text style={styles.backText}>◂ CHANGE EMAIL</Text>
@@ -142,16 +164,24 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
 
       {/* Header */}
       <View style={styles.emailHeader}>
-        <Text style={styles.screenTitle}>Check your inbox.</Text>
+        <Text style={styles.screenTitle}>
+          {codeRejected ? "That code didn't\nwork." : 'Check your inbox.'}
+        </Text>
         <Text style={styles.screenDesc}>
-          Six digits sent to <Text style={styles.emailHighlight}>{email}</Text>
+          {codeRejected ? (
+            'Codes die after ten minutes. Type it again, or get a fresh one.'
+          ) : (
+            <>
+              Six digits sent to <Text style={styles.emailHighlight}>{email}</Text>
+            </>
+          )}
         </Text>
       </View>
 
       {/* 6-digit boxes */}
       <View style={styles.codeBoxRow}>
         {codeDigits.map((digit, i) => {
-          const isCurrent = i === code.length;
+          const isCurrent = !codeRejected && i === code.length;
           const isFilled = i < code.length;
           return (
             <TouchableOpacity
@@ -160,6 +190,7 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
                 styles.codeBox,
                 isFilled && styles.codeBoxFilled,
                 isCurrent && styles.codeBoxActive,
+                codeRejected && styles.codeBoxRejected,
               ]}
               onPress={() => codeInputRef.current?.focus()}
               activeOpacity={1}
@@ -167,7 +198,9 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
               {isCurrent ? (
                 <View style={styles.codeCursor} />
               ) : (
-                <Text style={styles.codeDigit}>{digit}</Text>
+                <Text style={[styles.codeDigit, codeRejected && styles.codeDigitRejected]}>
+                  {digit}
+                </Text>
               )}
             </TouchableOpacity>
           );
@@ -179,22 +212,45 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
         ref={codeInputRef}
         style={styles.hiddenInput}
         value={code}
-        onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+        onChangeText={(v) => {
+          setCodeRejected(false);
+          setCode(v.replace(/\D/g, '').slice(0, 6));
+        }}
         keyboardType="number-pad"
         maxLength={6}
       />
 
-      {/* Resend / paste */}
+      {/* Resend / paste / error */}
       <View style={styles.codeActions}>
-        <Text style={styles.resendText}>
-          {resendCountdown > 0
-            ? `RESEND IN 0:${String(resendCountdown).padStart(2, '0')}`
-            : 'RESEND CODE'}
-        </Text>
-        <TouchableOpacity>
-          <Text style={styles.pasteText}>PASTE FROM MAIL</Text>
-        </TouchableOpacity>
+        {codeRejected ? (
+          <>
+            <Text style={styles.triesLeft}>■ {triesLeft} TRIES LEFT</Text>
+            <TouchableOpacity onPress={handleResend}>
+              <Text style={styles.resendActive}>SEND A NEW CODE</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity onPress={handleResend} disabled={resendCountdown > 0}>
+              <Text style={[styles.resendText, resendCountdown <= 0 && styles.resendActive]}>
+                {resendCountdown > 0
+                  ? `RESEND IN 0:${String(resendCountdown).padStart(2, '0')}`
+                  : 'RESEND CODE'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity>
+              <Text style={styles.pasteText}>PASTE FROM MAIL</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
+
+      {codeRejected ? (
+        <Text style={styles.altPath}>
+          Nothing in the inbox? Check spam, or continue with Google or Apple instead — same account
+          either way.
+        </Text>
+      ) : null}
 
       <View style={styles.spacer} />
 
@@ -359,10 +415,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.brand.primary,
   },
+  codeBoxRejected: {
+    borderWidth: 1,
+    borderColor: colors.accent.danger,
+  },
   codeDigit: {
     fontFamily: typography.fontFamily.mono,
     fontSize: 30,
     color: colors.text.primary,
+  },
+  codeDigitRejected: {
+    color: colors.accent.danger,
   },
   codeCursor: {
     width: 2,
@@ -387,11 +450,31 @@ const styles = StyleSheet.create({
     letterSpacing: 0.14 * 11,
     color: colors.text.disabled,
   },
+  resendActive: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    letterSpacing: 0.14 * 11,
+    color: colors.brand.primary,
+  },
+  triesLeft: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    letterSpacing: 0.14 * 11,
+    color: colors.accent.danger,
+  },
   pasteText: {
     fontFamily: typography.fontFamily.mono,
     fontSize: 11,
     letterSpacing: 0.14 * 11,
     color: colors.text.secondary,
+  },
+  altPath: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    lineHeight: 14 * 1.5,
+    color: colors.text.secondary,
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[5],
   },
   // Numpad
   numPad: {

@@ -1,6 +1,15 @@
 export { SignInScreen } from './auth/sign-in-screen';
 export { EmailSignInScreen } from './auth/email-sign-in-screen';
 export { ProfileSetupScreen } from './profile/profile-setup-screen';
+export { ProfileScreen } from './profile/profile-screen';
+export { PlayerDetailsScreen } from './profile/player-details-screen';
+export { SignInMethodsScreen } from './profile/sign-in-methods-screen';
+export { UnitsScreen } from './profile/units-screen';
+export { SavedPitchesScreen } from './profile/saved-pitches-screen';
+export { PrivacyDataScreen } from './profile/privacy-data-screen';
+export { BackupMethodSheet } from './identity/backup-method-sheet';
+export { LinkConflictScreen } from './identity/link-conflict-screen';
+export { FindWallScreen } from './identity/find-wall-screen';
 export { HomeScreen } from './home/home-screen';
 export { SessionTypeSheet } from './session/session-type-sheet';
 export { PitchSetupScreen } from './session/pitch-setup';

@@ -1,105 +1,44 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { ProfileScreen } from '@/screens';
 import { useAppStore } from '@/stores/app-store';
-import { colors, typography, spacing } from '@/theme';
 
 export default function ProfileRoute() {
   const user = useAppStore((state) => state.user);
-  const setUser = useAppStore((state) => state.setUser);
+  const sessionCount = useAppStore((state) => state.sessionCount);
+  const units = useAppStore((state) => state.units);
+  const signInMethods = useAppStore((state) => state.signInMethods);
+  const savedPitches = useAppStore((state) => state.savedPitches);
+  const signOut = useAppStore((state) => state.signOut);
+
+  const signInSummary = signInMethods
+    .filter((method) => method.connected)
+    .map((method) => method.label.toUpperCase())
+    .join(' · ');
+
+  const totalKm = sessionCount > 0 ? Math.round(sessionCount * 5.9) : 0;
+  const totalHours = sessionCount > 0 ? Math.round(sessionCount * 1.35) : 0;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.meta}>{user?.firstName?.toUpperCase() || 'PLAYER'}</Text>
-        <Text style={styles.meta}>
-          {user?.position || 'MID'} · {user?.preferredFoot || 'LEFT'}
-        </Text>
-      </View>
-
-      <View style={styles.tabBar}>
-        <TouchableOpacity style={styles.tab} onPress={() => router.push('/(app)/(tabs)')}>
-          <Text style={styles.tabText}>HOME</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => router.push('/(app)/(tabs)/history')}>
-          <Text style={styles.tabText}>HISTORY</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab}>
-          <Text style={styles.tabTextActive}>PROFILE</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.signOut}
-        onPress={() => {
-          setUser(null);
-          router.replace('/(auth)/sign-in');
-        }}
-      >
-        <Text style={styles.signOutText}>SIGN OUT</Text>
-      </TouchableOpacity>
-    </SafeAreaView>
+    <ProfileScreen
+      user={user}
+      sessionCount={sessionCount}
+      totalKm={totalKm}
+      totalHours={totalHours}
+      units={units}
+      signInSummary={signInSummary || 'NONE'}
+      savedPitchCount={savedPitches.length}
+      onNavigateToHome={() => router.push('/(app)/(tabs)')}
+      onNavigateToHistory={() => router.push('/(app)/(tabs)/history')}
+      onPlayerDetails={() => router.push('/(app)/player-details')}
+      onSignInMethods={() => router.push('/(app)/sign-in-methods')}
+      onUnits={() => router.push('/(app)/units')}
+      onSavedPitches={() => router.push('/(app)/saved-pitches')}
+      onPrivacyData={() => router.push('/(app)/privacy-data')}
+      onSignOut={() => {
+        signOut();
+        router.replace('/(auth)/sign-in');
+      }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    gap: 8,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-    marginBottom: spacing[4],
-  },
-  meta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.16 * 12,
-    color: colors.text.secondary,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    paddingTop: 16,
-    height: 76,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-  },
-  tabTextActive: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-  signOut: {
-    position: 'absolute',
-    right: spacing[6],
-    top: spacing[16],
-  },
-  signOutText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.accent.danger,
-  },
-});
