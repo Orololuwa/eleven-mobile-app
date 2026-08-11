@@ -2,11 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useApp } from '@/providers/app-provider';
+import { useAppStore } from '@/stores/app-store';
 import { colors, typography, spacing } from '@/theme';
 
 export default function ProfileRoute() {
-  const { user, setUser } = useApp();
+  const user = useAppStore((state) => state.user);
+  const setUser = useAppStore((state) => state.setUser);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -1,8 +1,8 @@
 import { Redirect } from 'expo-router';
-import { useApp } from '@/providers/app-provider';
+import { selectIsAuthenticated, useAppStore } from '@/stores/app-store';
 
 export default function Index() {
-  const { isAuthenticated } = useApp();
+  const isAuthenticated = useAppStore(selectIsAuthenticated);
 
   if (isAuthenticated) {
     return <Redirect href="/(app)/(tabs)" />;

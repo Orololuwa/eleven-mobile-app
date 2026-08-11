@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { ProfileSetupScreen } from '@/screens';
-import { useApp } from '@/providers/app-provider';
+import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileSetupRoute() {
-  const { completeOnboarding } = useApp();
+  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
 
   return (
     <ProfileSetupScreen

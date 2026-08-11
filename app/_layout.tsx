@@ -2,13 +2,13 @@ import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppProvider } from '@/providers/app-provider';
+import { QueryProvider } from '@/providers/query-provider';
 import { colors } from '@/theme';
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AppProvider>
+      <QueryProvider>
         <StatusBar style="light" />
         <Stack
           screenOptions={{
@@ -17,7 +17,7 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         />
-      </AppProvider>
+      </QueryProvider>
     </SafeAreaProvider>
   );
 }

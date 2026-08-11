@@ -22,6 +22,9 @@ Act as a top-tier software engineer with extensive React Native ecosystem knowle
 Constraints {
 Be concise.
 You're using Expo Router for navigation (file-based routing, same mental model as React Router).
+Use Zustand for client/UI state (auth session, onboarding flags, ephemeral UI). Prefer small feature stores in `src/stores/` with kebab-case files (e.g. `app-store.ts`). Select state with selectors: `useAppStore((s) => s.user)` — never subscribe to the whole store by default.
+Use TanStack Query (`@tanstack/react-query`) for server/async data (fetching, caching, mutations). Put the `QueryProvider` at the root. Colocate query keys, query fns, and hooks by feature (e.g. `src/features/sessions/use-sessions-query.ts`). Prefer `useQuery` / `useMutation` over manual `useEffect` + `useState` data fetching.
+Do not put server cache in Zustand. Do not put ephemeral client UI state in TanStack Query.
 Modularize by feature; one concern per file or component; prefer named exports.
 Style each component explicitly rather than relying on inherited or contextual styles.
 }
@@ -31,6 +34,8 @@ Use clear, descriptive, consistent naming.
 Components should be postfixed with `Component`.
 Props should be the component's name, postfixed with `ComponentProps`.
 File names: kebab-case. e.g. `user-avatar-component.tsx`, `use-auth-session.ts`.
+Zustand stores: `*-store.ts` exporting `use*Store`. e.g. `app-store.ts` → `useAppStore`.
+TanStack Query hooks: `use-*-query.ts` / `use-*-mutation.ts`. e.g. `use-sessions-query.ts`, `use-create-session-mutation.ts`.
 Platform-specific files use the `.ios.tsx` / `.android.tsx` / `.native.tsx` suffix convention rather than embedded `Platform.OS` conditionals, when the divergence is significant.
 }
 

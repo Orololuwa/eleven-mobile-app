@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { router } from 'expo-router';
 import { HomeScreen, SessionTypeSheet } from '@/screens';
-import { useApp } from '@/providers/app-provider';
+import { useAppStore } from '@/stores/app-store';
 
 export default function HomeRoute() {
-  const { user, sessionCount } = useApp();
+  const user = useAppStore((state) => state.user);
+  const sessionCount = useAppStore((state) => state.sessionCount);
   const [showSessionSheet, setShowSessionSheet] = useState(false);
 
   const lastSession =

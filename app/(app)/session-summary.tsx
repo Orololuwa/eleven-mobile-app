@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { SessionSummaryScreen } from '@/screens';
-import { useApp } from '@/providers/app-provider';
+import { useAppStore } from '@/stores/app-store';
 
 export default function SessionSummaryRoute() {
   const { sessionType = 'match' } = useLocalSearchParams<{ sessionType?: string }>();
-  const { sessionCount, incrementSessionCount } = useApp();
+  const sessionCount = useAppStore((state) => state.sessionCount);
+  const incrementSessionCount = useAppStore((state) => state.incrementSessionCount);
 
   const sessionData = {
     title: 'Sunday Match',
