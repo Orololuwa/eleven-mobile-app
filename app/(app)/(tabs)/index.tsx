@@ -39,8 +39,7 @@ export default function HomeRoute() {
     minutes: sessionCount > 0 ? 312 : 0,
   };
 
-  const connectedProvider =
-    signInMethods.find((method) => method.connected)?.label || 'Google';
+  const connectedProvider = signInMethods.find((method) => method.connected)?.label || 'Google';
 
   return (
     <>

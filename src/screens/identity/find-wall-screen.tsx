@@ -42,8 +42,8 @@ export const FindWallScreen: React.FC<FindWallScreenProps> = ({
         <View style={styles.tip}>
           <Text style={styles.tipLabel}>SO IT NEVER HAPPENS AGAIN</Text>
           <Text style={styles.tipBody}>
-            Once you're back in, add Apple from Profile → Sign-in methods. After that, Apple
-            opens the right wall every time.
+            Once you're back in, add Apple from Profile → Sign-in methods. After that, Apple opens
+            the right wall every time.
           </Text>
         </View>
       </View>

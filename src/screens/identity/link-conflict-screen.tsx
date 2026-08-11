@@ -32,7 +32,9 @@ export const LinkConflictScreen: React.FC<LinkConflictScreenProps> = ({
           <Text style={styles.badgeText}>CAN'T LINK</Text>
         </View>
 
-        <Text style={styles.title}>That Apple ID is{'\n'}already an Eleven{'\n'}account.</Text>
+        <Text style={styles.title}>
+          That Apple ID is{'\n'}already an Eleven{'\n'}account.
+        </Text>
         <Text style={styles.body}>
           It has its own wall. Joining them would bury one, so the choice is yours — not ours.
         </Text>
@@ -58,8 +60,8 @@ export const LinkConflictScreen: React.FC<LinkConflictScreenProps> = ({
         <View style={styles.note}>
           <View style={styles.noteBar} />
           <Text style={styles.noteText}>
-            Nothing is deleted either way. Merging two walls isn't automatic yet — mail us and
-            we'll do it by hand.
+            Nothing is deleted either way. Merging two walls isn't automatic yet — mail us and we'll
+            do it by hand.
           </Text>
         </View>
       </View>

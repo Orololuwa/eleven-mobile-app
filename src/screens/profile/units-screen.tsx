@@ -47,7 +47,11 @@ export const UnitsScreen: React.FC<UnitsScreenProps> = ({ units, onBack, onChang
                   <Text style={styles.rowLabel}>{option.label}</Text>
                   <Text style={styles.rowDetail}>{option.detail}</Text>
                 </View>
-                {selected ? <Text style={styles.check}>●</Text> : <Text style={styles.unchecked}>○</Text>}
+                {selected ? (
+                  <Text style={styles.check}>●</Text>
+                ) : (
+                  <Text style={styles.unchecked}>○</Text>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -67,7 +71,11 @@ export const UnitsScreen: React.FC<UnitsScreenProps> = ({ units, onBack, onChang
                   <Text style={styles.rowLabel}>{option.label}</Text>
                   <Text style={styles.rowDetail}>{option.detail}</Text>
                 </View>
-                {selected ? <Text style={styles.check}>●</Text> : <Text style={styles.unchecked}>○</Text>}
+                {selected ? (
+                  <Text style={styles.check}>●</Text>
+                ) : (
+                  <Text style={styles.unchecked}>○</Text>
+                )}
               </TouchableOpacity>
             );
           })}

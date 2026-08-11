@@ -50,7 +50,10 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
               >
                 <View style={styles.cardLeft}>
                   <View
-                    style={[styles.indicator, method.connected ? styles.indicatorOn : styles.indicatorOff]}
+                    style={[
+                      styles.indicator,
+                      method.connected ? styles.indicatorOn : styles.indicatorOff,
+                    ]}
                   />
                   <View style={styles.cardCopy}>
                     <Text style={styles.cardLabel}>{method.label.toUpperCase()}</Text>
@@ -68,9 +71,7 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
                       onPress={() => onRemove(method.id)}
                       disabled={isLastConnected}
                     >
-                      <Text
-                        style={[styles.action, isLastConnected && styles.actionDisabled]}
-                      >
+                      <Text style={[styles.action, isLastConnected && styles.actionDisabled]}>
                         REMOVE
                       </Text>
                     </TouchableOpacity>

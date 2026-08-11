@@ -20,16 +20,13 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
 }) => {
   const [fullName, setFullName] = useState(user.fullName || user.firstName || '');
   const [selectedPosition, setSelectedPosition] = useState(
-    Math.max(
-      0,
-      POSITIONS.indexOf((user.position as (typeof POSITIONS)[number]) || 'MID')
-    )
+    Math.max(0, POSITIONS.indexOf((user.position as (typeof POSITIONS)[number]) || 'MID')),
   );
   const [selectedFoot, setSelectedFoot] = useState(
     Math.max(
       0,
-      FOOT_OPTIONS.indexOf((user.preferredFoot as (typeof FOOT_OPTIONS)[number]) || 'LEFT')
-    )
+      FOOT_OPTIONS.indexOf((user.preferredFoot as (typeof FOOT_OPTIONS)[number]) || 'LEFT'),
+    ),
   );
   const [height, setHeight] = useState(user.heightCm ? String(user.heightCm) : '');
   const [weight, setWeight] = useState(user.weightKg ? String(user.weightKg) : '');
@@ -115,7 +112,9 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
         <View style={styles.metricsRow}>
           <View style={styles.metricField}>
             <Text style={styles.sectionLabel}>HEIGHT</Text>
-            <View style={[styles.metricUnderline, height.length > 0 && styles.metricUnderlineFocused]}>
+            <View
+              style={[styles.metricUnderline, height.length > 0 && styles.metricUnderlineFocused]}
+            >
               <TextInput
                 style={styles.metricValue}
                 value={height}
@@ -129,7 +128,9 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
           </View>
           <View style={styles.metricField}>
             <Text style={styles.sectionLabel}>WEIGHT</Text>
-            <View style={[styles.metricUnderline, weight.length > 0 && styles.metricUnderlineFocused]}>
+            <View
+              style={[styles.metricUnderline, weight.length > 0 && styles.metricUnderlineFocused]}
+            >
               <TextInput
                 style={styles.metricValue}
                 value={weight}

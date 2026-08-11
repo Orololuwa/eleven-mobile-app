@@ -78,11 +78,11 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>PREFERRED FOOT</Text>
-          <SegmentedControl
-            options={[...FOOT_OPTIONS]}
-            selectedIndex={selectedFoot}
-            onSelect={setSelectedFoot}
-          />
+            <SegmentedControl
+              options={[...FOOT_OPTIONS]}
+              selectedIndex={selectedFoot}
+              onSelect={setSelectedFoot}
+            />
           </View>
         </ScrollView>
 

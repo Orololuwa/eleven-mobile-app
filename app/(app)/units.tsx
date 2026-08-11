@@ -7,11 +7,5 @@ export default function UnitsRoute() {
   const units = useAppStore((state) => state.units);
   const setUnits = useAppStore((state) => state.setUnits);
 
-  return (
-    <UnitsScreen
-      units={units}
-      onBack={() => router.back()}
-      onChange={setUnits}
-    />
-  );
+  return <UnitsScreen units={units} onBack={() => router.back()} onChange={setUnits} />;
 }

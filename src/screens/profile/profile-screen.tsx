@@ -2,7 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
-import { displayName, profileMetaLine, type ProfileData, type UnitsPreference } from '@/types/profile';
+import {
+  displayName,
+  profileMetaLine,
+  type ProfileData,
+  type UnitsPreference,
+} from '@/types/profile';
 
 type ProfileMenuItem = {
   key: string;

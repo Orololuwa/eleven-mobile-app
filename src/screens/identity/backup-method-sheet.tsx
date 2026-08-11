@@ -26,8 +26,8 @@ export const BackupMethodSheet: React.FC<BackupMethodSheetProps> = ({
           <Text style={styles.eyebrow}>ONE BRICK IN · ASKED ONCE</Text>
           <Text style={styles.title}>Add a second{'\n'}way in.</Text>
           <Text style={styles.body}>
-            You're signed in with {providerLabel}. A backup method means a new phone never costs
-            you the wall.
+            You're signed in with {providerLabel}. A backup method means a new phone never costs you
+            the wall.
           </Text>
 
           <View style={styles.actions}>

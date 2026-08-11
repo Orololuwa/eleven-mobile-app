@@ -1,10 +1,5 @@
 import { create } from 'zustand';
-import type {
-  ProfileData,
-  SavedPitch,
-  SignInMethod,
-  UnitsPreference,
-} from '@/types/profile';
+import type { ProfileData, SavedPitch, SignInMethod, UnitsPreference } from '@/types/profile';
 
 type AppStore = {
   user: ProfileData | null;
@@ -81,7 +76,7 @@ export const useAppStore = create<AppStore>((set) => ({
   updateSignInMethod: (id, patch) =>
     set((state) => ({
       signInMethods: state.signInMethods.map((method) =>
-        method.id === id ? { ...method, ...patch } : method
+        method.id === id ? { ...method, ...patch } : method,
       ),
     })),
   dismissBackupNudge: () => set({ backupNudgeDismissed: true }),
