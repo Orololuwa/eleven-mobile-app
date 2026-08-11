@@ -13,7 +13,7 @@ import {
   HistoryScreen,
   SessionDetailScreen,
 } from '@/screens';
-import type { ProfileData } from '@/screens/ProfileSetupScreen';
+import type { ProfileData } from '@/screens/profile/profile-setup-screen';
 
 type AppState = 'signIn' | 'emailSignIn' | 'profileSetup' | 'home' | 'pitchSetup' | 'activeSession' | 'summary' | 'history' | 'sessionDetail';
 
