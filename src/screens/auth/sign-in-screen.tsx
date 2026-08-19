@@ -7,17 +7,25 @@ import { colors, typography, spacing } from '@/theme';
 
 const WOODSMOKE = colors.background.primary; // #060706
 
+type SignInProvider = 'apple' | 'google' | 'email';
+
 type SignInScreenProps = {
   onContinueWithApple: () => void;
   onContinueWithGoogle: () => void;
   onUseEmail: () => void;
+  busyProvider?: SignInProvider | null;
+  errorMessage?: string | null;
 };
 
 export const SignInScreen: React.FC<SignInScreenProps> = ({
   onContinueWithApple,
   onContinueWithGoogle,
   onUseEmail,
+  busyProvider = null,
+  errorMessage = null,
 }) => {
+  const busy = Boolean(busyProvider);
+
   return (
     <View style={styles.container}>
       <Image
@@ -43,18 +51,28 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           style={styles.actionsGradient}
         >
           <View style={styles.actions}>
+            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
             <Button
               title="Continue with Apple"
               onPress={onContinueWithApple}
               variant="primary"
               style={styles.appleButton}
+              loading={busyProvider === 'apple'}
+              disabled={busy && busyProvider !== 'apple'}
             />
             <Button
               title="Continue with Google"
               onPress={onContinueWithGoogle}
               variant="secondary"
+              loading={busyProvider === 'google'}
+              disabled={busy && busyProvider !== 'google'}
             />
-            <Button title="Continue with email" onPress={onUseEmail} variant="ghost" />
+            <Button
+              title="Continue with email"
+              onPress={onUseEmail}
+              variant="ghost"
+              disabled={busy}
+            />
             <Text style={styles.footer}>JOIN PROJECT ELEVEN</Text>
           </View>
         </LinearGradient>
@@ -120,6 +138,13 @@ const styles = StyleSheet.create({
   },
   appleButton: {
     backgroundColor: colors.text.primary,
+  },
+  error: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    lineHeight: 14 * 1.4,
+    color: colors.accent.danger,
+    textAlign: 'center',
   },
   footer: {
     fontFamily: typography.fontFamily.mono,

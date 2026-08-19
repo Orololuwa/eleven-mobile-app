@@ -1,23 +1,24 @@
 import { router } from 'expo-router';
 import { ProfileSetupScreen } from '@/screens';
-import { useAppStore } from '@/stores/app-store';
+import { completeLocalOnboarding } from '@/features/auth/use-auth-actions';
 
 export default function ProfileSetupRoute() {
-  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
+  const finish = async (data: Parameters<typeof completeLocalOnboarding>[0]) => {
+    await completeLocalOnboarding(data);
+    router.replace('/(app)/(tabs)');
+  };
 
   return (
     <ProfileSetupScreen
       onComplete={(data) => {
-        completeOnboarding(data);
-        router.replace('/(app)/(tabs)');
+        void finish(data);
       }}
       onSkip={() => {
-        completeOnboarding({
+        void finish({
           firstName: 'Player',
           position: 'MID',
           preferredFoot: 'LEFT',
         });
-        router.replace('/(app)/(tabs)');
       }}
     />
   );

@@ -15,20 +15,28 @@ type Step = 'email' | 'code';
 
 type EmailSignInScreenProps = {
   onBack: () => void;
-  onVerified: () => void;
+  onSendCode: ({ email }: { email: string }) => Promise<void>;
+  onVerifyCode: ({ email, code }: { email: string; code: string }) => Promise<void>;
 };
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-const VALID_DEMO_CODE = '111111';
 const MAX_TRIES = 3;
 
-export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, onVerified }) => {
+export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({
+  onBack,
+  onSendCode,
+  onVerifyCode,
+}) => {
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [resendCountdown, setResendCountdown] = useState(24);
   const [triesLeft, setTriesLeft] = useState(MAX_TRIES);
   const [codeRejected, setCodeRejected] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const verifyingRef = useRef(false);
 
   const emailInputRef = useRef<TextInput>(null);
   const codeInputRef = useRef<TextInput>(null);
@@ -43,36 +51,57 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
 
   // Auto-verify when 6 digits entered
   useEffect(() => {
-    if (code.length !== 6) return;
+    if (code.length !== 6 || verifyingRef.current || isVerifying || codeRejected) return;
 
-    if (code === VALID_DEMO_CODE) {
-      const t = setTimeout(() => onVerified(), 400);
-      return () => clearTimeout(t);
+    verifyingRef.current = true;
+    setIsVerifying(true);
+    setErrorMessage(null);
+
+    onVerifyCode({ email, code })
+      .catch(() => {
+        setCodeRejected(true);
+        setTriesLeft((left) => Math.max(0, left - 1));
+      })
+      .finally(() => {
+        verifyingRef.current = false;
+        setIsVerifying(false);
+      });
+  }, [code, codeRejected, email, isVerifying, onVerifyCode]);
+
+  const handleSendCode = async () => {
+    if (!isValidEmail(email) || isSending) return;
+    setIsSending(true);
+    setErrorMessage(null);
+    try {
+      await onSendCode({ email });
+      setStep('code');
+      setResendCountdown(24);
+      setCode('');
+      setCodeRejected(false);
+      setTriesLeft(MAX_TRIES);
+      setTimeout(() => codeInputRef.current?.focus(), 300);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not send a code. Try again.');
+    } finally {
+      setIsSending(false);
     }
-
-    const t = setTimeout(() => {
-      setCodeRejected(true);
-      setTriesLeft((left) => Math.max(0, left - 1));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [code, onVerified]);
-
-  const handleSendCode = () => {
-    if (!isValidEmail(email)) return;
-    setStep('code');
-    setResendCountdown(24);
-    setCode('');
-    setCodeRejected(false);
-    setTriesLeft(MAX_TRIES);
-    setTimeout(() => codeInputRef.current?.focus(), 300);
   };
 
-  const handleResend = () => {
-    if (resendCountdown > 0) return;
-    setResendCountdown(24);
-    setCode('');
-    setCodeRejected(false);
-    setTriesLeft(MAX_TRIES);
+  const handleResend = async () => {
+    if (resendCountdown > 0 || isSending) return;
+    setIsSending(true);
+    setErrorMessage(null);
+    try {
+      await onSendCode({ email });
+      setResendCountdown(24);
+      setCode('');
+      setCodeRejected(false);
+      setTriesLeft(MAX_TRIES);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Could not send a code. Try again.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleNumPad = (digit: string) => {
@@ -139,12 +168,13 @@ export const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ onBack, on
             <TouchableOpacity
               style={[styles.sendCodeButton, valid && styles.sendCodeButtonActive]}
               onPress={handleSendCode}
-              disabled={!valid}
+              disabled={!valid || isSending}
             >
               <Text style={[styles.sendCodeText, valid && styles.sendCodeTextActive]}>
-                SEND CODE
+                {isSending ? 'SENDING…' : 'SEND CODE'}
               </Text>
             </TouchableOpacity>
+            {errorMessage ? <Text style={styles.errorNote}>{errorMessage}</Text> : null}
             {!valid && <Text style={styles.disabledNote}>DISABLED UNTIL THE ADDRESS IS VALID</Text>}
           </View>
         </KeyboardAvoidingView>
@@ -390,6 +420,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.14 * 10,
     color: colors.text.disabled,
+    textAlign: 'center',
+  },
+  errorNote: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    letterSpacing: 0.14 * 10,
+    color: colors.accent.danger,
     textAlign: 'center',
   },
   // Code step

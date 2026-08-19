@@ -1,6 +1,7 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { ProfileScreen } from '@/screens';
+import { signOut } from '@/features/auth/use-auth-actions';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileRoute() {
@@ -9,7 +10,6 @@ export default function ProfileRoute() {
   const units = useAppStore((state) => state.units);
   const signInMethods = useAppStore((state) => state.signInMethods);
   const savedPitches = useAppStore((state) => state.savedPitches);
-  const signOut = useAppStore((state) => state.signOut);
 
   const signInSummary = signInMethods
     .filter((method) => method.connected)
@@ -36,8 +36,7 @@ export default function ProfileRoute() {
       onSavedPitches={() => router.push('/(app)/saved-pitches')}
       onPrivacyData={() => router.push('/(app)/privacy-data')}
       onSignOut={() => {
-        signOut();
-        router.replace('/(auth)/sign-in');
+        void signOut().then(() => router.replace('/(auth)/sign-in'));
       }}
     />
   );

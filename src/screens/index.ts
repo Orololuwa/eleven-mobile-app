@@ -1,5 +1,6 @@
 export { SignInScreen } from './auth/sign-in-screen';
 export { EmailSignInScreen } from './auth/email-sign-in-screen';
+export { AuthLoadingScreen } from './auth/auth-loading-screen';
 export { ProfileSetupScreen } from './profile/profile-setup-screen';
 export { ProfileScreen } from './profile/profile-screen';
 export { PlayerDetailsScreen } from './profile/player-details-screen';

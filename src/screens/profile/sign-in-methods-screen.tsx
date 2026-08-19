@@ -11,6 +11,9 @@ type SignInMethodsScreenProps = {
   onAdd: (id: SignInMethod['id']) => void;
   onRemove: (id: SignInMethod['id']) => void;
   onSignOut: () => void;
+  canRemove?: boolean;
+  busy?: boolean;
+  errorMessage?: string | null;
 };
 
 export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
@@ -19,6 +22,9 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
   onAdd,
   onRemove,
   onSignOut,
+  canRemove = false,
+  busy = false,
+  errorMessage = null,
 }) => {
   const connectedCount = methods.filter((method) => method.connected).length;
 
@@ -43,6 +49,7 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
         <View style={styles.list}>
           {methods.map((method) => {
             const isLastConnected = method.connected && connectedCount === 1;
+            const removeDisabled = !canRemove || isLastConnected || busy;
             return (
               <View
                 key={method.id}
@@ -58,7 +65,7 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
                   <View style={styles.cardCopy}>
                     <Text style={styles.cardLabel}>{method.label.toUpperCase()}</Text>
                     <Text style={styles.cardMeta}>
-                      {method.connected ? method.email : 'Not connected'}
+                      {method.connected ? (method.email ?? 'Connected') : 'Not connected'}
                     </Text>
                   </View>
                 </View>
@@ -67,17 +74,14 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
                     <Text style={styles.since}>SINCE {method.since}</Text>
                   ) : null}
                   {method.connected ? (
-                    <TouchableOpacity
-                      onPress={() => onRemove(method.id)}
-                      disabled={isLastConnected}
-                    >
-                      <Text style={[styles.action, isLastConnected && styles.actionDisabled]}>
+                    <TouchableOpacity onPress={() => onRemove(method.id)} disabled={removeDisabled}>
+                      <Text style={[styles.action, removeDisabled && styles.actionDisabled]}>
                         REMOVE
                       </Text>
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity onPress={() => onAdd(method.id)}>
-                      <Text style={styles.actionAdd}>ADD</Text>
+                    <TouchableOpacity onPress={() => onAdd(method.id)} disabled={busy}>
+                      <Text style={[styles.actionAdd, busy && styles.actionDisabled]}>ADD</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -89,13 +93,16 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
         <View style={styles.note}>
           <View style={styles.noteBar} />
           <Text style={styles.noteText}>
-            One method has to stay. Remove the last one and there's no door back in.
+            {canRemove
+              ? "One method has to stay. Remove the last one and there's no door back in."
+              : 'Adding a method attaches it to this account. Removing a method is not available yet.'}
           </Text>
         </View>
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button title="Sign Out" variant="secondary" onPress={onSignOut} />
+        <Button title="Sign Out" variant="secondary" onPress={onSignOut} disabled={busy} />
         <Text style={styles.footerNote}>SESSIONS STAY ON THE ACCOUNT, NOT THE PHONE</Text>
       </View>
     </SafeAreaView>
@@ -229,6 +236,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 15 * 1.5,
     color: colors.text.secondary,
+  },
+  errorText: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    lineHeight: 14 * 1.4,
+    color: colors.accent.danger,
+    marginTop: spacing[4],
   },
   footer: {
     paddingHorizontal: spacing[6],

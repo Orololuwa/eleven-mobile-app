@@ -1,13 +1,13 @@
 import React from 'react';
 import { router } from 'expo-router';
 import { FindWallScreen } from '@/screens';
+import { errorMessage, isUserCancelled } from '@/features/auth/errors';
+import { routeAfterAuth } from '@/features/auth/routes';
+import { signInWithGoogle, signOut } from '@/features/auth/use-auth-actions';
 import { useAppStore } from '@/stores/app-store';
 
 export default function FindWallRoute() {
   const setShowEmptyWallBanner = useAppStore((state) => state.setShowEmptyWallBanner);
-  const completeOnboarding = useAppStore((state) => state.completeOnboarding);
-  const setUser = useAppStore((state) => state.setUser);
-
   const dismissBanner = () => setShowEmptyWallBanner(false);
 
   return (
@@ -17,20 +17,24 @@ export default function FindWallRoute() {
         router.back();
       }}
       onContinueGoogle={() => {
-        dismissBanner();
-        completeOnboarding({
-          firstName: 'Emmanuel',
-          fullName: 'Emmanuel Awolusi',
-          position: 'MID',
-          preferredFoot: 'LEFT',
-          heightCm: 178,
-        });
-        router.replace('/(app)/(tabs)');
+        void (async () => {
+          try {
+            dismissBanner();
+            await signOut();
+            await signInWithGoogle();
+            router.replace(routeAfterAuth());
+          } catch (caught) {
+            if (!isUserCancelled(caught)) console.warn(errorMessage(caught));
+            router.replace('/(auth)/sign-in');
+          }
+        })();
       }}
       onUseEmail={() => {
-        dismissBanner();
-        setUser(null);
-        router.replace('/(auth)/email-sign-in');
+        void (async () => {
+          dismissBanner();
+          await signOut();
+          router.replace('/(auth)/email-sign-in');
+        })();
       }}
       onStayNew={() => {
         dismissBanner();

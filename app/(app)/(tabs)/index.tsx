@@ -9,7 +9,6 @@ export default function HomeRoute() {
   const backupNudgeDismissed = useAppStore((state) => state.backupNudgeDismissed);
   const showEmptyWallBanner = useAppStore((state) => state.showEmptyWallBanner);
   const dismissBackupNudge = useAppStore((state) => state.dismissBackupNudge);
-  const updateSignInMethod = useAppStore((state) => state.updateSignInMethod);
   const signInMethods = useAppStore((state) => state.signInMethods);
 
   const [showSessionSheet, setShowSessionSheet] = useState(false);
@@ -72,17 +71,12 @@ export default function HomeRoute() {
         onAddApple={() => {
           setShowBackupNudge(false);
           dismissBackupNudge();
-          router.push('/(app)/link-conflict');
+          router.push('/(app)/sign-in-methods?add=apple');
         }}
         onAddEmail={() => {
           setShowBackupNudge(false);
           dismissBackupNudge();
-          updateSignInMethod('email', {
-            connected: true,
-            email: 'emmanuel.a@gmail.com',
-            since: 'TODAY',
-          });
-          router.push('/(app)/sign-in-methods');
+          router.push('/(app)/sign-in-methods?add=email');
         }}
         onDismiss={() => {
           setShowBackupNudge(false);

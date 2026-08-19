@@ -1,7 +1,20 @@
-import { Stack } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
+import { AuthLoadingScreen } from '@/screens';
 import { colors } from '@/theme';
+import { selectIsAuthenticated, useAppStore } from '@/stores/app-store';
 
 export default function AppLayout() {
+  const authStatus = useAppStore((state) => state.authStatus);
+  const isAuthenticated = useAppStore(selectIsAuthenticated);
+
+  if (authStatus === 'loading') {
+    return <AuthLoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/sign-in" />;
+  }
+
   return (
     <Stack
       screenOptions={{
@@ -17,6 +30,7 @@ export default function AppLayout() {
       <Stack.Screen name="session/[id]" />
       <Stack.Screen name="player-details" />
       <Stack.Screen name="sign-in-methods" />
+      <Stack.Screen name="link-email" />
       <Stack.Screen name="units" />
       <Stack.Screen name="saved-pitches" />
       <Stack.Screen name="privacy-data" />
