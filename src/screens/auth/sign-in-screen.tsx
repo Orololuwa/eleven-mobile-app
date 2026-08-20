@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LogoText, Button } from '@/components';
@@ -52,21 +52,23 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
         >
           <View style={styles.actions}>
             {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-            <Button
-              title="Continue with Apple"
-              onPress={onContinueWithApple}
-              variant="primary"
-              style={styles.appleButton}
-              loading={busyProvider === 'apple'}
-              disabled={busy && busyProvider !== 'apple'}
-              icon={
-                <Image
-                  source={require('@assets/icons8-apple-50.png')}
-                  style={styles.providerIcon}
-                  resizeMode="contain"
-                />
-              }
-            />
+            {Platform.OS === 'ios' ? (
+              <Button
+                title="Continue with Apple"
+                onPress={onContinueWithApple}
+                variant="primary"
+                style={styles.appleButton}
+                loading={busyProvider === 'apple'}
+                disabled={busy && busyProvider !== 'apple'}
+                icon={
+                  <Image
+                    source={require('@assets/icons8-apple-50.png')}
+                    style={styles.providerIcon}
+                    resizeMode="contain"
+                  />
+                }
+              />
+            ) : null}
             <Button
               title="Continue with Google"
               onPress={onContinueWithGoogle}
