@@ -59,6 +59,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               style={styles.appleButton}
               loading={busyProvider === 'apple'}
               disabled={busy && busyProvider !== 'apple'}
+              icon={
+                <Image
+                  source={require('@assets/icons8-apple-50.png')}
+                  style={styles.providerIcon}
+                  resizeMode="contain"
+                />
+              }
             />
             <Button
               title="Continue with Google"
@@ -66,6 +73,13 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               variant="secondary"
               loading={busyProvider === 'google'}
               disabled={busy && busyProvider !== 'google'}
+              icon={
+                <Image
+                  source={require('@assets/icons8-google-48.png')}
+                  style={styles.providerIcon}
+                  resizeMode="contain"
+                />
+              }
             />
             <Button
               title="Continue with email"
@@ -138,6 +152,10 @@ const styles = StyleSheet.create({
   },
   appleButton: {
     backgroundColor: colors.text.primary,
+  },
+  providerIcon: {
+    width: 20,
+    height: 20,
   },
   error: {
     fontFamily: typography.fontFamily.primary,

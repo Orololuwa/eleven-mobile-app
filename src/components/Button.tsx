@@ -6,8 +6,9 @@ import {
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  View,
 } from 'react-native';
-import { colors, typography } from '@/theme';
+import { colors, typography, spacing } from '@/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -19,6 +20,7 @@ type ButtonProps = {
   loading?: boolean;
   fullWidth?: boolean;
   size?: 'default' | 'large';
+  icon?: React.ReactNode;
   style?: ViewStyle;
   textStyle?: TextStyle;
 };
@@ -31,6 +33,7 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   fullWidth = true,
   size = 'default',
+  icon,
   style,
   textStyle,
 }) => {
@@ -122,7 +125,10 @@ export const Button: React.FC<ButtonProps> = ({
           color={variant === 'primary' ? colors.background.secondary : colors.text.primary}
         />
       ) : (
-        <Text style={[getTextStyle(), textStyle]}>{title.toUpperCase()}</Text>
+        <View style={styles.content}>
+          {icon}
+          <Text style={[getTextStyle(), textStyle]}>{title.toUpperCase()}</Text>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -131,6 +137,11 @@ export const Button: React.FC<ButtonProps> = ({
 const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
   },
   fullWidth: {
     width: '100%',
