@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { BackupMethodSheet, HomeScreen, SessionTypeSheet } from '@/screens';
-import { displayName } from '@/features/profile/display';
+import { avatarUrlWithCacheBust, displayName } from '@/features/profile/display';
 import { useMyProfileQuery } from '@/features/profile/use-profile-query';
 import { useAppStore } from '@/stores/app-store';
 
@@ -46,6 +46,10 @@ export default function HomeRoute() {
     <>
       <HomeScreen
         userName={displayName(profile)}
+        avatarUrl={avatarUrlWithCacheBust({
+          avatar_url: profile?.avatar_url,
+          avatar_updated_at: profile?.avatar_updated_at,
+        })}
         sessionCount={sessionCount}
         onStartSession={() => setShowSessionSheet(true)}
         onNavigateToHistory={() => router.push('/(app)/(tabs)/history')}

@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Wall, StatTile } from '@/components';
 import { colors, typography, spacing } from '@/theme';
 
 type HomeScreenProps = {
   userName: string;
+  avatarUrl?: string | null;
   sessionCount: number;
   onStartSession: () => void;
   onNavigateToHistory: () => void;
@@ -30,6 +31,7 @@ type HomeScreenProps = {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   userName,
+  avatarUrl = null,
   sessionCount,
   onStartSession,
   onNavigateToHistory,
@@ -52,7 +54,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.headerTitle}>{userName.toUpperCase()}</Text>
           </View>
           <TouchableOpacity style={styles.avatar} onPress={onNavigateToProfile}>
-            <View style={styles.avatarPlaceholder} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder} />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -207,6 +213,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.strong,
     backgroundColor: colors.background.secondary,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarPlaceholder: {
     flex: 1,
