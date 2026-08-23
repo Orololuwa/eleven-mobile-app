@@ -1,4 +1,5 @@
 import type { PositionIn, PreferredFoot, ProfileUpdate, SkillLevel } from './types';
+import { parseIsoDate, startOfToday } from './date';
 
 export const DISPLAY_NAME_MAX = 100;
 export const BIO_MAX = 500;
@@ -16,6 +17,15 @@ export const validateDisplayName = (value: string) => {
 
 export const validateBio = (value: string) => {
   if (value.length > BIO_MAX) return `Max ${BIO_MAX} characters`;
+  return undefined;
+};
+
+export const validateDateOfBirth = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const date = parseIsoDate(trimmed);
+  if (!date) return 'Enter a valid date';
+  if (date > startOfToday()) return 'Date of birth cannot be in the future';
   return undefined;
 };
 
@@ -59,6 +69,10 @@ export const validateProfileUpdate = (update: ProfileUpdate) => {
   }
   if (update.bio != null) {
     const error = validateBio(update.bio);
+    if (error) return error;
+  }
+  if (update.date_of_birth) {
+    const error = validateDateOfBirth(update.date_of_birth);
     if (error) return error;
   }
   if (update.height_cm != null) {

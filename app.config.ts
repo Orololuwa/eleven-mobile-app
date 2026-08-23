@@ -18,6 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-secure-store',
     'expo-dev-client',
+    '@react-native-community/datetimepicker',
     [
       'react-native-auth0',
       {

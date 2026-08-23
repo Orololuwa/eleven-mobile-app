@@ -7,6 +7,7 @@ export { Button } from './button';
 export { Chip } from './chip';
 export { SegmentedControl } from './segmented-control';
 export { Field } from './field';
+export { DateField } from './date-field';
 export { StatTile } from './stat-tile';
 export { Wall } from './wall';
 export { StatusPill } from './status-pill';

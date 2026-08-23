@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import * as Location from 'expo-location';
-import { AvatarPicker, Button, Chip, Field, SegmentedControl } from '@/components';
+import { AvatarPicker, Button, Chip, DateField, Field, SegmentedControl } from '@/components';
 import { colors, typography, spacing } from '@/theme';
 import type { UnitsPreference } from '@/types/profile';
 import { preferredFootIndex, preferredPosition } from '@/features/profile/display';
@@ -31,9 +31,11 @@ import {
 import {
   BIO_MAX,
   validateBio,
+  validateDateOfBirth,
   validateDisplayName,
   validateHeightCm,
 } from '@/features/profile/validation';
+import { parseIsoDate } from '@/features/profile/date';
 
 type PlayerDetailsFormValues = {
   display_name: string;
@@ -52,6 +54,7 @@ type PlayerDetailsScreenProps = {
   busy?: boolean;
   avatarBusy?: boolean;
   error?: string | null;
+  fieldErrors?: Record<string, string>;
   onCancel: () => void;
   onSave: (update: ProfileUpdate, positions: PositionIn[]) => void;
   onOpenPositionPicker: () => void;
@@ -88,6 +91,7 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
   busy = false,
   avatarBusy = false,
   error = null,
+  fieldErrors = {},
   onCancel,
   onSave,
   onOpenPositionPicker,
@@ -119,7 +123,7 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
     ],
   );
 
-  const { control, handleSubmit, reset } = useForm<PlayerDetailsFormValues>({
+  const { control, handleSubmit, reset, setError } = useForm<PlayerDetailsFormValues>({
     defaultValues,
     mode: 'onChange',
   });
@@ -127,6 +131,23 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
   useEffect(() => {
     reset(defaultValues);
   }, [defaultValues, reset]);
+
+  useEffect(() => {
+    const aliases: Record<string, keyof PlayerDetailsFormValues> = {
+      display_name: 'display_name',
+      bio: 'bio',
+      date_of_birth: 'date_of_birth',
+      preferred_foot: 'preferred_foot',
+      skill_level: 'skill_level',
+      visibility: 'visibility',
+      height_cm: 'height_input',
+    };
+
+    Object.entries(fieldErrors).forEach(([field, message]) => {
+      const name = aliases[field];
+      if (name) setError(name, { type: 'server', message });
+    });
+  }, [fieldErrors, setError]);
 
   const locationLat = profile.location?.lat;
   const locationLng = profile.location?.lng;
@@ -157,7 +178,7 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
       {
         display_name: values.display_name.trim(),
         bio: values.bio.trim() || null,
-        date_of_birth: values.date_of_birth.trim() || null,
+        date_of_birth: parseIsoDate(values.date_of_birth) ? values.date_of_birth.trim() : null,
         height_cm,
         preferred_foot: values.preferred_foot,
         skill_level: values.skill_level,
@@ -260,14 +281,16 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
         <Controller
           control={control}
           name="date_of_birth"
-          render={({ field: { value, onChange } }) => (
-            <Field
+          rules={{
+            validate: (value) => validateDateOfBirth(value),
+          }}
+          render={({ field: { value, onChange }, fieldState: { error: fieldError } }) => (
+            <DateField
               label="Date of Birth"
               optional
               value={value}
-              onChangeText={onChange}
-              placeholder="YYYY-MM-DD"
-              focused={value.length > 0}
+              onChange={onChange}
+              error={fieldError?.message}
             />
           )}
         />

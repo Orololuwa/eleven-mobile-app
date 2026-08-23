@@ -22,6 +22,7 @@ export default function PlayerDetailsRoute() {
   const uploadAvatar = useUploadAvatarMutation();
   const deleteAvatar = useDeleteAvatarMutation();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   if (isLoading || !profile) {
     return null;
@@ -33,6 +34,7 @@ export default function PlayerDetailsRoute() {
 
   const handleSave = async (update: ProfileUpdate, positions: PositionIn[]) => {
     setError(null);
+    setFieldErrors({});
     const positionError = validatePositionSet(positions);
     if (positionError) {
       setError(positionError);
@@ -47,7 +49,12 @@ export default function PlayerDetailsRoute() {
       resetDraftPositions();
       router.back();
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Could not save profile');
+      if (err instanceof ApiError) {
+        setFieldErrors(err.fieldErrors);
+        setError(Object.keys(err.fieldErrors).length > 0 ? null : err.detail);
+        return;
+      }
+      setError('Could not save profile');
     }
   };
 
@@ -61,6 +68,7 @@ export default function PlayerDetailsRoute() {
       busy={busy}
       avatarBusy={uploadAvatar.isPending || deleteAvatar.isPending}
       error={error}
+      fieldErrors={fieldErrors}
       onCancel={() => {
         resetDraftPositions();
         router.back();
@@ -75,6 +83,7 @@ export default function PlayerDetailsRoute() {
       }
       onUploadAvatar={(uri) => {
         setError(null);
+        setFieldErrors({});
         uploadAvatar.mutate(uri, {
           onError: (err) => {
             setError(err instanceof ApiError ? err.detail : 'Could not upload avatar');
@@ -83,6 +92,7 @@ export default function PlayerDetailsRoute() {
       }}
       onRemoveAvatar={() => {
         setError(null);
+        setFieldErrors({});
         deleteAvatar.mutate(undefined, {
           onError: (err) => {
             setError(err instanceof ApiError ? err.detail : 'Could not remove avatar');
