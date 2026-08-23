@@ -7,9 +7,11 @@ import { useUpdatePositionsMutation } from '@/features/profile/use-update-positi
 import { useUpdateProfileMutation } from '@/features/profile/use-update-profile-mutation';
 import { useAppStore } from '@/stores/app-store';
 import type { PositionIn, PreferredFoot } from '@/features/profile/types';
+import { ensureOnePreferred } from '@/features/profile/validation';
 
 export default function ProfileSetupRoute() {
-  const positions = usePositionPickerDraftStore((state) => state.positions);
+  const draftPositions = usePositionPickerDraftStore((state) => state.positions);
+  const positions = ensureOnePreferred(draftPositions);
   const displayName = usePositionPickerDraftStore((state) => state.displayName);
   const preferredFootIndex = usePositionPickerDraftStore((state) => state.preferredFootIndex);
   const setDisplayName = usePositionPickerDraftStore((state) => state.setDisplayName);
@@ -32,12 +34,12 @@ export default function ProfileSetupRoute() {
     }) => {
       setError(null);
       try {
+        await updatePositions.mutateAsync(nextPositions);
         await updateProfile.mutateAsync({
           display_name,
           preferred_foot,
           onboarding_completed: true,
         });
-        await updatePositions.mutateAsync(nextPositions);
         setOnboardingCompleted(true);
         resetPositions();
         router.replace('/(app)/(tabs)');

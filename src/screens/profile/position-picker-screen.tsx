@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip } from '@/components';
 import { colors, typography, spacing } from '@/theme';
 import { POSITION_CODES, type PositionCode, type PositionIn } from '@/features/profile/types';
-import { validatePositionSet } from '@/features/profile/validation';
+import { ensureOnePreferred, validatePositionSet } from '@/features/profile/validation';
 
 type PositionPickerScreenProps = {
   initialPositions: PositionIn[];
@@ -35,8 +35,7 @@ export const PositionPickerScreen: React.FC<PositionPickerScreenProps> = ({
         return next;
       }
       if (current.length >= 5) return current;
-      const isFirst = current.length === 0;
-      return [...current, { position, is_preferred: isFirst }];
+      return ensureOnePreferred([...current, { position, is_preferred: current.length === 0 }]);
     });
   };
 
@@ -56,7 +55,7 @@ export const PositionPickerScreen: React.FC<PositionPickerScreenProps> = ({
           <Text style={styles.headerAction}>CANCEL</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Positions</Text>
-        <TouchableOpacity disabled={!canSave} onPress={() => onSave(selected)}>
+        <TouchableOpacity disabled={!canSave} onPress={() => onSave(ensureOnePreferred(selected))}>
           <Text style={[styles.headerSave, !canSave && styles.headerSaveDisabled]}>SAVE</Text>
         </TouchableOpacity>
       </View>
@@ -101,7 +100,11 @@ export const PositionPickerScreen: React.FC<PositionPickerScreenProps> = ({
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button title="Save Positions" onPress={() => onSave(selected)} disabled={!canSave} />
+        <Button
+          title="Save Positions"
+          onPress={() => onSave(ensureOnePreferred(selected))}
+          disabled={!canSave}
+        />
       </View>
     </SafeAreaView>
   );

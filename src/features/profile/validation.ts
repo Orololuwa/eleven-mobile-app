@@ -28,6 +28,16 @@ export const validateHeightCm = (value: number | null | undefined) => {
   return undefined;
 };
 
+export const ensureOnePreferred = (positions: PositionIn[]): PositionIn[] => {
+  if (positions.length === 0) return positions;
+  const preferredIndex = positions.findIndex((entry) => entry.is_preferred);
+  const index = preferredIndex >= 0 ? preferredIndex : 0;
+  return positions.map((entry, entryIndex) => ({
+    position: entry.position,
+    is_preferred: entryIndex === index,
+  }));
+};
+
 export const validatePositionSet = (positions: PositionIn[]) => {
   if (positions.length < POSITION_MIN || positions.length > POSITION_MAX) {
     return `Select ${POSITION_MIN}–${POSITION_MAX} positions`;
