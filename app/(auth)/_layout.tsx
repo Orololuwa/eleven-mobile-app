@@ -12,7 +12,8 @@ export default function AuthLayout() {
   const isAuthenticated = useAppStore(selectIsAuthenticated);
   const hasCompletedOnboarding = useAppStore(selectHasCompletedOnboarding);
   const segments = useSegments();
-  const onProfileSetup = segments.includes('profile-setup');
+  const onOnboardingFlow =
+    segments.includes('profile-setup') || segments.includes('position-picker');
 
   if (authStatus === 'loading') {
     return <AuthLoadingScreen />;
@@ -22,11 +23,11 @@ export default function AuthLayout() {
     return <Redirect href="/(app)/(tabs)" />;
   }
 
-  if (isAuthenticated && !hasCompletedOnboarding && !onProfileSetup) {
+  if (isAuthenticated && !hasCompletedOnboarding && !onOnboardingFlow) {
     return <Redirect href="/(auth)/profile-setup" />;
   }
 
-  if (!isAuthenticated && onProfileSetup) {
+  if (!isAuthenticated && onOnboardingFlow) {
     return <Redirect href="/(auth)/sign-in" />;
   }
 

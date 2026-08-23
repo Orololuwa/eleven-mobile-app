@@ -8,15 +8,12 @@ import { useUpdateProfileMutation } from '@/features/profile/use-update-profile-
 import { useAppStore } from '@/stores/app-store';
 import type { PositionIn, PreferredFoot } from '@/features/profile/types';
 
-const defaultSkipPayload = {
-  display_name: 'X',
-  preferred_foot: 'right' as PreferredFoot,
-  positions: [{ position: 'CM' as const, is_preferred: true }],
-};
-
 export default function ProfileSetupRoute() {
   const positions = usePositionPickerDraftStore((state) => state.positions);
-  const setPositions = usePositionPickerDraftStore((state) => state.setPositions);
+  const displayName = usePositionPickerDraftStore((state) => state.displayName);
+  const preferredFootIndex = usePositionPickerDraftStore((state) => state.preferredFootIndex);
+  const setDisplayName = usePositionPickerDraftStore((state) => state.setDisplayName);
+  const setPreferredFootIndex = usePositionPickerDraftStore((state) => state.setPreferredFootIndex);
   const resetPositions = usePositionPickerDraftStore((state) => state.reset);
   const setOnboardingCompleted = useAppStore((state) => state.setOnboardingCompleted);
   const updateProfile = useUpdateProfileMutation();
@@ -55,15 +52,15 @@ export default function ProfileSetupRoute() {
 
   return (
     <ProfileSetupScreen
+      displayName={displayName}
+      preferredFootIndex={preferredFootIndex}
       initialPositions={positions}
       busy={busy}
       error={error}
+      onDisplayNameChange={setDisplayName}
+      onPreferredFootIndexChange={setPreferredFootIndex}
       onComplete={(data) => {
         void finish(data);
-      }}
-      onSkip={() => {
-        setPositions(defaultSkipPayload.positions);
-        void finish(defaultSkipPayload);
       }}
       onOpenPositionPicker={() => router.push('/(auth)/position-picker')}
     />

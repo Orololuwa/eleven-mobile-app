@@ -9,38 +9,45 @@ import { preferredPosition } from '@/features/profile/display';
 import { validateDisplayName, validatePositionSet } from '@/features/profile/validation';
 
 type ProfileSetupScreenProps = {
+  displayName: string;
+  preferredFootIndex: number;
   initialPositions: PositionIn[];
   busy?: boolean;
   error?: string | null;
+  onDisplayNameChange: (displayName: string) => void;
+  onPreferredFootIndexChange: (index: number) => void;
   onComplete: (data: {
     display_name: string;
     preferred_foot: PreferredFoot;
     positions: PositionIn[];
   }) => void;
-  onSkip: () => void;
   onOpenPositionPicker: () => void;
 };
 
 export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
+  displayName,
+  preferredFootIndex,
   initialPositions,
   busy = false,
   error = null,
+  onDisplayNameChange,
+  onPreferredFootIndexChange,
   onComplete,
-  onSkip,
   onOpenPositionPicker,
 }) => {
-  const [displayName, setDisplayName] = useState('');
-  const [selectedFoot, setSelectedFoot] = useState(0);
-  const [progress] = useState(2);
+  const progress = 2;
+  const [displayNameTouched, setDisplayNameTouched] = useState(false);
+  const [positionsTouched, setPositionsTouched] = useState(false);
 
+  const displayNameError = validateDisplayName(displayName);
   const positionError = validatePositionSet(initialPositions);
-  const canComplete = !busy && !validateDisplayName(displayName) && !positionError;
+  const canComplete = !busy && !displayNameError && !positionError;
 
   const handleComplete = () => {
     if (!canComplete) return;
     onComplete({
       display_name: displayName.trim(),
-      preferred_foot: PREFERRED_FOOT_OPTIONS[selectedFoot],
+      preferred_foot: PREFERRED_FOOT_OPTIONS[preferredFootIndex],
       positions: initialPositions,
     });
   };
@@ -64,9 +71,6 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
               />
             ))}
           </View>
-          <TouchableOpacity disabled={busy} onPress={onSkip}>
-            <Text style={styles.skipButton}>SKIP</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.titleSection}>
@@ -78,14 +82,22 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
           <Field
             label="Display Name"
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={onDisplayNameChange}
+            onBlur={() => setDisplayNameTouched(true)}
             placeholder="Enter your display name"
             focused={displayName.length > 0}
+            error={displayNameTouched ? displayNameError : undefined}
           />
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>POSITIONS</Text>
-            <TouchableOpacity style={styles.positionRow} onPress={onOpenPositionPicker}>
+            <TouchableOpacity
+              style={styles.positionRow}
+              onPress={() => {
+                setPositionsTouched(true);
+                onOpenPositionPicker();
+              }}
+            >
               <Text style={styles.positionValue}>
                 {initialPositions.length > 0
                   ? `${initialPositions.length} selected · ${positionSummary ?? '—'} preferred`
@@ -93,15 +105,17 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
               </Text>
               <Text style={styles.positionChevron}>▸</Text>
             </TouchableOpacity>
-            {positionError ? <Text style={styles.inlineError}>{positionError}</Text> : null}
+            {positionsTouched && positionError ? (
+              <Text style={styles.inlineError}>{positionError}</Text>
+            ) : null}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>PREFERRED FOOT</Text>
             <SegmentedControl
               options={PREFERRED_FOOT_OPTIONS.map((foot) => foot.toUpperCase())}
-              selectedIndex={selectedFoot}
-              onSelect={setSelectedFoot}
+              selectedIndex={preferredFootIndex}
+              onSelect={onPreferredFootIndexChange}
             />
           </View>
 
@@ -129,7 +143,6 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing[6],
     paddingTop: spacing[2],
@@ -145,12 +158,6 @@ const styles = StyleSheet.create({
   },
   progressSegmentFilled: {
     backgroundColor: colors.brand.primary,
-  },
-  skipButton: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
   },
   titleSection: {
     paddingHorizontal: spacing[6],

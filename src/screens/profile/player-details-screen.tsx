@@ -107,7 +107,16 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
       skill_level: profile.skill_level,
       visibility: profile.visibility,
     }),
-    [profile, units],
+    [
+      profile.bio,
+      profile.date_of_birth,
+      profile.display_name,
+      profile.height_cm,
+      profile.preferred_foot,
+      profile.skill_level,
+      profile.visibility,
+      units,
+    ],
   );
 
   const { control, handleSubmit, reset } = useForm<PlayerDetailsFormValues>({
@@ -117,8 +126,18 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
 
   useEffect(() => {
     reset(defaultValues);
-    setLocation(profile.location);
-  }, [defaultValues, profile.location, reset]);
+  }, [defaultValues, reset]);
+
+  const locationLat = profile.location?.lat;
+  const locationLng = profile.location?.lng;
+
+  useEffect(() => {
+    setLocation(
+      locationLat == null || locationLng == null
+        ? null
+        : { lat: locationLat, lng: locationLng },
+    );
+  }, [locationLat, locationLng]);
 
   const positions = draftPositions.length > 0 ? draftPositions : profile.positions;
   const positionSummary = preferredPosition(
