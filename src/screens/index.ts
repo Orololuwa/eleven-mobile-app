@@ -4,6 +4,7 @@ export { AuthLoadingScreen } from './auth/auth-loading-screen';
 export { ProfileSetupScreen } from './profile/profile-setup-screen';
 export { ProfileScreen } from './profile/profile-screen';
 export { PlayerDetailsScreen } from './profile/player-details-screen';
+export { PositionPickerScreen } from './profile/position-picker-screen';
 export { SignInMethodsScreen } from './profile/sign-in-methods-screen';
 export { UnitsScreen } from './profile/units-screen';
 export { SavedPitchesScreen } from './profile/saved-pitches-screen';

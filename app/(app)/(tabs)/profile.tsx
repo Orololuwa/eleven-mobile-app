@@ -2,10 +2,11 @@ import React from 'react';
 import { router } from 'expo-router';
 import { ProfileScreen } from '@/screens';
 import { signOut } from '@/features/auth/use-auth-actions';
+import { useMyProfileQuery } from '@/features/profile/use-profile-query';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileRoute() {
-  const user = useAppStore((state) => state.user);
+  const { data: profile, isLoading } = useMyProfileQuery();
   const sessionCount = useAppStore((state) => state.sessionCount);
   const units = useAppStore((state) => state.units);
   const signInMethods = useAppStore((state) => state.signInMethods);
@@ -21,7 +22,8 @@ export default function ProfileRoute() {
 
   return (
     <ProfileScreen
-      user={user}
+      profile={profile ?? null}
+      loading={isLoading}
       sessionCount={sessionCount}
       totalKm={totalKm}
       totalHours={totalHours}

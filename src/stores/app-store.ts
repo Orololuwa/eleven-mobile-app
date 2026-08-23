@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { emptySignInMethods, methodsFromUser } from '@/features/auth/map-identities';
 import type { AuthStatus, AuthUser } from '@/features/auth/types';
-import type { ProfileData, SavedPitch, SignInMethod, UnitsPreference } from '@/types/profile';
+import type { SavedPitch, SignInMethod, UnitsPreference } from '@/types/profile';
 
 type AppStore = {
   authStatus: AuthStatus;
   authUser: AuthUser | null;
-  user: ProfileData | null;
+  onboardingCompleted: boolean;
   sessionCount: number;
   units: UnitsPreference;
   signInMethods: SignInMethod[];
@@ -15,10 +15,14 @@ type AppStore = {
   showEmptyWallBanner: boolean;
   setAuthStatus: (status: AuthStatus) => void;
   applyAuthUser: (authUser: AuthUser) => void;
-  applySession: ({ authUser, user }: { authUser: AuthUser; user: ProfileData | null }) => void;
-  setUser: (user: ProfileData | null) => void;
-  updateUser: (patch: Partial<ProfileData>) => void;
-  completeOnboarding: (user: ProfileData) => void;
+  applySession: ({
+    authUser,
+    onboardingCompleted,
+  }: {
+    authUser: AuthUser;
+    onboardingCompleted: boolean;
+  }) => void;
+  setOnboardingCompleted: (completed: boolean) => void;
   incrementSessionCount: () => void;
   setUnits: (units: UnitsPreference) => void;
   dismissBackupNudge: () => void;
@@ -38,7 +42,7 @@ const defaultUnits: UnitsPreference = { distance: 'km', mass: 'kg' };
 export const useAppStore = create<AppStore>((set) => ({
   authStatus: 'loading',
   authUser: null,
-  user: null,
+  onboardingCompleted: false,
   sessionCount: 0,
   units: defaultUnits,
   signInMethods: emptySignInMethods(),
@@ -51,25 +55,14 @@ export const useAppStore = create<AppStore>((set) => ({
       authUser,
       signInMethods: methodsFromUser(authUser),
     }),
-  applySession: ({ authUser, user }) =>
+  applySession: ({ authUser, onboardingCompleted }) =>
     set({
       authStatus: 'authenticated',
       authUser,
-      user,
+      onboardingCompleted,
       signInMethods: methodsFromUser(authUser),
     }),
-  setUser: (user) => set({ user }),
-  updateUser: (patch) =>
-    set((state) => ({
-      user: state.user ? { ...state.user, ...patch } : null,
-    })),
-  completeOnboarding: (user) =>
-    set({
-      user: {
-        ...user,
-        fullName: user.fullName || user.firstName,
-      },
-    }),
+  setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
   incrementSessionCount: () => set((state) => ({ sessionCount: state.sessionCount + 1 })),
   setUnits: (units) => set({ units }),
   dismissBackupNudge: () => set({ backupNudgeDismissed: true }),
@@ -82,7 +75,7 @@ export const useAppStore = create<AppStore>((set) => ({
     set({
       authStatus: 'unauthenticated',
       authUser: null,
-      user: null,
+      onboardingCompleted: false,
       sessionCount: 0,
       backupNudgeDismissed: false,
       showEmptyWallBanner: false,
@@ -94,5 +87,4 @@ export const useAppStore = create<AppStore>((set) => ({
 
 export const selectIsAuthenticated = (state: AppStore) => state.authStatus === 'authenticated';
 
-export const selectHasCompletedOnboarding = (state: AppStore) =>
-  Boolean(state.user?.firstName?.trim());
+export const selectHasCompletedOnboarding = (state: AppStore) => state.onboardingCompleted;

@@ -25,6 +25,8 @@ You're using Expo Router for navigation (file-based routing, same mental model a
 Use Zustand for client/UI state (auth session, onboarding flags, ephemeral UI). Prefer small feature stores in `src/stores/` with kebab-case files (e.g. `app-store.ts`). Select state with selectors: `useAppStore((s) => s.user)` — never subscribe to the whole store by default.
 Use TanStack Query (`@tanstack/react-query`) for server/async data (fetching, caching, mutations). Put the `QueryProvider` at the root. Colocate query keys, query fns, and hooks by feature (e.g. `src/features/sessions/use-sessions-query.ts`). Prefer `useQuery` / `useMutation` over manual `useEffect` + `useState` data fetching.
 Do not put server cache in Zustand. Do not put ephemeral client UI state in TanStack Query.
+Forms: prefer `react-hook-form` for multi-field forms. Wire inputs with `Controller` into existing `@/components` (`Field`, `Chip`, `SegmentedControl`). Keep in-progress form state in the form (or a short-lived Zustand draft for cross-screen pickers) — never in TanStack Query. Submit via feature `use-*-mutation.ts` hooks; surface `ApiError.detail` to the UI. Client validation must match the API contract (enums, max lengths, ranges). One- or two-field screens may stay on local `useState`.
+Images: pick with `expo-image-picker`, crop/compress with `expo-image-manipulator`, then upload via the feature’s signed-upload flow (do not invent a new media stack).
 Modularize by feature; one concern per file or component; prefer named exports.
 Style each component explicitly rather than relying on inherited or contextual styles.
 }

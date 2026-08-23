@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { BackupMethodSheet, HomeScreen, SessionTypeSheet } from '@/screens';
+import { displayName } from '@/features/profile/display';
+import { useMyProfileQuery } from '@/features/profile/use-profile-query';
 import { useAppStore } from '@/stores/app-store';
 
 export default function HomeRoute() {
-  const user = useAppStore((state) => state.user);
+  const { data: profile } = useMyProfileQuery();
   const sessionCount = useAppStore((state) => state.sessionCount);
   const backupNudgeDismissed = useAppStore((state) => state.backupNudgeDismissed);
   const showEmptyWallBanner = useAppStore((state) => state.showEmptyWallBanner);
@@ -43,7 +45,7 @@ export default function HomeRoute() {
   return (
     <>
       <HomeScreen
-        userName={user?.firstName || 'Player'}
+        userName={displayName(profile)}
         sessionCount={sessionCount}
         onStartSession={() => setShowSessionSheet(true)}
         onNavigateToHistory={() => router.push('/(app)/(tabs)/history')}

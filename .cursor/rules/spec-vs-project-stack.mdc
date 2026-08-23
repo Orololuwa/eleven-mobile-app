@@ -1,0 +1,37 @@
+---
+description: When implementing from system design specs or PRDs, prefer the project's existing packages, components, and libraries over whatever the spec names — unless that capability is not already in the repo.
+alwaysApply: true
+---
+
+# Spec stack vs project stack
+
+Specs describe product behavior. They are not a shopping list of packages.
+
+Treat named libraries, UI kits, form libraries, state libraries, and component systems in a spec as **suggestions**. The repo's existing setup wins.
+
+## Precedence
+
+1. Use what is already in `package.json`, `src/components/`, and established feature patterns.
+2. Map the spec's intent onto those existing tools (same UX, different implementation).
+3. Add a new package or component **only** when the project has no equivalent for that capability.
+4. If the user explicitly names a library in the conversation, that overrides this rule.
+
+Do not mention the skipped spec library in plans or code comments unless the user asks.
+
+## Keep coding rules in sync
+
+When you add a dependency (or adopt a stack pattern) that becomes the project default for a capability — forms, images, state, navigation, etc. — update [`.cursor/rules/js-and-ts.mdc`](.cursor/rules/js-and-ts.mdc) and/or [`.cursor/rules/jsx-and-tsx.mdc`](.cursor/rules/jsx-and-tsx.mdc) in the **same change**.
+
+- Put JS/TS-only guidance (pure validators, helpers, naming) in `js-and-ts.mdc`.
+- Put React Native / Expo usage (hooks, components, screen patterns) in `jsx-and-tsx.mdc`.
+- Keep additions short: what to prefer, what not to invent, and where it lives by feature.
+- Do this automatically; do not wait for the user to ask.
+
+## Examples
+
+- Spec says "PositionPicker built on React Native Reusables" and the app already has `Chip` / `Field` / `SegmentedControl` → build with those. Do not add Reusables.
+- Spec says "TanStack Query" and the app already uses it → use it.
+- Spec says "crop and compress images" and neither `expo-image-picker` nor `expo-image-manipulator` is installed → add them; there is no existing equivalent. Then document that image pick/crop path in `jsx-and-tsx.mdc`.
+- Spec says `react-hook-form` and it is now in `package.json` → use it for multi-field forms and record that preference in `jsx-and-tsx.mdc`.
+
+Check `package.json` and `src/components/` before proposing a new dependency.

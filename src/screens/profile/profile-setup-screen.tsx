@@ -1,36 +1,60 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Field, Chip, SegmentedControl, Button } from '@/components';
+import { Field, SegmentedControl, Button } from '@/components';
 import { colors, typography, spacing } from '@/theme';
-import { FOOT_OPTIONS, POSITIONS, type ProfileData } from '@/types/profile';
-
-export type { ProfileData };
+import type { PositionIn, PreferredFoot } from '@/features/profile/types';
+import { PREFERRED_FOOT_OPTIONS } from '@/features/profile/types';
+import { preferredPosition } from '@/features/profile/display';
+import { validateDisplayName, validatePositionSet } from '@/features/profile/validation';
 
 type ProfileSetupScreenProps = {
-  onComplete: (data: ProfileData) => void;
+  initialPositions: PositionIn[];
+  busy?: boolean;
+  error?: string | null;
+  onComplete: (data: {
+    display_name: string;
+    preferred_foot: PreferredFoot;
+    positions: PositionIn[];
+  }) => void;
   onSkip: () => void;
+  onOpenPositionPicker: () => void;
 };
 
-export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComplete, onSkip }) => {
-  const [firstName, setFirstName] = useState('');
-  const [selectedPosition, setSelectedPosition] = useState(2); // MID
-  const [selectedFoot, setSelectedFoot] = useState(0); // LEFT
-  const [progress] = useState(2); // Step 2 of 3
+export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
+  initialPositions,
+  busy = false,
+  error = null,
+  onComplete,
+  onSkip,
+  onOpenPositionPicker,
+}) => {
+  const [displayName, setDisplayName] = useState('');
+  const [selectedFoot, setSelectedFoot] = useState(0);
+  const [progress] = useState(2);
+
+  const positionError = validatePositionSet(initialPositions);
+  const canComplete = !busy && !validateDisplayName(displayName) && !positionError;
 
   const handleComplete = () => {
+    if (!canComplete) return;
     onComplete({
-      firstName,
-      fullName: firstName.trim(),
-      position: POSITIONS[selectedPosition],
-      preferredFoot: FOOT_OPTIONS[selectedFoot],
+      display_name: displayName.trim(),
+      preferred_foot: PREFERRED_FOOT_OPTIONS[selectedFoot],
+      positions: initialPositions,
     });
   };
+
+  const positionSummary = preferredPosition(
+    initialPositions.map((entry) => ({
+      position: entry.position,
+      is_preferred: Boolean(entry.is_preferred),
+    })),
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.progressBar}>
             {[0, 1, 2].map((index) => (
@@ -40,58 +64,55 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({ onComple
               />
             ))}
           </View>
-          <TouchableOpacity onPress={onSkip}>
+          <TouchableOpacity disabled={busy} onPress={onSkip}>
             <Text style={styles.skipButton}>SKIP</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Title */}
         <View style={styles.titleSection}>
           <Text style={styles.subtitle}>PROJECT //</Text>
           <Text style={styles.title}>Who are we{'\n'}building?</Text>
         </View>
 
-        {/* Form */}
         <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
           <Field
-            label="First Name"
-            value={firstName}
-            onChangeText={setFirstName}
-            placeholder="Enter your first name"
-            focused={firstName.length > 0}
+            label="Display Name"
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="Enter your display name"
+            focused={displayName.length > 0}
           />
 
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>POSITION</Text>
-            <View style={styles.chipRow}>
-              {POSITIONS.map((position, index) => (
-                <Chip
-                  key={position}
-                  label={position}
-                  selected={selectedPosition === index}
-                  onPress={() => setSelectedPosition(index)}
-                  variant="position"
-                />
-              ))}
-            </View>
+            <Text style={styles.sectionLabel}>POSITIONS</Text>
+            <TouchableOpacity style={styles.positionRow} onPress={onOpenPositionPicker}>
+              <Text style={styles.positionValue}>
+                {initialPositions.length > 0
+                  ? `${initialPositions.length} selected · ${positionSummary ?? '—'} preferred`
+                  : 'Choose up to 5 positions'}
+              </Text>
+              <Text style={styles.positionChevron}>▸</Text>
+            </TouchableOpacity>
+            {positionError ? <Text style={styles.inlineError}>{positionError}</Text> : null}
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>PREFERRED FOOT</Text>
             <SegmentedControl
-              options={[...FOOT_OPTIONS]}
+              options={PREFERRED_FOOT_OPTIONS.map((foot) => foot.toUpperCase())}
               selectedIndex={selectedFoot}
               onSelect={setSelectedFoot}
             />
           </View>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Height, weight and club can wait. You can play first.
+            Height, bio and avatar can wait. You can play first.
           </Text>
-          <Button title="Into the App" onPress={handleComplete} disabled={!firstName.trim()} />
+          <Button title="Into the App" onPress={handleComplete} disabled={!canComplete} />
         </View>
       </View>
     </SafeAreaView>
@@ -165,10 +186,35 @@ const styles = StyleSheet.create({
     letterSpacing: 0.18 * 9,
     color: colors.text.secondary,
   },
-  chipRow: {
+  positionRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.medium,
+    paddingBottom: 12,
+  },
+  positionValue: {
+    flex: 1,
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  positionChevron: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 14,
+    color: colors.brand.primary,
+  },
+  inlineError: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    color: colors.accent.danger,
+  },
+  error: {
+    marginTop: 18,
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    color: colors.accent.danger,
   },
   footer: {
     paddingHorizontal: spacing[6],

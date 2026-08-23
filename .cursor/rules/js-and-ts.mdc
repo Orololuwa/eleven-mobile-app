@@ -55,6 +55,7 @@ Avoid using || for defaults. Use parameter defaults instead. See above.
 Prefer async/await or asyncPipe over raw promise chains.
 Use strict equality (===).
 Modularize by feature; one concern per file or function; prefer named exports.
+Form and API validation: keep pure validators in the feature module (e.g. `validation.ts`). Match backend enums, ranges, and max lengths 1:1. Prefer these shared validators over inline ad-hoc checks in screens.
 }
 
 NamingConstraints {

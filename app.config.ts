@@ -8,6 +8,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: config.slug ?? 'eleven-app',
   plugins: [
     'expo-location',
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Eleven uses your photo library to set your profile avatar.',
+        cameraPermission: 'Eleven uses your camera to take a profile avatar photo.',
+      },
+    ],
     'expo-router',
     'expo-secure-store',
     'expo-dev-client',

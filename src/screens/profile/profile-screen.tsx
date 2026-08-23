@@ -1,13 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
+import type { UnitsPreference } from '@/types/profile';
 import {
+  avatarUrlWithCacheBust,
   displayName,
+  preferredPosition,
   profileMetaLine,
-  type ProfileData,
-  type UnitsPreference,
-} from '@/types/profile';
+} from '@/features/profile/display';
+import type { ProfileRead } from '@/features/profile/types';
+import { footLabel } from '@/features/profile/validation';
 
 type ProfileMenuItem = {
   key: string;
@@ -18,7 +21,8 @@ type ProfileMenuItem = {
 };
 
 type ProfileScreenProps = {
-  user: ProfileData | null;
+  profile: ProfileRead | null;
+  loading?: boolean;
   sessionCount: number;
   totalKm: number;
   totalHours: number;
@@ -36,7 +40,8 @@ type ProfileScreenProps = {
 };
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
-  user,
+  profile,
+  loading = false,
   sessionCount,
   totalKm,
   totalHours,
@@ -52,16 +57,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onPrivacyData,
   onSignOut,
 }) => {
-  const name = displayName(user);
-  const meta = profileMetaLine(user);
+  const name = displayName(profile);
+  const meta = profileMetaLine(profile);
   const distanceLabel = units.distance.toUpperCase();
   const massLabel = units.mass.toUpperCase();
+  const avatarUrl = avatarUrlWithCacheBust({
+    avatar_url: profile?.avatar_url,
+    avatar_updated_at: profile?.avatar_updated_at,
+  });
+  const positionLabel = preferredPosition(profile?.positions ?? []);
+  const footLabelText = profile?.preferred_foot ? footLabel(profile.preferred_foot) : 'LEFT';
 
   const menuItems: ProfileMenuItem[] = [
     {
       key: 'player',
       label: 'Player Details',
-      value: `${user?.position || 'MID'} · ${user?.preferredFoot || 'LEFT'}`,
+      value: `${positionLabel ?? 'CM'} · ${footLabelText}`,
       accent: true,
       onPress: onPlayerDetails,
     },
@@ -97,10 +108,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <View style={styles.identityRow}>
           <View style={styles.avatar}>
-            <View style={styles.avatarInner} />
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarInner} />
+            )}
           </View>
           <View style={styles.identityCopy}>
-            <Text style={styles.name}>{name}</Text>
+            <Text style={styles.name}>{loading ? 'Loading…' : name}</Text>
             <Text style={styles.meta}>{meta}</Text>
           </View>
         </View>
@@ -196,6 +211,10 @@ const styles = StyleSheet.create({
   avatarInner: {
     flex: 1,
     backgroundColor: colors.background.tertiary,
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   identityCopy: {
     flex: 1,

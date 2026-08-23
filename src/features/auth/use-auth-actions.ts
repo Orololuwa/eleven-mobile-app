@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { clearProfileCache, prefetchMyProfile } from '@/features/profile/profile-cache';
 import { useAppStore } from '@/stores/app-store';
-import type { ProfileData, SignInMethodId } from '@/types/profile';
+import type { SignInMethodId } from '@/types/profile';
 import { fetchMe, linkIdentity } from './auth-api';
 import {
   authorizeConnection,
@@ -9,7 +10,6 @@ import {
   sendEmailCode,
   type Credentials,
 } from './auth0-client';
-import { loadLocalProfile, saveLocalProfile } from './local-profile';
 import { meQueryKey } from './query-keys';
 import {
   clearStoredCredentials,
@@ -40,11 +40,14 @@ const applyAuthenticated = async ({
 }) => {
   await saveCredentials(credentials);
   const authUser = await fetchMe();
-  const user = await loadLocalProfile(authUser.id);
-  useAppStore.getState().applySession({ authUser, user });
+  const profile = queryClient ? await prefetchMyProfile(queryClient) : null;
+  useAppStore.getState().applySession({
+    authUser,
+    onboardingCompleted: profile?.onboarding_completed ?? false,
+  });
   useAppStore.getState().setShowEmptyWallBanner(showEmptyWallBanner);
   syncMeCache(authUser);
-  return { authUser, user };
+  return { authUser, profile };
 };
 
 const attachSecondaryIdentity = async ({
@@ -92,6 +95,7 @@ export const hydrateSession = async () => {
     if (!hasCredentials) {
       store.resetAuth();
       syncMeCache(null);
+      if (queryClient) clearProfileCache(queryClient);
       return;
     }
 
@@ -100,17 +104,22 @@ export const hydrateSession = async () => {
       await clearStoredCredentials();
       store.resetAuth();
       syncMeCache(null);
+      if (queryClient) clearProfileCache(queryClient);
       return;
     }
 
     const authUser = await fetchMe();
-    const user = await loadLocalProfile(authUser.id);
-    store.applySession({ authUser, user });
+    const profile = queryClient ? await prefetchMyProfile(queryClient) : null;
+    store.applySession({
+      authUser,
+      onboardingCompleted: profile?.onboarding_completed ?? false,
+    });
     syncMeCache(authUser);
   } catch {
     await clearStoredCredentials();
     store.resetAuth();
     syncMeCache(null);
+    if (queryClient) clearProfileCache(queryClient);
   }
 };
 
@@ -131,13 +140,6 @@ export const verifyEmailCode = ({ email, code }: { email: string; code: string }
     applyAuthenticated({ credentials, showEmptyWallBanner: false }),
   );
 
-export const completeLocalOnboarding = async (profile: ProfileData) => {
-  const { authUser, completeOnboarding } = useAppStore.getState();
-  const next = { ...profile, fullName: profile.fullName || profile.firstName };
-  completeOnboarding(next);
-  if (authUser) await saveLocalProfile(authUser.id, next);
-};
-
 export const signOut = async () => {
   if (signingOut) return;
   signingOut = true;
@@ -146,6 +148,7 @@ export const signOut = async () => {
     await clearStoredCredentials();
     useAppStore.getState().resetAuth();
     syncMeCache(null);
+    if (queryClient) clearProfileCache(queryClient);
   } finally {
     signingOut = false;
   }
@@ -155,6 +158,7 @@ export const clearLocalSession = async () => {
   await clearStoredCredentials();
   useAppStore.getState().resetAuth();
   syncMeCache(null);
+  if (queryClient) clearProfileCache(queryClient);
 };
 
 export const useAuthActions = () => ({
@@ -166,5 +170,4 @@ export const useAuthActions = () => ({
   linkEmailIdentity,
   signOut,
   hydrateSession,
-  completeLocalOnboarding,
 });

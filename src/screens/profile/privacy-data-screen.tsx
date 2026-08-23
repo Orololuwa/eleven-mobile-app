@@ -27,8 +27,8 @@ export const PrivacyDataScreen: React.FC<PrivacyDataScreenProps> = ({ onBack }) 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>LOCATION</Text>
           <Text style={styles.cardBody}>
-            GPS is used only while a session is live, to build distance, speed and heatmaps. It is
-            not shared socially.
+            GPS is used while a session is live to build distance, speed and heatmaps. You can
+            optionally save a profile location for future features — it is not shared socially.
           </Text>
         </View>
 

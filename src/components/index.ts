@@ -10,3 +10,4 @@ export { Field } from './field';
 export { StatTile } from './stat-tile';
 export { Wall } from './wall';
 export { StatusPill } from './status-pill';
+export { AvatarPicker } from './avatar-picker';

@@ -29,6 +29,7 @@ export default function AppLayout() {
       <Stack.Screen name="session-summary" />
       <Stack.Screen name="session/[id]" />
       <Stack.Screen name="player-details" />
+      <Stack.Screen name="position-picker" />
       <Stack.Screen name="sign-in-methods" />
       <Stack.Screen name="link-email" />
       <Stack.Screen name="units" />
