@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { PlayStructureScreen } from '@/screens';
-import { ApiError } from '@/lib/api-client';
 import { useStartSessionDraftStore } from '@/features/sessions/start-session-draft-store';
-import { useCreateSessionMutation } from '@/features/sessions/use-create-session-mutation';
-import { useStartSessionMutation } from '@/features/sessions/use-start-session-mutation';
 import type { PlayStructure, SessionType } from '@/features/sessions/types';
 import { validatePlannedSegmentLength } from '@/features/sessions/validation';
 
@@ -26,13 +23,8 @@ export default function PlayStructureRoute() {
   const setPlannedSegmentLengthMinutes = useStartSessionDraftStore(
     (s) => s.setPlannedSegmentLengthMinutes,
   );
-  const setSkipHeatmap = useStartSessionDraftStore((s) => s.setSkipHeatmap);
   const resetDraft = useStartSessionDraftStore((s) => s.reset);
 
-  const createSession = useCreateSessionMutation();
-  const startSession = useStartSessionMutation();
-
-  const [step, setStep] = useState<'structure' | 'kickoff'>('structure');
   const [error, setError] = useState<string | null>(null);
 
   const playStructure: PlayStructure = draftPlayStructure ?? 'halves';
@@ -53,46 +45,16 @@ export default function PlayStructureRoute() {
       return;
     }
 
-    if (playStructure === 'open') {
-      setSkipHeatmap();
-      setStep('kickoff');
-      return;
-    }
-
     router.push({
       pathname: '/(app)/pitch-setup',
       params: { sessionType },
     });
   };
 
-  const handleKickOff = async () => {
-    setError(null);
-    try {
-      const session = await createSession.mutateAsync({
-        session_type: sessionType,
-        play_structure: 'open',
-        pitch_id: null,
-      });
-      await startSession.mutateAsync({ sessionId: session.id, body: {} });
-      resetDraft();
-      router.replace({
-        pathname: '/(app)/active-session',
-        params: { sessionType, sessionId: session.id },
-      });
-    } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Could not start session');
-    }
-  };
-
-  const busy = createSession.isPending || startSession.isPending;
-
   return (
     <PlayStructureScreen
-      sessionType={sessionType}
       playStructure={playStructure}
       plannedSegmentLengthMinutes={plannedSegmentLengthMinutes}
-      step={step}
-      busy={busy}
       error={error}
       onSelectStructure={(structure) => {
         setError(null);
@@ -104,14 +66,7 @@ export default function PlayStructureRoute() {
         setPlannedSegmentLengthMinutes(minutes);
       }}
       onContinue={handleContinue}
-      onKickOff={() => {
-        void handleKickOff();
-      }}
       onBack={() => {
-        if (step === 'kickoff') {
-          setStep('structure');
-          return;
-        }
         resetDraft();
         router.back();
       }}

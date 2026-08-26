@@ -44,6 +44,7 @@ type PitchSetupScreenProps = {
   similarPitches: PitchRead[];
   selectedPitchName: string | null;
   skipHeatmap: boolean;
+  needsAttackDirection: boolean;
   attackDirection: AttackDirection;
   busy?: boolean;
   error?: string | null;
@@ -75,6 +76,7 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
   similarPitches,
   selectedPitchName,
   skipHeatmap,
+  needsAttackDirection,
   attackDirection,
   busy = false,
   error = null,
@@ -329,14 +331,22 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
           >
             <View style={styles.header}>
               <Text style={styles.stepLabel}>
-                {skipHeatmap ? 'READY · NO HEATMAP' : 'KICKOFF · ATTACK'}
+                {skipHeatmap
+                  ? 'READY · NO HEATMAP'
+                  : needsAttackDirection
+                    ? 'KICKOFF · ATTACK'
+                    : 'READY · OPEN'}
               </Text>
               <Text style={styles.headerTitle}>
-                {skipHeatmap ? 'Track without a\nheatmap.' : 'Which end are you\nattacking?'}
+                {skipHeatmap
+                  ? 'Track without a\nheatmap.'
+                  : needsAttackDirection
+                    ? 'Which end are you\nattacking?'
+                    : 'Pitch set. No ends\nto defend.'}
               </Text>
             </View>
 
-            {!skipHeatmap ? (
+            {needsAttackDirection && !skipHeatmap ? (
               <>
                 <View style={styles.directionPitch}>
                   <View style={styles.centreLine} />
@@ -393,7 +403,9 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
               </>
             ) : (
               <Text style={styles.hintPadded}>
-                No corners, no attack direction. You can still track distance and time.
+                {skipHeatmap
+                  ? 'No corners, no attack direction. You can still track distance and time.'
+                  : 'Open sessions keep the pitch for heatmap context but skip attack direction.'}
               </Text>
             )}
             {error ? <Text style={styles.error}>{error}</Text> : null}

@@ -23,30 +23,22 @@ const STRUCTURE_OPTIONS: PlayStructure[] = ['halves', 'sets', 'open'];
 const STRUCTURE_LABELS = ['Halves', 'Sets', 'Open'];
 
 type PlayStructureScreenProps = {
-  sessionType: string;
   playStructure: PlayStructure;
   plannedSegmentLengthMinutes: number | null;
-  step: 'structure' | 'kickoff';
-  busy?: boolean;
   error?: string | null;
   onSelectStructure: (structure: PlayStructure) => void;
   onChangeMinutes: (minutes: number | null) => void;
   onContinue: () => void;
-  onKickOff: () => void;
   onBack: () => void;
 };
 
 export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
-  sessionType,
   playStructure,
   plannedSegmentLengthMinutes,
-  step,
-  busy = false,
   error = null,
   onSelectStructure,
   onChangeMinutes,
   onContinue,
-  onKickOff,
   onBack,
 }) => {
   const [minutesInput, setMinutesInput] = useState(
@@ -82,35 +74,6 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
     onChangeMinutes(parsed);
   };
 
-  if (step === 'kickoff') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <TouchableOpacity style={styles.backRow} onPress={onBack}>
-          <Text style={styles.backText}>◂ BACK</Text>
-        </TouchableOpacity>
-        <View style={styles.header}>
-          <Text style={styles.stepLabel}>READY · OPEN</Text>
-          <Text style={styles.headerTitle}>No pitch. No heatmap.{'\n'}Just track.</Text>
-        </View>
-        <Text style={styles.openCopy}>
-          Open sessions skip Home and Away ends marking. Kick off whenever you&apos;re ready.
-        </Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <View style={styles.spacer} />
-        <View style={styles.kickOffActions}>
-          <TouchableOpacity
-            style={[styles.kickOffButton, busy && styles.kickOffButtonDisabled]}
-            onPress={onKickOff}
-            disabled={busy}
-          >
-            <Text style={styles.kickOffLabel}>{busy ? 'STARTING…' : 'KICK OFF'}</Text>
-            <Text style={styles.kickOffSub}>{sessionType.toUpperCase()} · OPEN</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -144,8 +107,8 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
 
           {playStructure === 'open' ? (
             <Text style={styles.hint}>
-              Solo drills and open training. No ends to defend — pitch marking and segment length
-              are skipped.
+              Solo drills and open training — no segment clock. You can still mark a pitch for a
+              heatmap on the next step, or skip it.
             </Text>
           ) : (
             <View style={styles.section}>
@@ -191,12 +154,7 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
         </ScrollView>
 
         <View style={styles.actions}>
-          <Button
-            title="Continue"
-            onPress={onContinue}
-            size="large"
-            disabled={!canContinue || busy}
-          />
+          <Button title="Continue" onPress={onContinue} size="large" disabled={!canContinue} />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -267,50 +225,14 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 15 * 1.5,
   },
-  openCopy: {
-    paddingHorizontal: spacing[6],
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 15 * 1.5,
-  },
   error: {
     paddingHorizontal: spacing[6],
     marginTop: spacing[4],
     fontSize: 14,
     color: colors.accent.danger,
   },
-  spacer: {
-    flex: 1,
-  },
   actions: {
     paddingHorizontal: spacing[6],
     paddingBottom: spacing[9],
-  },
-  kickOffActions: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[9],
-  },
-  kickOffButton: {
-    height: 72,
-    backgroundColor: colors.brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  kickOffButtonDisabled: {
-    opacity: 0.6,
-  },
-  kickOffLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 17,
-    letterSpacing: 0.22 * 17,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.background.secondary,
-  },
-  kickOffSub: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: 'rgba(8,9,10,0.65)',
   },
 });

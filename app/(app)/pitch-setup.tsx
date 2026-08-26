@@ -103,6 +103,7 @@ export default function PitchSetupRoute() {
   );
 
   const structure: PlayStructure = playStructure ?? 'halves';
+  const needsAttackDirection = structure !== 'open';
 
   const goKickoffWithPitch = ({ id, name }: { id: string; name: string }) => {
     setPitch({ pitchId: id, pitchName: name });
@@ -246,7 +247,10 @@ export default function PitchSetupRoute() {
 
       await startSession.mutateAsync({
         sessionId: session.id,
-        body: skipHeatmap || !pitchId ? {} : { attack_direction: attackDirection },
+        body:
+          needsAttackDirection && !skipHeatmap && pitchId
+            ? { attack_direction: attackDirection }
+            : {},
       });
 
       resetDraft();
@@ -280,6 +284,7 @@ export default function PitchSetupRoute() {
       similarPitches={similarPitches}
       selectedPitchName={pitchNameDraft}
       skipHeatmap={skipHeatmap}
+      needsAttackDirection={needsAttackDirection}
       attackDirection={attackDirection}
       busy={busy}
       error={error}
