@@ -24,7 +24,9 @@ export default function AppLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="play-structure" />
       <Stack.Screen name="pitch-setup" />
+      <Stack.Screen name="select-saved-pitch" />
       <Stack.Screen name="active-session" />
       <Stack.Screen name="session-summary" />
       <Stack.Screen name="session/[id]" />

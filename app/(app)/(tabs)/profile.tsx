@@ -2,15 +2,16 @@ import React from 'react';
 import { router } from 'expo-router';
 import { ProfileScreen } from '@/screens';
 import { signOut } from '@/features/auth/use-auth-actions';
+import { useSavedPitchesQuery } from '@/features/pitches/use-saved-pitches-query';
 import { useMyProfileQuery } from '@/features/profile/use-profile-query';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileRoute() {
   const { data: profile, isLoading } = useMyProfileQuery();
+  const { data: savedPitches = [] } = useSavedPitchesQuery();
   const sessionCount = useAppStore((state) => state.sessionCount);
   const units = useAppStore((state) => state.units);
   const signInMethods = useAppStore((state) => state.signInMethods);
-  const savedPitches = useAppStore((state) => state.savedPitches);
 
   const signInSummary = signInMethods
     .filter((method) => method.connected)

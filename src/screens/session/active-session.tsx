@@ -6,12 +6,14 @@ import { colors, typography, spacing } from '@/theme';
 
 type ActiveSessionScreenProps = {
   sessionType: string;
+  sessionId?: string;
   onPause: () => void;
   onEnd: () => void;
 };
 
 export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   sessionType,
+  sessionId: _sessionId,
   onPause,
   onEnd,
 }) => {

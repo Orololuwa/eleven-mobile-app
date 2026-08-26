@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { emptySignInMethods, methodsFromUser } from '@/features/auth/map-identities';
 import type { AuthStatus, AuthUser } from '@/features/auth/types';
-import type { SavedPitch, SignInMethod, UnitsPreference } from '@/types/profile';
+import type { SignInMethod, UnitsPreference } from '@/types/profile';
 
 type AppStore = {
   authStatus: AuthStatus;
@@ -10,7 +10,6 @@ type AppStore = {
   sessionCount: number;
   units: UnitsPreference;
   signInMethods: SignInMethod[];
-  savedPitches: SavedPitch[];
   backupNudgeDismissed: boolean;
   showEmptyWallBanner: boolean;
   setAuthStatus: (status: AuthStatus) => void;
@@ -27,15 +26,8 @@ type AppStore = {
   setUnits: (units: UnitsPreference) => void;
   dismissBackupNudge: () => void;
   setShowEmptyWallBanner: (show: boolean) => void;
-  removeSavedPitch: (id: string) => void;
   resetAuth: () => void;
 };
-
-const defaultSavedPitches: SavedPitch[] = [
-  { id: '1', name: 'Lekki Astro', size: '64 × 42 M', sessions: 12 },
-  { id: '2', name: 'Surulere Pitch', size: '90 × 55 M', sessions: 8 },
-  { id: '3', name: 'Ikoyi Futsal', size: '40 × 20 M', sessions: 5 },
-];
 
 const defaultUnits: UnitsPreference = { distance: 'km', mass: 'kg' };
 
@@ -46,7 +38,6 @@ export const useAppStore = create<AppStore>((set) => ({
   sessionCount: 0,
   units: defaultUnits,
   signInMethods: emptySignInMethods(),
-  savedPitches: defaultSavedPitches,
   backupNudgeDismissed: false,
   showEmptyWallBanner: false,
   setAuthStatus: (authStatus) => set({ authStatus }),
@@ -67,10 +58,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setUnits: (units) => set({ units }),
   dismissBackupNudge: () => set({ backupNudgeDismissed: true }),
   setShowEmptyWallBanner: (show) => set({ showEmptyWallBanner: show }),
-  removeSavedPitch: (id) =>
-    set((state) => ({
-      savedPitches: state.savedPitches.filter((pitch) => pitch.id !== id),
-    })),
   resetAuth: () =>
     set({
       authStatus: 'unauthenticated',
@@ -80,7 +67,6 @@ export const useAppStore = create<AppStore>((set) => ({
       backupNudgeDismissed: false,
       showEmptyWallBanner: false,
       signInMethods: emptySignInMethods(),
-      savedPitches: defaultSavedPitches,
       units: defaultUnits,
     }),
 }));

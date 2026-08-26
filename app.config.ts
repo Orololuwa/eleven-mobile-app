@@ -7,7 +7,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: config.name ?? 'Eleven',
   slug: config.slug ?? 'eleven-app',
   plugins: [
-    'expo-location',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Eleven uses your location to mark pitch corners and suggest nearby grounds.',
+      },
+    ],
     [
       'expo-image-picker',
       {

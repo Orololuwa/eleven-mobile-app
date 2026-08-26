@@ -15,10 +15,3 @@ export type UnitsPreference = {
   distance: DistanceUnit;
   mass: MassUnit;
 };
-
-export type SavedPitch = {
-  id: string;
-  name: string;
-  size: string;
-  sessions: number;
-};

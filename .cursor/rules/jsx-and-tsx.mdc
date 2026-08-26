@@ -28,6 +28,7 @@ Do not put server cache in Zustand. Do not put ephemeral client UI state in TanS
 Forms: prefer `react-hook-form` for multi-field forms. Wire inputs with `Controller` into existing `@/components` (`Field`, `DateField`, `Chip`, `SegmentedControl`). Keep in-progress form state in the form (or a short-lived Zustand draft for cross-screen pickers) — never in TanStack Query. Submit via feature `use-*-mutation.ts` hooks; surface `ApiError.detail` / `ApiError.fieldErrors` to the UI. Client validation must match the API contract (enums, max lengths, ranges). One- or two-field screens may stay on local `useState`.
 Images: pick with `expo-image-picker`, crop/compress with `expo-image-manipulator`, then upload via the feature’s signed-upload flow (do not invent a new media stack).
 Dates: pick with `DateField` (`@react-native-community/datetimepicker`). Store/submit ISO `YYYY-MM-DD`. Do not use a free-text date input.
+Sessions / pitches: colocate under `src/features/sessions/` and `src/features/pitches/` (api, types, query keys, `use-*-query` / `use-*-mutation`). Hold the Start Session wizard in `useStartSessionDraftStore` (`start-session-draft-store.ts`) — not TanStack Query. Location for nearby pitches and End A/B corner marks: `expo-location` via `src/features/pitches/location.ts` (`getCurrentDeviceLocation`). Do not add a map library for pitch marking.
 Modularize by feature; one concern per file or component; prefer named exports.
 Style each component explicitly rather than relying on inherited or contextual styles.
 }

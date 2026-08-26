@@ -56,6 +56,7 @@ Prefer async/await or asyncPipe over raw promise chains.
 Use strict equality (===).
 Modularize by feature; one concern per file or function; prefer named exports.
 Form and API validation: keep pure validators in the feature module (e.g. `validation.ts`). Match backend enums, ranges, and max lengths 1:1. Prefer these shared validators over inline ad-hoc checks in screens.
+Session start validators (`src/features/sessions/validation.ts`): `play_structure` enums `halves` | `sets` | `open`; `planned_segment_length_minutes` integer `1`–`180` (required for halves, optional for sets, omitted for open). Pitch name: required, trim, max length via `src/features/pitches/validation.ts`.
 Calendar dates: parse and format ISO `YYYY-MM-DD` with the feature date helpers (e.g. `src/features/profile/date.ts`). Do not use `new Date('YYYY-MM-DD')` for calendar dates.
 }
 

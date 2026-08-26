@@ -1,17 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/theme';
-import type { SavedPitch } from '@/types/profile';
+import type { PitchRead } from '@/features/pitches/types';
 
 type SavedPitchesScreenProps = {
-  pitches: SavedPitch[];
+  pitches: PitchRead[];
+  loading?: boolean;
+  busyId?: string | null;
+  error?: string | null;
   onBack: () => void;
   onRemove: (id: string) => void;
 };
 
 export const SavedPitchesScreen: React.FC<SavedPitchesScreenProps> = ({
   pitches,
+  loading = false,
+  busyId = null,
+  error = null,
   onBack,
   onRemove,
 }) => {
@@ -31,11 +44,15 @@ export const SavedPitchesScreen: React.FC<SavedPitchesScreenProps> = ({
           Marked once per ground. Next visit is a single tap — or skip and track without a heatmap.
         </Text>
 
-        {pitches.length === 0 ? (
+        {loading ? <ActivityIndicator color={colors.brand.primary} style={styles.loader} /> : null}
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {!loading && pitches.length === 0 ? (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>No grounds yet.</Text>
             <Text style={styles.emptyBody}>
-              The first time you mark four corners, Eleven keeps the pitch here.
+              The first time you mark Home and Away ends, Eleven keeps the pitch here.
             </Text>
           </View>
         ) : (
@@ -44,12 +61,10 @@ export const SavedPitchesScreen: React.FC<SavedPitchesScreenProps> = ({
               <View key={pitch.id} style={styles.card}>
                 <View style={styles.cardCopy}>
                   <Text style={styles.cardTitle}>{pitch.name}</Text>
-                  <Text style={styles.cardMeta}>
-                    {pitch.size} · {pitch.sessions} SESSIONS
-                  </Text>
+                  <Text style={styles.cardMeta}>{pitch.visibility.toUpperCase()}</Text>
                 </View>
-                <TouchableOpacity onPress={() => onRemove(pitch.id)}>
-                  <Text style={styles.remove}>REMOVE</Text>
+                <TouchableOpacity onPress={() => onRemove(pitch.id)} disabled={busyId === pitch.id}>
+                  <Text style={styles.remove}>{busyId === pitch.id ? '…' : 'REMOVE'}</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -80,72 +95,76 @@ const styles = StyleSheet.create({
   },
   contentInner: {
     paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
-    paddingBottom: spacing[8],
+    paddingTop: spacing[5],
+    paddingBottom: spacing[9],
+    gap: 16,
   },
   title: {
     fontFamily: typography.fontFamily.primary,
-    fontSize: 36,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.035 * 36,
+    fontSize: 30,
+    fontWeight: typography.fontWeight.extrabold,
+    letterSpacing: -0.025 * 30,
     color: colors.text.primary,
-    marginBottom: 14,
   },
   description: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    lineHeight: 16 * 1.5,
+    fontSize: 15,
     color: colors.text.secondary,
-    marginBottom: spacing[7],
+    lineHeight: 15 * 1.5,
+  },
+  loader: {
+    marginTop: spacing[6],
+  },
+  error: {
+    fontSize: 14,
+    color: colors.accent.danger,
+  },
+  empty: {
+    marginTop: spacing[8],
+    gap: 10,
+  },
+  emptyTitle: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  emptyBody: {
+    fontSize: 15,
+    color: colors.text.secondary,
+    lineHeight: 15 * 1.5,
   },
   list: {
-    gap: 12,
+    gap: 10,
   },
   card: {
     borderWidth: 1,
     borderColor: colors.border.default,
-    padding: 16,
+    padding: 18,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   cardCopy: {
     flex: 1,
     gap: 6,
+    marginRight: 12,
   },
   cardTitle: {
     fontFamily: typography.fontFamily.primary,
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
   },
   cardMeta: {
     fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.12 * 11,
+    fontSize: 10,
+    letterSpacing: 0.14 * 10,
     color: colors.text.secondary,
   },
   remove: {
     fontFamily: typography.fontFamily.mono,
     fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.text.secondary,
-  },
-  empty: {
-    gap: 12,
-    paddingTop: spacing[4],
-  },
-  emptyTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  emptyBody: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 15 * 1.5,
-    color: colors.text.secondary,
+    letterSpacing: 0.16 * 11,
+    color: colors.accent.danger,
   },
 });
