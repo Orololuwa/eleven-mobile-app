@@ -182,31 +182,35 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
             </Text>
           </View>
 
-          <View style={styles.pitchContainer}>
-            <Text style={styles.pitchPlaceholder}>[ SCHEMATIC ]</Text>
-            <View style={styles.pitchOutline} />
-            <View style={[styles.endLabel, styles.endLabelA]}>
-              <Text style={styles.endLabelText}>END A</Text>
-            </View>
-            <View style={[styles.endLabel, styles.endLabelB]}>
-              <Text style={styles.endLabelText}>END B</Text>
-            </View>
+          <View style={styles.directionPitch}>
+            <View style={styles.centreLine} />
+            <View style={styles.centreCircle} />
+            <View style={[styles.goalBox, styles.goalBoxLeft]} />
+            <View style={[styles.goalBox, styles.goalBoxRight]} />
+            <View style={[styles.goalPost, styles.goalPostLeft, styles.goalPostDim]} />
+            <View style={[styles.goalPost, styles.goalPostRight, styles.goalPostDim]} />
+
+            <Text style={[styles.endSideLabel, styles.endSideLabelLeft]}>HOME</Text>
+            <Text style={[styles.endSideLabel, styles.endSideLabelRight]}>AWAY</Text>
+
             {CORNER_ORDER.map((key, index) => {
               const marked = index < markedCornerCount;
+              // Landscape: Home = left short side (1 top, 2 bottom); Away = right (3 top, 4 bottom)
               const posStyle =
                 key === 'end_a_corner_1'
-                  ? styles.cornerTL
+                  ? styles.cornerHomeTop
                   : key === 'end_a_corner_2'
-                    ? styles.cornerTR
+                    ? styles.cornerHomeBottom
                     : key === 'end_b_corner_1'
-                      ? styles.cornerBL
-                      : styles.cornerBR;
+                      ? styles.cornerAwayTop
+                      : styles.cornerAwayBottom;
               return (
                 <View key={key} style={[styles.corner, posStyle]}>
                   <CornerMarker number={index + 1} marked={marked} />
                 </View>
               );
             })}
+
             <Text style={styles.gpsLabel}>
               {gpsAccuracy != null ? `GPS ±${gpsAccuracy.toFixed(1)} M` : 'GPS'}
             </Text>
@@ -495,48 +499,27 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   nearbyActions: { gap: 10, marginTop: 8 },
-  pitchContainer: {
-    marginHorizontal: spacing[6],
-    height: 240,
-    backgroundColor: 'rgba(16, 20, 16, 1)',
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    position: 'relative',
-  },
-  pitchPlaceholder: {
+  corner: { position: 'absolute', width: 24, height: 24, zIndex: 3 },
+  // Landscape pitch (same as attack view): Home left, Away right
+  cornerHomeTop: { top: 10, left: 10 },
+  cornerHomeBottom: { bottom: 10, left: 10 },
+  cornerAwayTop: { top: 10, right: 10 },
+  cornerAwayBottom: { bottom: 10, right: 10 },
+  endSideLabel: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    top: '50%',
+    marginTop: -6,
     fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.disabled,
-  },
-  pitchOutline: {
-    position: 'absolute',
-    top: 40,
-    left: 36,
-    right: 36,
-    bottom: 40,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(200,242,78,0.5)',
-    backgroundColor: 'rgba(200,242,78,0.06)',
-  },
-  endLabel: { position: 'absolute', zIndex: 2 },
-  endLabelA: { top: 12, alignSelf: 'center', left: 0, right: 0, alignItems: 'center' },
-  endLabelB: { bottom: 12, alignSelf: 'center', left: 0, right: 0, alignItems: 'center' },
-  endLabelText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
+    fontSize: 10,
+    letterSpacing: 0.16 * 10,
     color: colors.brand.primary,
+    zIndex: 2,
   },
-  corner: { position: 'absolute', width: 24, height: 24, zIndex: 2 },
-  cornerTL: { top: 28, left: 24 },
-  cornerTR: { top: 28, right: 24 },
-  cornerBR: { bottom: 28, right: 24 },
-  cornerBL: { bottom: 28, left: 24 },
+  endSideLabelLeft: { left: 52 },
+  endSideLabelRight: { right: 52 },
+  goalPostDim: {
+    backgroundColor: 'rgba(242,241,236,0.16)',
+  },
   cornerMarker: {
     width: 24,
     height: 24,
@@ -559,11 +542,12 @@ const styles = StyleSheet.create({
   gpsLabel: {
     position: 'absolute',
     bottom: 12,
-    right: 12,
+    alignSelf: 'center',
     fontFamily: typography.fontFamily.mono,
     fontSize: 9,
     letterSpacing: 0.14 * 9,
     color: colors.text.secondary,
+    zIndex: 2,
   },
   statsRow: {
     marginHorizontal: spacing[6],
