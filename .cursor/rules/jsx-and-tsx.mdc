@@ -29,6 +29,7 @@ Forms: prefer `react-hook-form` for multi-field forms. Wire inputs with `Control
 Images: pick with `expo-image-picker`, crop/compress with `expo-image-manipulator`, then upload via the feature’s signed-upload flow (do not invent a new media stack).
 Dates: pick with `DateField` (`@react-native-community/datetimepicker`). Store/submit ISO `YYYY-MM-DD`. Do not use a free-text date input.
 Sessions / pitches: colocate under `src/features/sessions/` and `src/features/pitches/` (api, types, query keys, `use-*-query` / `use-*-mutation`). Hold the Start Session wizard in `useStartSessionDraftStore` (`start-session-draft-store.ts`) — not TanStack Query. Location for nearby pitches and End A/B corner marks: `expo-location` via `src/features/pitches/location.ts` (`getCurrentDeviceLocation`). Do not add a map library for pitch marking.
+Pitch ends (presentation): API/storage use `end_a` / `end_b`. In UI copy and schematics, label **End A as Home end** and **End B as Away end**. Do not invent other end names; keep snake_case `end_a`/`end_b` on the wire.
 Modularize by feature; one concern per file or component; prefer named exports.
 Style each component explicitly rather than relying on inherited or contextual styles.
 }
