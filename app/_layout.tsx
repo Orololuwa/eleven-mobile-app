@@ -7,6 +7,7 @@ import { QueryProvider } from '@/providers/query-provider';
 import { AuthProvider } from '@/providers/auth-provider';
 import { colors } from '@/theme';
 import { config } from '@/lib/config';
+import '@/features/sessions/tracking/location-task';
 
 const AppStack = () => (
   <SafeAreaProvider>

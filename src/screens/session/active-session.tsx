@@ -1,155 +1,399 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, StatusPill } from '@/components';
+import { Button, HoldToConfirmButton, StatusPill } from '@/components';
 import { colors, typography, spacing } from '@/theme';
+import type { AttackDirection } from '@/features/sessions/types';
+import {
+  formatDistance,
+  formatElapsed,
+  formatElapsedLong,
+  formatSpeed,
+} from '@/features/sessions/tracking/live-metrics';
+import { useTrackingHudStore } from '@/features/sessions/tracking/tracking-store';
+import { useTrackingSession } from '@/features/sessions/tracking/use-tracking-session';
 
 type ActiveSessionScreenProps = {
   sessionType: string;
-  sessionId?: string;
-  onPause: () => void;
+  sessionId: string;
+  distanceUnit: 'km' | 'mi';
   onEnd: () => void;
+};
+
+const segmentCtaLabel = ({ playStructure }: { playStructure: string | undefined }) => {
+  if (playStructure === 'sets') return 'START NEW SET';
+  if (playStructure === 'halves') return 'HALF TIME';
+  return '';
+};
+
+const PermissionScreen: React.FC<{
+  onAlways: () => void;
+  onWhenInUse: () => void;
+  busy?: boolean;
+}> = ({ onAlways, onWhenInUse, busy }) => (
+  <ScrollView style={styles.content} contentContainerStyle={styles.permissionContent}>
+    <Text style={styles.eyebrow}>BEFORE KICKOFF</Text>
+    <Text style={styles.permissionTitle}>
+      Your phone goes in your pocket.{'\n'}We keep counting.
+    </Text>
+    <Text style={styles.permissionBody}>
+      iOS asks twice for location — corner marking first, then tracking while locked. This is the
+      second ask.
+    </Text>
+    <View style={styles.systemDialog}>
+      <Text style={styles.systemDialogText}>
+        Allow &quot;Eleven&quot; to use your location even when you&apos;re not using the app?
+      </Text>
+      <Text style={styles.systemDialogSub}>
+        Eleven needs to track your session even while your phone is locked in your pocket.
+      </Text>
+      <Button title="CHANGE TO ALWAYS ALLOW" onPress={onAlways} loading={busy} />
+      <Button title="KEEP WHILE USING" onPress={onWhenInUse} variant="secondary" disabled={busy} />
+    </View>
+    <Text style={styles.permissionFoot}>
+      Keeping While Using still works — tracking pauses when the screen locks and resumes when you
+      open the app again.
+    </Text>
+    {Platform.OS === 'android' ? (
+      <Text style={styles.permissionFoot}>
+        Android uses a persistent notification — no &quot;All the time&quot; permission needed.
+      </Text>
+    ) : null}
+  </ScrollView>
+);
+
+const SegmentSwitchScreen: React.FC<{
+  sessionType: string;
+  playStructure: string;
+  segmentIndex: number;
+  closedElapsed: number;
+  closedDistanceKm: number;
+  attackDirection: AttackDirection | null;
+  distanceUnit: 'km' | 'mi';
+  onFlip: () => void;
+  onConfirm: () => void;
+  busy?: boolean;
+}> = ({
+  sessionType,
+  playStructure,
+  segmentIndex,
+  closedElapsed,
+  closedDistanceKm,
+  attackDirection,
+  distanceUnit,
+  onFlip,
+  onConfirm,
+  busy,
+}) => {
+  const attackingEndA = attackDirection === 'end_a';
+  const halfLabel =
+    playStructure === 'halves'
+      ? segmentIndex === 1
+        ? 'FIRST HALF'
+        : 'SECOND HALF'
+      : `SET ${segmentIndex}`;
+
+  return (
+    <ScrollView style={styles.content} contentContainerStyle={styles.segmentSwitchContent}>
+      <Text style={styles.eyebrow}>
+        {halfLabel} CLOSED · {formatElapsedLong(closedElapsed)}
+      </Text>
+      <Text style={styles.permissionTitle}>Swapped ends?</Text>
+      <Text style={styles.permissionBody}>
+        Compass read against your marked corners. Check before kickoff again.
+      </Text>
+      <View style={styles.directionPitch}>
+        <Text style={styles.endLabelLeft}>HOME END</Text>
+        <Text style={styles.endLabelRight}>AWAY END</Text>
+        <View style={styles.centreLine} />
+        <View style={styles.centreCircle} />
+        <View style={[styles.goalBox, styles.goalBoxLeft]} />
+        <View style={[styles.goalBox, styles.goalBoxRight]} />
+        <Text style={[styles.directionArrows, { color: colors.brand.primary }]}>
+          {attackingEndA ? '◀◀◀' : '▶▶▶'}
+        </Text>
+        <Text style={styles.compassSays}>COMPASS SAYS</Text>
+        <Text style={styles.compassResult}>
+          ATTACKING {attackingEndA ? 'HOME END' : 'AWAY END'}
+        </Text>
+      </View>
+      <View style={styles.segmentMetaRow}>
+        <Text style={styles.segmentMetaChip}>
+          SEGMENT {segmentIndex + 1} OF {playStructure === 'halves' ? 2 : segmentIndex + 1}
+        </Text>
+        <Text style={styles.segmentMetaChip}>
+          {halfLabel} {formatDistance({ km: closedDistanceKm, unit: distanceUnit })}{' '}
+          {distanceUnit === 'mi' ? 'MI' : 'KM'}
+        </Text>
+      </View>
+      <TouchableOpacity onPress={onFlip}>
+        <Text style={styles.flipLink}>FLIP DIRECTION</Text>
+      </TouchableOpacity>
+      <Button
+        title={
+          playStructure === 'halves'
+            ? segmentIndex >= 1
+              ? 'START SECOND HALF'
+              : 'START FIRST HALF'
+            : `START SET ${segmentIndex + 1}`
+        }
+        onPress={onConfirm}
+        loading={busy}
+      />
+      <Text style={styles.permissionFoot}>
+        NO PITCH MARKED? THIS STEP IS SKIPPED — THE HALF STILL COUNTS, THE DIRECTION STAYS BLANK.
+      </Text>
+    </ScrollView>
+  );
 };
 
 export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   sessionType,
-  sessionId: _sessionId,
-  onPause,
+  sessionId,
+  distanceUnit: distanceUnitProp,
   onEnd,
 }) => {
-  const [elapsed, setElapsed] = useState(0);
-  const [distance, setDistance] = useState(0);
-  const [topSpeed, setTopSpeed] = useState(0);
-  const [sprints, setSprints] = useState(0);
-  const [holdProgress, setHoldProgress] = useState(0);
+  const {
+    ready,
+    session,
+    phase,
+    trackingStatus,
+    gps,
+    distanceUnit: distanceUnitFromHook,
+    grantPermissionAndStart,
+    pause,
+    resume,
+    beginSegmentSwitch,
+    confirmSegmentSwitch,
+    flipPendingDirection,
+    endSession,
+  } = useTrackingSession({ sessionId });
 
-  // Simulate timer
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed((prev) => prev + 1);
-      // Simulate other metrics incrementing
-      setDistance((prev) => prev + 0.01);
-      if (Math.random() > 0.95) {
-        setTopSpeed(Math.max(topSpeed, 20 + Math.random() * 15));
-      }
-      if (Math.random() > 0.98) {
-        setSprints((prev) => prev + 1);
-      }
-    }, 1000);
+  const distanceUnit = distanceUnitProp ?? distanceUnitFromHook;
 
-    return () => clearInterval(interval);
-  }, [topSpeed]);
+  const elapsedSeconds = useTrackingHudStore((s) => s.elapsedSeconds);
+  const extraSeconds = useTrackingHudStore((s) => s.extraSeconds);
+  const metrics = useTrackingHudStore((s) => s.metrics);
+  const segmentLabel = useTrackingHudStore((s) => s.segmentLabel);
+  const pendingAttackDirection = useTrackingHudStore((s) => s.pendingAttackDirection);
+  const closedSegmentElapsed = useTrackingHudStore((s) => s.closedSegmentElapsed);
+  const closedSegmentDistanceKm = useTrackingHudStore((s) => s.closedSegmentDistanceKm);
+  const gpsSearchSeconds = useTrackingHudStore((s) => s.gpsSearchSeconds);
+  const segmentIndex = useTrackingHudStore((s) => s.segmentIndex);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const [busy, setBusy] = React.useState(false);
+
+  if (!ready) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator color={colors.brand.primary} style={styles.loader} />
+      </SafeAreaView>
+    );
+  }
+
+  const playStructure = session?.play_structure ?? 'open';
+  const plannedMinutes = session?.planned_segment_length_minutes;
+  const plannedSeconds = plannedMinutes ? plannedMinutes * 60 : null;
+  const displayElapsed =
+    plannedSeconds != null && extraSeconds > 0 ? plannedSeconds : elapsedSeconds;
+  const isExtraTime = plannedSeconds != null && extraSeconds > 0;
+  const isOpen = playStructure === 'open';
+  const segmentCta = segmentCtaLabel({ playStructure });
+  const statusLabel =
+    trackingStatus === 'manual_pause'
+      ? `PAUSED · ${sessionType.toUpperCase()} · ${segmentLabel}`
+      : trackingStatus === 'auto_pause'
+        ? `HOLDING · ${segmentLabel}`
+        : `LIVE · ${sessionType.toUpperCase()} · ${segmentLabel}`;
+
+  const statusPillStatus =
+    trackingStatus === 'manual_pause'
+      ? 'paused'
+      : trackingStatus === 'auto_pause'
+        ? 'holding'
+        : 'live';
+
+  const handleEnd = async () => {
+    setBusy(true);
+    try {
+      await endSession();
+      onEnd();
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const currentPace = distance > 0 ? formatTime(Math.floor(elapsed / distance)) : '0:00';
-
-  // Generate mock speed trace
-  const generateTrace = () => {
-    return Array.from({ length: 40 }).map((_, i) => {
-      const height = Math.random() * 80 + 20;
-      return (
-        <View
-          key={i}
-          style={[
-            styles.traceBar,
-            {
-              height,
-              backgroundColor: height > 80 ? colors.brand.primary : colors.border.strong,
-            },
-          ]}
+  if (phase === 'permission' && Platform.OS === 'ios') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <PermissionScreen
+          busy={busy}
+          onAlways={async () => {
+            setBusy(true);
+            const ok = await grantPermissionAndStart(true);
+            setBusy(false);
+            if (!ok) return;
+          }}
+          onWhenInUse={async () => {
+            setBusy(true);
+            const ok = await grantPermissionAndStart(false);
+            setBusy(false);
+            if (!ok) return;
+          }}
         />
-      );
-    });
-  };
+      </SafeAreaView>
+    );
+  }
+
+  if (phase === 'segment-switch') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <SegmentSwitchScreen
+          sessionType={sessionType}
+          playStructure={playStructure}
+          segmentIndex={segmentIndex}
+          closedElapsed={closedSegmentElapsed}
+          closedDistanceKm={closedSegmentDistanceKm}
+          attackDirection={pendingAttackDirection}
+          distanceUnit={distanceUnit}
+          onFlip={flipPendingDirection}
+          onConfirm={async () => {
+            setBusy(true);
+            await confirmSegmentSwitch(pendingAttackDirection);
+            setBusy(false);
+          }}
+          busy={busy}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const isPaused = trackingStatus !== 'live';
+  const metricsDimmed = trackingStatus === 'auto_pause';
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
-          <StatusPill label={`LIVE · ${sessionType.toUpperCase()}`} status="live" />
-          <Text style={styles.gpsStatus}>GPS ▮▮▮ STRONG</Text>
+          <StatusPill label={statusLabel} status={statusPillStatus} />
+          <Text style={[styles.gpsStatus, metricsDimmed && styles.dimmed]}>
+            {trackingStatus === 'auto_pause' ? 'GPS ▮ WEAK' : gps.label}
+          </Text>
         </View>
 
-        {/* Elapsed Time */}
         <View style={styles.timeSection}>
-          <Text style={styles.timeLabel}>ELAPSED</Text>
-          <Text style={styles.timeValue}>{formatTime(elapsed)}</Text>
+          <Text style={styles.timeLabel}>
+            {trackingStatus === 'manual_pause'
+              ? 'ELAPSED · YOU STOPPED IT'
+              : trackingStatus === 'auto_pause'
+                ? 'ELAPSED · CLOCK STOPPED'
+                : plannedMinutes
+                  ? `ELAPSED · PLANNED ${formatElapsed(plannedMinutes * 60)}`
+                  : 'ELAPSED'}
+          </Text>
+          <Text style={[styles.timeValue, isExtraTime && styles.timeValueMuted]}>
+            {formatElapsed(displayElapsed)}
+          </Text>
         </View>
 
-        {/* Primary Stats */}
-        <View style={styles.primaryStats}>
+        {isExtraTime && trackingStatus === 'live' ? (
+          <View style={styles.extraTimeCard}>
+            <View>
+              <Text style={styles.extraTimeLabel}>EXTRA TIME</Text>
+              <Text style={styles.extraTimeHint}>Ref hasn&apos;t blown yet</Text>
+            </View>
+            <Text style={styles.extraTimeValue}>+{formatElapsed(extraSeconds)}</Text>
+          </View>
+        ) : null}
+
+        {trackingStatus === 'auto_pause' ? (
+          <View style={styles.autoPauseBlock}>
+            <Text style={styles.autoPauseTitle}>Lost you for a second.</Text>
+            <Text style={styles.autoPauseSub}>SEARCHING {gpsSearchSeconds}S</Text>
+            <Text style={styles.autoPauseFoot}>RESUMES ON ITS OWN — NOTHING TO TAP</Text>
+          </View>
+        ) : null}
+
+        {trackingStatus === 'manual_pause' ? (
+          <View style={styles.manualPauseBlock}>
+            <Text style={styles.autoPauseTitle}>Take your time.</Text>
+            <Text style={styles.pauseListLabel}>
+              BREAKS THIS {playStructure === 'halves' ? 'HALF' : 'SET'}
+            </Text>
+            <Text style={styles.pauseListItem}>YOUR PAUSE · RUNNING</Text>
+          </View>
+        ) : null}
+
+        <View style={[styles.primaryStats, metricsDimmed && styles.dimmed]}>
           <View style={styles.primaryStat}>
             <Text style={styles.primaryStatLabel}>DISTANCE</Text>
             <Text style={styles.primaryStatValue}>
-              {distance.toFixed(1)}
-              <Text style={styles.primaryStatUnit}> KM</Text>
+              {formatDistance({ km: metrics.distanceKm, unit: distanceUnit })}
+              <Text style={styles.primaryStatUnit}> {distanceUnit === 'mi' ? 'MI' : 'KM'}</Text>
             </Text>
           </View>
           <View style={[styles.primaryStat, styles.primaryStatBorder]}>
-            <Text style={styles.primaryStatLabel}>PACE</Text>
-            <Text style={styles.primaryStatValue}>
-              {currentPace}
-              <Text style={styles.primaryStatUnit}> /KM</Text>
+            <Text style={styles.primaryStatLabel}>TOP SPEED</Text>
+            <Text style={[styles.primaryStatValue, styles.speedHighlight]}>
+              {formatSpeed({ kmh: metrics.topSpeedKmh, unit: distanceUnit })}
+              <Text style={styles.primaryStatUnit}> {distanceUnit === 'mi' ? 'MPH' : 'KM/H'}</Text>
             </Text>
           </View>
         </View>
 
-        {/* Speed Trace */}
-        <View style={styles.traceSection}>
-          <View style={styles.traceSectionHeader}>
-            <Text style={styles.traceLabel}>SPEED TRACE</Text>
-            <Text style={styles.traceTopSpeed}>TOP {topSpeed.toFixed(1)} KM/H</Text>
-          </View>
-          <View style={styles.trace}>{generateTrace()}</View>
-          <View style={styles.secondaryStats}>
-            <View style={styles.secondaryStat}>
-              <Text style={styles.secondaryStatLabel}>SPRINTS</Text>
-              <Text style={styles.secondaryStatValue}>{sprints}</Text>
-            </View>
-            <View style={styles.secondaryStat}>
-              <Text style={styles.secondaryStatLabel}>KCAL</Text>
-              <Text style={styles.secondaryStatValue}>{Math.floor(elapsed * 8.5)}</Text>
-            </View>
-            <View style={styles.secondaryStat}>
-              <Text style={styles.secondaryStatLabel}>AVG</Text>
-              <Text style={styles.secondaryStatValue}>
-                {distance > 0 ? (elapsed / 60 / distance).toFixed(1) : '0.0'}
-              </Text>
-            </View>
-          </View>
-        </View>
+        {isExtraTime && trackingStatus === 'live' ? (
+          <Text style={styles.helperCopy}>
+            The clock keeps running past the planned mark. Eleven never auto-switches halves — you
+            decide when to switch.
+          </Text>
+        ) : null}
       </ScrollView>
 
-      {/* Action Buttons */}
       <View style={styles.actions}>
-        <Button title="Pause — Half Time" onPress={onPause} variant="secondary" />
-        <TouchableOpacity
-          style={styles.endButton}
-          onPressIn={() => {
-            const interval = setInterval(() => {
-              setHoldProgress((prev) => {
-                if (prev >= 100) {
-                  clearInterval(interval);
-                  onEnd();
-                  return 0;
-                }
-                return prev + 3.33; // 3 second hold
-              });
-            }, 100);
-          }}
-          onPressOut={() => setHoldProgress(0)}
-          activeOpacity={1}
-        >
-          <View style={[styles.endButtonProgress, { width: `${holdProgress}%` }]} />
-          <Text style={styles.endButtonText}>HOLD TO END SESSION</Text>
-        </TouchableOpacity>
-        <Text style={styles.endButtonHint}>HOLD 3 SECONDS · NO ACCIDENTAL STOPS</Text>
+        {trackingStatus === 'manual_pause' ? (
+          <>
+            <Button title="RESUME" onPress={() => void resume()} />
+            <HoldToConfirmButton
+              title="HOLD TO END SESSION"
+              hint="HOLD 3 SECONDS · NO ACCIDENTAL STOPS"
+              onConfirm={() => void handleEnd()}
+              disabled={busy}
+            />
+          </>
+        ) : trackingStatus === 'auto_pause' ? null : (
+          <>
+            {!isOpen && !isPaused && segmentCta ? (
+              <Button
+                title={segmentCta}
+                onPress={() => void beginSegmentSwitch()}
+                disabled={busy}
+              />
+            ) : null}
+            <View style={styles.holdRow}>
+              <HoldToConfirmButton
+                title="HOLD TO PAUSE"
+                onConfirm={() => void pause()}
+                variant="secondary"
+                disabled={busy}
+              />
+              <HoldToConfirmButton
+                title="HOLD TO END"
+                onConfirm={() => void handleEnd()}
+                variant="danger"
+                disabled={busy}
+              />
+            </View>
+            <Text style={styles.endHint}>HOLD 3 SECONDS · NO ACCIDENTAL STOPS</Text>
+          </>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -163,6 +407,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  loader: {
+    flex: 1,
+    alignSelf: 'center',
+  },
   header: {
     paddingHorizontal: spacing[6],
     paddingTop: spacing[3],
@@ -175,6 +423,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.14 * 10,
     color: colors.text.secondary,
+  },
+  dimmed: {
+    opacity: 0.45,
   },
   timeSection: {
     paddingHorizontal: spacing[6],
@@ -194,6 +445,36 @@ const styles = StyleSheet.create({
     letterSpacing: -0.03 * 82,
     color: colors.text.primary,
   },
+  timeValueMuted: {
+    color: colors.text.secondary,
+  },
+  extraTimeCard: {
+    marginHorizontal: spacing[6],
+    marginTop: spacing[6],
+    borderWidth: 1,
+    borderColor: colors.brand.primary,
+    padding: spacing[5],
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  extraTimeLabel: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    letterSpacing: 0.18 * 10,
+    color: colors.brand.primary,
+  },
+  extraTimeHint: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginTop: 4,
+  },
+  extraTimeValue: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 46,
+    color: colors.brand.primary,
+  },
   primaryStats: {
     marginTop: spacing[9],
     flexDirection: 'row',
@@ -204,6 +485,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.secondary,
     paddingHorizontal: 8,
+    paddingVertical: spacing[4],
     gap: 8,
   },
   primaryStatBorder: {
@@ -217,69 +499,25 @@ const styles = StyleSheet.create({
   },
   primaryStatValue: {
     fontFamily: typography.fontFamily.mono,
-    fontSize: 44,
-    lineHeight: 44,
-    letterSpacing: -0.03 * 44,
+    fontSize: 38,
+    lineHeight: 38,
+    letterSpacing: -0.03 * 38,
     color: colors.text.primary,
   },
-  primaryStatUnit: {
-    fontSize: 16,
-    color: colors.text.secondary,
-  },
-  traceSection: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    flex: 1,
-    gap: 18,
-  },
-  traceSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  traceLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: colors.text.secondary,
-  },
-  traceTopSpeed: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
+  speedHighlight: {
     color: colors.brand.primary,
   },
-  trace: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-    height: 120,
-  },
-  traceBar: {
-    flex: 1,
-  },
-  secondaryStats: {
-    flexDirection: 'row',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-    marginTop: 4,
-  },
-  secondaryStat: {
-    flex: 1,
-    backgroundColor: colors.background.tertiary,
-    padding: 14,
-    gap: 6,
-  },
-  secondaryStatLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
+  primaryStatUnit: {
+    fontSize: 14,
     color: colors.text.secondary,
   },
-  secondaryStatValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 22,
-    color: colors.text.primary,
+  helperCopy: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[5],
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    color: colors.text.secondary,
+    lineHeight: 20,
   },
   actions: {
     paddingHorizontal: spacing[6],
@@ -287,35 +525,209 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[9],
     gap: 12,
   },
-  endButton: {
-    height: 72,
-    borderWidth: 2,
-    borderColor: colors.accent.danger,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
+  holdRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  endButtonProgress: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: `${colors.accent.danger}22`,
-  },
-  endButtonText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 14,
-    letterSpacing: 0.22 * 14,
-    color: colors.accent.danger,
-    fontWeight: typography.fontWeight.semibold,
-    position: 'relative',
-  },
-  endButtonHint: {
+  endHint: {
     fontFamily: typography.fontFamily.mono,
     fontSize: 10,
     letterSpacing: 0.16 * 10,
     color: colors.text.disabled,
     textAlign: 'center',
+  },
+  autoPauseBlock: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[6],
+    gap: 8,
+  },
+  autoPauseTitle: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 24,
+    color: colors.text.primary,
+  },
+  autoPauseSub: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    color: colors.accent.danger,
+    letterSpacing: 0.16 * 11,
+  },
+  autoPauseFoot: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    color: colors.text.disabled,
+    letterSpacing: 0.14 * 10,
+    marginTop: spacing[4],
+  },
+  manualPauseBlock: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[6],
+    gap: 8,
+  },
+  pauseListLabel: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    color: colors.text.secondary,
+    letterSpacing: 0.18 * 10,
+    marginTop: spacing[4],
+  },
+  pauseListItem: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 12,
+    color: colors.text.primary,
+  },
+  permissionContent: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[8],
+    paddingBottom: spacing[12],
+    gap: spacing[5],
+  },
+  eyebrow: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    letterSpacing: 0.2 * 10,
+    color: colors.text.secondary,
+  },
+  permissionTitle: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 30,
+    lineHeight: 34,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.bold,
+  },
+  permissionBody: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text.secondary,
+  },
+  systemDialog: {
+    backgroundColor: colors.background.tertiary,
+    padding: spacing[5],
+    gap: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+  },
+  systemDialogText: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 15,
+    color: colors.text.primary,
+  },
+  systemDialogSub: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 14,
+    color: colors.text.secondary,
+  },
+  permissionFoot: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    color: colors.text.disabled,
+    lineHeight: 16,
+    letterSpacing: 0.12 * 10,
+  },
+  segmentSwitchContent: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[8],
+    paddingBottom: spacing[12],
+    gap: spacing[5],
+  },
+  directionPitch: {
+    height: 180,
+    backgroundColor: colors.background.tertiary,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  endLabelLeft: {
+    position: 'absolute',
+    left: 12,
+    top: 8,
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 9,
+    color: colors.text.secondary,
+  },
+  endLabelRight: {
+    position: 'absolute',
+    right: 12,
+    top: 8,
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 9,
+    color: colors.text.secondary,
+  },
+  centreLine: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: colors.border.default,
+  },
+  centreCircle: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    top: '50%',
+    left: '50%',
+    marginLeft: -24,
+    marginTop: -24,
+  },
+  goalBox: {
+    position: 'absolute',
+    top: '30%',
+    height: '40%',
+    width: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  goalBoxLeft: { left: 0, borderLeftWidth: 0 },
+  goalBoxRight: { right: 0, borderRightWidth: 0 },
+  directionArrows: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -24,
+    marginTop: -10,
+    fontSize: 16,
+  },
+  compassSays: {
+    position: 'absolute',
+    bottom: 28,
+    left: 12,
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 9,
+    color: colors.text.secondary,
+  },
+  compassResult: {
+    position: 'absolute',
+    bottom: 10,
+    left: 12,
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    color: colors.brand.primary,
+  },
+  segmentMetaRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  segmentMetaChip: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    color: colors.text.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  flipLink: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 12,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    letterSpacing: 0.16 * 12,
   },
 });

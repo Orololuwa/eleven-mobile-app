@@ -154,9 +154,7 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
 
   useEffect(() => {
     setLocation(
-      locationLat == null || locationLng == null
-        ? null
-        : { lat: locationLat, lng: locationLng },
+      locationLat == null || locationLng == null ? null : { lat: locationLat, lng: locationLng },
     );
   }, [locationLat, locationLng]);
 

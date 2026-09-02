@@ -11,4 +11,5 @@ export { DateField } from './date-field';
 export { StatTile } from './stat-tile';
 export { Wall } from './wall';
 export { StatusPill } from './status-pill';
+export { HoldToConfirmButton } from './hold-to-confirm-button';
 export { AvatarPicker } from './avatar-picker';

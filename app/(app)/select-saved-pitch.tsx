@@ -5,7 +5,7 @@ import { useStartSessionDraftStore } from '@/features/sessions/start-session-dra
 
 export default function SelectSavedPitchRoute() {
   const { data: pitches = [], isLoading, error } = useSavedPitchesQuery();
-  const setPitch = useStartSessionDraftStore((s) => s.setPitch);
+  const setPitchFromRead = useStartSessionDraftStore((s) => s.setPitchFromRead);
 
   return (
     <SelectSavedPitchScreen
@@ -14,7 +14,7 @@ export default function SelectSavedPitchRoute() {
       error={error ? 'Could not load saved pitches' : null}
       onBack={() => router.back()}
       onSelect={(pitch) => {
-        setPitch({ pitchId: pitch.id, pitchName: pitch.name });
+        setPitchFromRead(pitch);
         router.back();
       }}
     />

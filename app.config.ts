@@ -12,6 +12,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         locationWhenInUsePermission:
           'Eleven uses your location to mark pitch corners and suggest nearby grounds.',
+        locationAlwaysAndWhenInUsePermission:
+          'Eleven needs to track your session even while your phone is locked in your pocket.',
+        isIosBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
+        isAndroidBackgroundLocationEnabled: false,
       },
     ],
     [
@@ -24,6 +29,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-router',
     'expo-secure-store',
     'expo-dev-client',
+    'expo-sqlite',
+    'expo-task-manager',
+    'expo-live-activity',
     '@react-native-community/datetimepicker',
     [
       'react-native-auth0',

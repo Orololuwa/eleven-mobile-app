@@ -4,7 +4,7 @@ import { colors, typography } from '@/theme';
 
 type StatusPillProps = {
   label: string;
-  status?: 'live' | 'paused' | 'gps' | 'streak';
+  status?: 'live' | 'paused' | 'holding' | 'gps' | 'streak';
   style?: ViewStyle;
 };
 
@@ -22,7 +22,19 @@ export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', 
         return {
           width: 8,
           height: 8,
-          backgroundColor: colors.accent.warning,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: colors.text.primary,
+          backgroundColor: 'transparent',
+        };
+      case 'holding':
+        return {
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          borderWidth: 1,
+          borderColor: colors.text.secondary,
+          backgroundColor: 'transparent',
         };
       case 'gps':
       case 'streak':
@@ -35,7 +47,9 @@ export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', 
       case 'live':
         return colors.brand.primary;
       case 'paused':
-        return colors.accent.warning;
+        return colors.text.primary;
+      case 'holding':
+        return colors.text.secondary;
       case 'gps':
         return colors.text.secondary;
       case 'streak':

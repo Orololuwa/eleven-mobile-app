@@ -10,6 +10,8 @@ import { useSavePitchMutation } from '@/features/pitches/use-save-pitch-mutation
 import { validatePitchName } from '@/features/pitches/validation';
 import type { LocationIn, PitchRead } from '@/features/pitches/types';
 import { useStartSessionDraftStore } from '@/features/sessions/start-session-draft-store';
+import { bootstrapTrackingSession } from '@/features/sessions/tracking/session-lifecycle';
+import type { StoredPitchCorners } from '@/features/sessions/tracking/types';
 import { useCreateSessionMutation } from '@/features/sessions/use-create-session-mutation';
 import { useStartSessionMutation } from '@/features/sessions/use-start-session-mutation';
 import type { PlayStructure, SessionType } from '@/features/sessions/types';
@@ -40,8 +42,9 @@ export default function PitchSetupRoute() {
   const pitchNameDraft = useStartSessionDraftStore((s) => s.pitchName);
   const skipHeatmap = useStartSessionDraftStore((s) => s.skipHeatmap);
   const corners = useStartSessionDraftStore((s) => s.corners);
+  const pitchCorners = useStartSessionDraftStore((s) => s.pitchCorners);
   const attackDirection = useStartSessionDraftStore((s) => s.attackDirection);
-  const setPitch = useStartSessionDraftStore((s) => s.setPitch);
+  const setPitchFromRead = useStartSessionDraftStore((s) => s.setPitchFromRead);
   const setSkipHeatmap = useStartSessionDraftStore((s) => s.setSkipHeatmap);
   const clearPitchSelection = useStartSessionDraftStore((s) => s.clearPitchSelection);
   const setCorners = useStartSessionDraftStore((s) => s.setCorners);
@@ -105,8 +108,8 @@ export default function PitchSetupRoute() {
   const structure: PlayStructure = playStructure ?? 'halves';
   const needsAttackDirection = structure !== 'open';
 
-  const goKickoffWithPitch = ({ id, name }: { id: string; name: string }) => {
-    setPitch({ pitchId: id, pitchName: name });
+  const goKickoffWithPitch = (pitch: PitchRead) => {
+    setPitchFromRead(pitch);
     setStep('kickoff');
   };
 
@@ -115,7 +118,7 @@ export default function PitchSetupRoute() {
     setError(null);
     try {
       await savePitch.mutateAsync(nearbyPitch.id);
-      goKickoffWithPitch({ id: nearbyPitch.id, name: nearbyPitch.name });
+      goKickoffWithPitch(nearbyPitch);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : 'Could not save pitch');
     }
@@ -185,7 +188,7 @@ export default function PitchSetupRoute() {
       name: pitchName.trim(),
       ...payload,
     });
-    goKickoffWithPitch({ id: pitch.id, name: pitch.name });
+    goKickoffWithPitch(pitch);
   };
 
   const handleSubmitName = async () => {
@@ -219,7 +222,7 @@ export default function PitchSetupRoute() {
     setError(null);
     try {
       await savePitch.mutateAsync(pitch.id);
-      goKickoffWithPitch({ id: pitch.id, name: pitch.name });
+      goKickoffWithPitch(pitch);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : 'Could not save pitch');
     }
@@ -234,6 +237,12 @@ export default function PitchSetupRoute() {
     }
   };
 
+  const resolvedPitchCorners = (): StoredPitchCorners | null => {
+    if (skipHeatmap) return null;
+    if (pitchCorners) return pitchCorners;
+    return cornersPayload();
+  };
+
   const handleKickOff = async () => {
     setError(null);
     try {
@@ -245,12 +254,18 @@ export default function PitchSetupRoute() {
         pitch_id: skipHeatmap ? null : pitchId,
       });
 
-      await startSession.mutateAsync({
+      const startOut = await startSession.mutateAsync({
         sessionId: session.id,
         body:
           needsAttackDirection && !skipHeatmap && pitchId
             ? { attack_direction: attackDirection }
             : {},
+      });
+
+      await bootstrapTrackingSession({
+        startOut,
+        pitchName: pitchNameDraft,
+        pitchCorners: resolvedPitchCorners(),
       });
 
       resetDraft();

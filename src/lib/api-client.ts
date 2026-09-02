@@ -23,14 +23,14 @@ export class ApiError extends Error {
 }
 
 type FastApiIssue = {
-  loc?: Array<string | number>;
+  loc?: (string | number)[];
   msg?: string;
 };
 
 const isIssue = (value: unknown): value is FastApiIssue =>
   Boolean(value && typeof value === 'object' && 'msg' in value);
 
-const locToField = (loc: Array<string | number> = []) => {
+const locToField = (loc: (string | number)[] = []) => {
   const parts = loc.filter((part) => part !== 'body' && part !== 'query' && part !== 'path');
   const field = [...parts].reverse().find((part) => typeof part === 'string');
   return typeof field === 'string' ? field : undefined;
