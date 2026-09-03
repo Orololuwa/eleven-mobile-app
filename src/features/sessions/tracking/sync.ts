@@ -12,7 +12,7 @@ import {
   getTrackingSession,
   updateSessionFields,
 } from './db';
-import type { SessionFinalizeBody, TrackPointUpload } from './types';
+import type { SessionFinalizeBody, TrackingSegmentRow, TrackPointUpload } from './types';
 
 const retryDelays = new Map<string, number>();
 let syncLoopStarted = false;
@@ -38,6 +38,12 @@ const chunkPoints = (points: TrackPointUpload[]) => {
   return chunks;
 };
 
+const indexBySegmentId = (segments: TrackingSegmentRow[]) =>
+  new Map(segments.map((segment) => [segment.id, segment.segment_index]));
+
+const segmentIndexFor = (indexById: Map<string, number>, segmentId: string | null) =>
+  segmentId == null ? null : (indexById.get(segmentId) ?? null);
+
 export const syncSession = async (sessionId: string): Promise<boolean> => {
   const session = await getTrackingSession(sessionId);
   if (!session?.ended_at) return false;
@@ -57,6 +63,7 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
     const pauses = await getPausesForSession(sessionId);
     const allPoints = await getPointsForSession(sessionId);
     const downsampled = downsampleTrackPoints(allPoints);
+    const segmentIndexes = indexBySegmentId(segments);
 
     const finalizeBody: SessionFinalizeBody = {
       ended_at: session.ended_at,
@@ -64,27 +71,32 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
         segment_index: segment.segment_index,
         attack_direction: segment.attack_direction,
         started_at: segment.started_at,
-        ended_at: segment.ended_at,
+        ended_at: segment.ended_at ?? session.ended_at,
       })),
       pauses: pauses.map((pause) => ({
-        segment_id: pause.segment_id,
+        segment_index: segmentIndexFor(segmentIndexes, pause.segment_id),
         reason: pause.reason,
         started_at: pause.started_at,
-        ended_at: pause.ended_at,
+        ended_at: pause.ended_at ?? session.ended_at,
       })),
     };
 
     await finalizeSession({ sessionId, body: finalizeBody });
 
-    const uploads: TrackPointUpload[] = downsampled.map((point) => ({
-      sequence_index: point.sequence_index,
-      segment_id: point.segment_id,
-      recorded_at: point.recorded_at,
-      lat: point.lat,
-      lng: point.lng,
-      speed_kmh: point.speed_kmh,
-      horizontal_accuracy_m: point.horizontal_accuracy_m,
-    }));
+    const uploads: TrackPointUpload[] = downsampled.flatMap((point) => {
+      if (point.horizontal_accuracy_m == null || point.horizontal_accuracy_m <= 0) return [];
+      return [
+        {
+          sequence_index: point.sequence_index,
+          segment_index: segmentIndexFor(segmentIndexes, point.segment_id),
+          recorded_at: point.recorded_at,
+          lat: point.lat,
+          lng: point.lng,
+          speed_kmh: point.speed_kmh,
+          horizontal_accuracy_m: point.horizontal_accuracy_m,
+        },
+      ];
+    });
 
     for (const chunk of chunkPoints(uploads)) {
       await uploadTrackPoints({ sessionId, body: { points: chunk } });

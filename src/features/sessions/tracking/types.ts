@@ -83,14 +83,14 @@ export type SessionFinalizeSegment = {
   segment_index: number;
   attack_direction: AttackDirection | null;
   started_at: string;
-  ended_at: string | null;
+  ended_at: string;
 };
 
 export type SessionFinalizePause = {
-  segment_id: string | null;
+  segment_index: number | null;
   reason: PauseReason;
   started_at: string;
-  ended_at: string | null;
+  ended_at: string;
 };
 
 export type SessionFinalizeBody = {
@@ -101,12 +101,12 @@ export type SessionFinalizeBody = {
 
 export type TrackPointUpload = {
   sequence_index: number;
-  segment_id: string | null;
+  segment_index: number | null;
   recorded_at: string;
   lat: number;
   lng: number;
   speed_kmh: number | null;
-  horizontal_accuracy_m: number | null;
+  horizontal_accuracy_m: number;
 };
 
 export type TrackPointsBody = {
