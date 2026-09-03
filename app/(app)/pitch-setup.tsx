@@ -274,7 +274,14 @@ export default function PitchSetupRoute() {
         params: { sessionType, sessionId: session.id },
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.detail : 'Could not start session');
+      console.error('[kickoff]', err);
+      setError(
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : 'Could not start session',
+      );
     }
   };
 

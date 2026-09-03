@@ -133,10 +133,15 @@ export const seedTrackingSession = async ({
 }) => {
   const db = await getDb();
   const { session, segments } = startOut;
+  if (!session?.id) {
+    throw new Error('Kickoff response missing session id');
+  }
+
   const startedAt = session.started_at ?? new Date().toISOString();
   const segmentClockOriginMs = Date.now();
   const cornerCols = cornersToColumns(pitchCorners);
-  const currentSegment = segments[0] ?? null;
+  const segmentRows = segments ?? [];
+  const currentSegment = segmentRows[0] ?? null;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO tracking_sessions (
@@ -170,11 +175,17 @@ export const seedTrackingSession = async ({
     ],
   );
 
-  for (const segment of segments) {
+  for (const segment of segmentRows) {
     await db.runAsync(
       `INSERT OR REPLACE INTO tracking_segments (id, session_id, segment_index, attack_direction, started_at, ended_at)
        VALUES (?, ?, ?, ?, ?, NULL)`,
-      [segment.id, session.id, segment.segment_index, segment.attack_direction, segment.started_at],
+      [
+        segment.id,
+        session.id,
+        segment.segment_index,
+        segment.attack_direction,
+        segment.started_at ?? startedAt,
+      ],
     );
   }
 };

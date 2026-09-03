@@ -29,12 +29,16 @@ export type SessionRead = {
   pitch_id: string | null;
   created_at: string;
   started_at: string | null;
+  ended_at?: string | null;
+  /** Present on start / read responses from the API. */
+  segments?: SessionSegment[];
 };
 
 export type SessionStartIn = {
   attack_direction?: AttackDirection | null;
 };
 
+/** Normalized kickoff payload for local tracking seed (API returns flat SessionRead). */
 export type SessionStartOut = {
   session: SessionRead;
   segments: SessionSegment[];

@@ -9,12 +9,37 @@ export const createSession = (body: SessionCreate) =>
     body,
   });
 
-export const startSession = ({ sessionId, body }: { sessionId: string; body?: SessionStartIn }) =>
-  apiRequest<SessionStartOut>({
+/**
+ * Backend returns a flat `SessionRead` with nested `segments`.
+ * Normalize to `{ session, segments }` for local tracking seed.
+ */
+export const startSession = async ({
+  sessionId,
+  body,
+}: {
+  sessionId: string;
+  body?: SessionStartIn;
+}): Promise<SessionStartOut> => {
+  const payload = await apiRequest<SessionRead | SessionStartOut>({
     path: `/sessions/${sessionId}/start`,
     method: 'POST',
     body: body ?? {},
   });
+
+  if (payload && typeof payload === 'object' && 'session' in payload && payload.session) {
+    const wrapped = payload as SessionStartOut;
+    return {
+      session: wrapped.session,
+      segments: wrapped.segments ?? [],
+    };
+  }
+
+  const read = payload as SessionRead;
+  return {
+    session: read,
+    segments: read.segments ?? [],
+  };
+};
 
 export const finalizeSession = ({
   sessionId,
