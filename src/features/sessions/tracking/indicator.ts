@@ -9,6 +9,8 @@ import {
   stopLocationTracking,
 } from './location-task';
 
+let lastAndroidNotificationBody: string | null = null;
+
 type IndicatorSnapshot = {
   elapsedSeconds: number;
   distanceKm: number;
@@ -92,6 +94,7 @@ export const startTrackingIndicator = async ({
     return activityId ?? null;
   }
 
+  lastAndroidNotificationBody = notificationBody;
   await startLocationTracking({ notificationBody });
   return null;
 };
@@ -126,6 +129,8 @@ export const updateTrackingIndicator = async ({
   }
 
   if (Platform.OS === 'android') {
+    if (notificationBody === lastAndroidNotificationBody) return;
+    lastAndroidNotificationBody = notificationBody;
     const running = await isLocationTaskRunning();
     if (running) {
       await stopLocationTracking();
@@ -138,6 +143,7 @@ export const stopTrackingIndicator = async (liveActivityId: string | null) => {
   if (Platform.OS === 'ios' && liveActivityId) {
     LiveActivity.stopActivity(liveActivityId, { title: 'Session ended', progressBar: {} });
   }
+  lastAndroidNotificationBody = null;
   await stopLocationTracking();
 };
 

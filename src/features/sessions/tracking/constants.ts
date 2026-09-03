@@ -1,7 +1,11 @@
-/** Accepted-fix horizontal accuracy threshold (metres). */
-export const ACCEPTED_FIX_ACCURACY_M = 20;
+/**
+ * Accepted-fix horizontal accuracy threshold (metres).
+ * 40m is still usable for pitch tracking; 20m was rejecting most Android
+ * pocket/indoor-edge fixes and triggering permanent gps_loss.
+ */
+export const ACCEPTED_FIX_ACCURACY_M = 40;
 
-/** No accepted fix for this long → auto-pause (gps_loss). */
+/** No accepted fix for this long (after the first good lock) → auto-pause (gps_loss). */
 export const GPS_LOSS_PAUSE_MS = 30_000;
 
 /** Cooldown after auto-resume before another auto-pause can fire. */

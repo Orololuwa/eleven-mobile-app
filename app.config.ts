@@ -6,6 +6,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: config.name ?? 'Eleven',
   slug: config.slug ?? 'eleven-app',
+  android: {
+    ...config.android,
+    permissions: [
+      ...new Set([
+        ...(config.android?.permissions ?? []),
+        'ACCESS_COARSE_LOCATION',
+        'ACCESS_FINE_LOCATION',
+        'FOREGROUND_SERVICE',
+        'FOREGROUND_SERVICE_LOCATION',
+        'POST_NOTIFICATIONS',
+      ]),
+    ],
+  },
   plugins: [
     [
       'expo-location',

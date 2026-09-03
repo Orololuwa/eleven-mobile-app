@@ -101,8 +101,10 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
       await updateSessionFields(session.id, { next_sequence_index: sequenceIndex + 1 });
     }
   } else if (!inManualPause) {
-    const lastFixReference = session.last_accepted_fix_at ?? session.started_at;
-    const lastFixMs = msSince(lastFixReference);
+    // Stay in "acquiring" until the first good lock — don't treat cold-start GPS as loss.
+    if (!session.last_accepted_fix_at) return;
+
+    const lastFixMs = msSince(session.last_accepted_fix_at);
     const cooldownActive =
       session.auto_resume_cooldown_until != null &&
       Date.now() < new Date(session.auto_resume_cooldown_until).getTime();
@@ -171,6 +173,9 @@ export const stopLocationTracking = async () => {
 
 /** Called when app backgrounds under When-In-Use iOS permission. */
 export const handleAppBackgrounded = async () => {
+  // Android uses a foreground service — keep tracking when the app is backgrounded.
+  if (Platform.OS === 'android') return;
+
   const session = await getActiveTrackingSession();
   if (!session || session.tracking_status !== 'live') return;
   if (session.background_permission === 'always') return;

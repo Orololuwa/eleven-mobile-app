@@ -72,8 +72,8 @@ export const formatElapsedLong = (totalSeconds: number) => {
 };
 
 export const gpsStrengthBars = (accuracyM: number | null) => {
-  if (accuracyM == null) return { label: 'GPS ▮ WEAK', strength: 1 };
-  if (accuracyM <= 10) return { label: `GPS ▮▮▮ ±${Math.round(accuracyM)} M`, strength: 3 };
-  if (accuracyM <= 20) return { label: `GPS ▮▮ ±${Math.round(accuracyM)} M`, strength: 2 };
-  return { label: 'GPS ▮ WEAK', strength: 1 };
+  if (accuracyM == null) return { label: 'GPS ▮ …', strength: 1 };
+  if (accuracyM <= 15) return { label: `GPS ▮▮▮ ±${Math.round(accuracyM)} M`, strength: 3 };
+  if (accuracyM <= 40) return { label: `GPS ▮▮ ±${Math.round(accuracyM)} M`, strength: 2 };
+  return { label: `GPS ▮ WEAK ±${Math.round(accuracyM)} M`, strength: 1 };
 };
