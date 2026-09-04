@@ -15,6 +15,7 @@ import {
   handleAppForegrounded,
   isLocationTaskRunning,
   resumeManualPause,
+  startLocationTracking,
   startManualPause,
 } from './location-task';
 import {
@@ -61,7 +62,11 @@ export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
         const running = await isLocationTaskRunning();
         if (Platform.OS === 'android') {
           if (!running) {
-            await requestAndBeginTracking(distanceUnit);
+            try {
+              await startLocationTracking({ notificationBody: 'Starting session…' });
+            } catch (error) {
+              console.warn('[tracking] failed to resume location updates', error);
+            }
           }
           setPhase('tracking');
         } else if (!running) {
@@ -76,7 +81,7 @@ export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
     return () => {
       resetHud();
     };
-  }, [loadSession, resetHud, setPhase, distanceUnit]);
+  }, [loadSession, resetHud, setPhase]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {

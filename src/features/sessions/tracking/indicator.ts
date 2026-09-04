@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as LiveActivity from 'expo-live-activity';
 import * as Location from 'expo-location';
 import { colors } from '@/theme';
@@ -126,7 +126,11 @@ const updateAndroidIndicator = async (notificationBody: string) => {
   });
   if (updatedInPlace) return;
 
-  // Foreground fallback: expo-location can update FGS options only while the app is active.
+  if (AppState.currentState !== 'active') {
+    lastAndroidNotificationBody = null;
+    return;
+  }
+
   try {
     await Location.startLocationUpdatesAsync(
       LOCATION_TASK_NAME,

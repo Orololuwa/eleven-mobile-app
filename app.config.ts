@@ -53,5 +53,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         customScheme: 'eleven',
       },
     ],
+    './plugins/with-safe-react-delegate.js',
   ],
 });

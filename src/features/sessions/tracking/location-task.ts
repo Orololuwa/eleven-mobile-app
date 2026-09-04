@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import {
@@ -160,15 +160,39 @@ export const buildLocationOptions = ({
     : {}),
 });
 
+const whenAppActive = () => {
+  if (AppState.currentState === 'active') return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      sub.remove();
+      resolve();
+    });
+  });
+};
+
 export const startLocationTracking = async ({ notificationBody }: { notificationBody: string }) => {
-  const running = await isLocationTaskRunning();
-  if (running) {
-    await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  if (await isLocationTaskRunning()) return;
+
+  if (Platform.OS === 'android' && AppState.currentState !== 'active') {
+    await whenAppActive();
+    if (await isLocationTaskRunning()) return;
   }
-  await Location.startLocationUpdatesAsync(
-    LOCATION_TASK_NAME,
-    buildLocationOptions({ notificationBody }),
-  );
+
+  try {
+    await Location.startLocationUpdatesAsync(
+      LOCATION_TASK_NAME,
+      buildLocationOptions({ notificationBody }),
+    );
+  } catch (error) {
+    if (Platform.OS !== 'android') throw error;
+    await whenAppActive();
+    if (await isLocationTaskRunning()) return;
+    await Location.startLocationUpdatesAsync(
+      LOCATION_TASK_NAME,
+      buildLocationOptions({ notificationBody }),
+    );
+  }
 };
 
 export const stopLocationTracking = async () => {
