@@ -16,6 +16,24 @@ export const haversineMetres = (
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 };
 
+export const elapsedSecondsFromPauses = ({
+  startedAt,
+  pausedRanges,
+  nowMs = Date.now(),
+}: {
+  startedAt: string;
+  pausedRanges: { started_at: string; ended_at: string | null }[];
+  nowMs?: number;
+}) => {
+  const startMs = new Date(startedAt).getTime();
+  const pausedMs = pausedRanges.reduce((sum, pause) => {
+    const pauseStart = new Date(pause.started_at).getTime();
+    const pauseEnd = pause.ended_at ? new Date(pause.ended_at).getTime() : nowMs;
+    return sum + Math.max(0, pauseEnd - pauseStart);
+  }, 0);
+  return Math.max(0, Math.floor((nowMs - startMs - pausedMs) / 1000));
+};
+
 export const computeLiveMetrics = ({
   points,
   pausedRanges,

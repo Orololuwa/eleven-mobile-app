@@ -7,8 +7,6 @@ import {
   getActiveTrackingSession,
   getCurrentSegment,
   getPausesForSegment,
-  getPointsForSegment,
-  getPointsForSession,
   getSegmentsForSession,
   getTrackingSession,
   insertSegment,
@@ -17,11 +15,12 @@ import {
 } from './db';
 import { startLocationTracking, stopLocationTracking } from './location-task';
 import {
+  refreshTrackingIndicator,
   startTrackingIndicator,
   stopTrackingIndicator,
   updateTrackingIndicator,
 } from './indicator';
-import { computeLiveMetrics } from './live-metrics';
+import { elapsedSecondsFromPauses } from './live-metrics';
 import { requestTrackingPermissions } from './permissions';
 import { enqueueSessionSync } from './sync';
 import type { BackgroundPermission, StoredPitchCorners } from './types';
@@ -97,64 +96,17 @@ export const computeSegmentElapsedSeconds = async (sessionId: string, segmentId:
         (p) => p.segment_id == null,
       );
 
-  const startMs = new Date(segmentStart).getTime();
-  const nowMs = Date.now();
-
-  const pausedMs = pauses.reduce((sum, pause) => {
-    const pauseStart = new Date(pause.started_at).getTime();
-    const pauseEnd = pause.ended_at ? new Date(pause.ended_at).getTime() : nowMs;
-    return sum + Math.max(0, pauseEnd - pauseStart);
-  }, 0);
-
-  return Math.max(0, Math.floor((nowMs - startMs - pausedMs) / 1000));
+  return elapsedSecondsFromPauses({ startedAt: segmentStart, pausedRanges: pauses });
 };
 
 export const refreshIndicatorIfNeeded = async ({
-  sessionId,
   distanceUnit,
   force = false,
-  tickMs,
 }: {
-  sessionId: string;
   distanceUnit: 'km' | 'mi';
   force?: boolean;
-  tickMs: number;
 }) => {
-  const session = await getTrackingSession(sessionId);
-  if (!session || session.ended_at) return null;
-
-  const segment = await getCurrentSegment(sessionId);
-  const segmentId = segment?.id ?? null;
-  const points = segmentId
-    ? await getPointsForSegment(segmentId)
-    : await getPointsForSession(sessionId);
-
-  const pauses = segmentId
-    ? await getPausesForSegment(segmentId)
-    : (await import('./db').then((m) => m.getPausesForSession(sessionId))).filter(
-        (p) => p.segment_id == null,
-      );
-
-  const metrics = computeLiveMetrics({ points, pausedRanges: pauses });
-  const elapsedSeconds = await computeSegmentElapsedSeconds(sessionId, segmentId);
-
-  const shouldUpdate = force || tickMs % 5000 < 1000;
-
-  if (shouldUpdate) {
-    await updateTrackingIndicator({
-      liveActivityId: session.live_activity_id,
-      session,
-      segment,
-      snapshot: {
-        elapsedSeconds,
-        distanceKm: metrics.distanceKm,
-        topSpeedKmh: metrics.topSpeedKmh,
-      },
-      distanceUnit,
-    });
-  }
-
-  return { elapsedSeconds, metrics, segment, session };
+  await refreshTrackingIndicator({ distanceUnit, force });
 };
 
 export const closeCurrentSegmentForSwitch = async (sessionId: string) => {

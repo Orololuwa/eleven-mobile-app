@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { useAppStore } from '@/stores/app-store';
 import type { AttackDirection } from '../types';
@@ -41,7 +41,6 @@ export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
 
   const [session, setSession] = useState<TrackingSessionRow | null>(null);
   const [ready, setReady] = useState(false);
-  const tickRef = useRef(0);
 
   const loadSession = useCallback(async () => {
     await initTrackingDb();
@@ -94,7 +93,6 @@ export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
     if (!ready || !session || session.tracking_status === 'ended') return;
 
     const interval = setInterval(() => {
-      tickRef.current += 1000;
       void (async () => {
         const row = await getTrackingSession(sessionId);
         if (!row) return;
@@ -148,11 +146,7 @@ export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
         });
 
         if (row.tracking_status === 'live') {
-          await refreshIndicatorIfNeeded({
-            sessionId,
-            distanceUnit,
-            tickMs: tickRef.current,
-          });
+          await refreshIndicatorIfNeeded({ distanceUnit });
         }
       })();
     }, 1000);

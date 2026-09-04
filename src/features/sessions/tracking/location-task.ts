@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import {
   ACCEPTED_FIX_ACCURACY_M,
+  ANDROID_FGS_TITLE,
   AUTO_RESUME_COOLDOWN_MS,
   GPS_LOSS_PAUSE_MS,
   LOCATION_TASK_NAME,
@@ -127,6 +128,12 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const { locations } = (data ?? {}) as LocationTaskData;
   if (!locations?.length) return;
   await processLocationUpdate(locations);
+  try {
+    const { refreshTrackingIndicator } = await import('./indicator');
+    await refreshTrackingIndicator();
+  } catch (indicatorError) {
+    console.warn('[location-task] indicator refresh failed', indicatorError);
+  }
 });
 
 export const isLocationTaskRunning = async () =>
@@ -145,7 +152,7 @@ export const buildLocationOptions = ({
   ...(Platform.OS === 'android'
     ? {
         foregroundService: {
-          notificationTitle: 'Eleven — tracking your session',
+          notificationTitle: ANDROID_FGS_TITLE,
           notificationBody,
           notificationColor: '#C8F24E',
         },
