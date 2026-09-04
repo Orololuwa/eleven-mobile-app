@@ -47,7 +47,7 @@ export const computeLiveMetrics = ({
 
 export const formatDistance = ({ km, unit }: { km: number; unit: 'km' | 'mi' }) => {
   const value = unit === 'mi' ? km * 0.621371 : km;
-  return value.toFixed(1);
+  return value.toFixed(2);
 };
 
 export const formatSpeed = ({ kmh, unit }: { kmh: number; unit: 'km' | 'mi' }) => {
