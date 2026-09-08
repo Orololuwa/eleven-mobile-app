@@ -64,20 +64,22 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
     const allPoints = await getPointsForSession(sessionId);
     const downsampled = downsampleTrackPoints(allPoints);
     const segmentIndexes = indexBySegmentId(segments);
+    const endedAt = session.ended_at;
 
     const finalizeBody: SessionFinalizeBody = {
-      ended_at: session.ended_at,
+      ended_at: endedAt,
       segments: segments.map((segment) => ({
         segment_index: segment.segment_index,
         attack_direction: segment.attack_direction,
+        activity_kind: segment.activity_kind,
         started_at: segment.started_at,
-        ended_at: segment.ended_at ?? session.ended_at,
+        ended_at: segment.ended_at ?? endedAt,
       })),
       pauses: pauses.map((pause) => ({
         segment_index: segmentIndexFor(segmentIndexes, pause.segment_id),
         reason: pause.reason,
         started_at: pause.started_at,
-        ended_at: pause.ended_at ?? session.ended_at,
+        ended_at: pause.ended_at ?? endedAt,
       })),
     };
 

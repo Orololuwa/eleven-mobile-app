@@ -12,6 +12,7 @@ import {
   getPausesForSession,
   getPointsForSegment,
   getPointsForSession,
+  getSegmentsForSession,
 } from './db';
 import {
   computeLiveMetrics,
@@ -21,6 +22,7 @@ import {
   formatSpeed,
 } from './live-metrics';
 import type { TrackingSegmentRow, TrackingSessionRow } from './types';
+import { segmentLabelFor } from '../segment-display';
 
 let lastAndroidNotificationBody: string | null = null;
 let lastDistanceUnit: 'km' | 'mi' = 'km';
@@ -44,17 +46,19 @@ const liveActivityConfig: LiveActivity.LiveActivityConfig = {
   timerType: 'digital',
 };
 
-const segmentLabelFor = (
+const resolveSegmentLabel = (
   session: TrackingSessionRow,
   segment: TrackingSegmentRow | null,
-): string => {
-  if (session.play_structure === 'open') return session.session_type.toUpperCase();
-  if (!segment) return 'SESSION';
-  if (session.play_structure === 'halves') {
-    return segment.segment_index === 1 ? '1ST HALF' : '2ND HALF';
-  }
-  return `SET ${segment.segment_index}`;
-};
+  allSegments: TrackingSegmentRow[] = [],
+): string =>
+  segmentLabelFor({
+    session: {
+      session_type: session.session_type,
+      play_structure: session.play_structure,
+    },
+    segment,
+    allSegments,
+  });
 
 const resolveDistanceUnit = (distanceUnit?: 'km' | 'mi'): 'km' | 'mi' => {
   if (distanceUnit) {
@@ -144,18 +148,20 @@ const updateAndroidIndicator = async (notificationBody: string) => {
 export const startTrackingIndicator = async ({
   session,
   segment,
+  allSegments = [],
   snapshot,
   distanceUnit,
 }: {
   session: TrackingSessionRow;
   segment: TrackingSegmentRow | null;
+  allSegments?: TrackingSegmentRow[];
   snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
   distanceUnit: 'km' | 'mi';
 }) => {
   const unit = resolveDistanceUnit(distanceUnit);
   const fullSnapshot: IndicatorSnapshot = {
     ...snapshot,
-    segmentLabel: segmentLabelFor(session, segment),
+    segmentLabel: resolveSegmentLabel(session, segment, allSegments),
     distanceUnit: unit,
   };
   const notificationBody = buildNotificationBody(fullSnapshot);
@@ -174,19 +180,21 @@ export const updateTrackingIndicator = async ({
   liveActivityId,
   session,
   segment,
+  allSegments = [],
   snapshot,
   distanceUnit,
 }: {
   liveActivityId: string | null;
   session: TrackingSessionRow;
   segment: TrackingSegmentRow | null;
+  allSegments?: TrackingSegmentRow[];
   snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
   distanceUnit: 'km' | 'mi';
 }) => {
   const unit = resolveDistanceUnit(distanceUnit);
   const fullSnapshot: IndicatorSnapshot = {
     ...snapshot,
-    segmentLabel: segmentLabelFor(session, segment),
+    segmentLabel: resolveSegmentLabel(session, segment, allSegments),
     distanceUnit: unit,
   };
   const notificationBody = buildNotificationBody(fullSnapshot);
@@ -232,6 +240,7 @@ export const refreshTrackingIndicator = async ({
 
   const unit = resolveDistanceUnit(distanceUnit);
   const segment = await getCurrentSegment(session.id);
+  const allSegments = await getSegmentsForSession(session.id);
   const segmentId = segment?.id ?? null;
   const points = segmentId
     ? await getPointsForSegment(segmentId)
@@ -249,6 +258,7 @@ export const refreshTrackingIndicator = async ({
     liveActivityId: session.live_activity_id,
     session,
     segment,
+    allSegments,
     snapshot: {
       elapsedSeconds,
       distanceKm: metrics.distanceKm,

@@ -32,8 +32,10 @@ export const SYNC_RETRY_MAX_MS = 5 * 60_000;
 /** Track-points upload chunk size. */
 export const TRACK_POINTS_CHUNK_SIZE = 500;
 
-/** Hold-to-confirm duration (ms). */
-export const HOLD_CONFIRM_MS = 3_000;
+/** Hold-to-confirm duration (ms). Pause, end activity, and end session all use this. */
+export const HOLD_CONFIRM_MS = 1_500;
+
+export const HOLD_CONFIRM_SECONDS = HOLD_CONFIRM_MS / 1_000;
 
 export const LOCATION_TASK_NAME = 'eleven-location-tracking';
 

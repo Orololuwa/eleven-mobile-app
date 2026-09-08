@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
-import type { AttackDirection, SessionStartOut } from '../types';
+import type { ActivityKind, AttackDirection, SessionStartOut } from '../types';
+import { normalizePlayStructure, shouldResolveAttackDirection } from '../segment-display';
 import { resolveAttackDirection, cornersFromSessionRow } from './attack-direction';
 import {
   closeOpenPause,
@@ -29,12 +30,28 @@ export const bootstrapTrackingSession = async ({
   startOut,
   pitchName,
   pitchCorners,
+  extraTimeEnabled,
+  plannedExtraTimeSegmentLengthMinutes,
+  trainingActivityOptions,
+  startingActivityKind,
 }: {
   startOut: SessionStartOut;
   pitchName: string | null;
   pitchCorners: StoredPitchCorners | null;
+  extraTimeEnabled?: boolean | null;
+  plannedExtraTimeSegmentLengthMinutes?: number | null;
+  trainingActivityOptions?: ActivityKind[];
+  startingActivityKind?: ActivityKind | null;
 }) => {
-  await seedTrackingSession({ startOut, pitchName, pitchCorners });
+  await seedTrackingSession({
+    startOut,
+    pitchName,
+    pitchCorners,
+    extraTimeEnabled,
+    plannedExtraTimeSegmentLengthMinutes,
+    trainingActivityOptions,
+    startingActivityKind,
+  });
 };
 
 export const beginTrackingAfterPermission = async ({
@@ -109,7 +126,31 @@ export const refreshIndicatorIfNeeded = async ({
   await refreshTrackingIndicator({ distanceUnit, force });
 };
 
-export const closeCurrentSegmentForSwitch = async (sessionId: string) => {
+export const endCurrentActivity = async (sessionId: string) => {
+  const session = await getTrackingSession(sessionId);
+  if (!session) return;
+
+  await closeOpenPause(sessionId);
+  const current = await getCurrentSegment(sessionId);
+  if (current) {
+    await closeSegment(current.id);
+  }
+
+  await updateSessionFields(sessionId, {
+    current_segment_id: null,
+    segment_clock_origin_ms: Date.now(),
+    tracking_status: 'live',
+    gps_search_started_at: null,
+  });
+};
+
+export const closeCurrentSegmentForSwitch = async ({
+  sessionId,
+  activityKind = null,
+}: {
+  sessionId: string;
+  activityKind?: ActivityKind | null;
+}) => {
   const session = await getTrackingSession(sessionId);
   if (!session) return null;
 
@@ -119,32 +160,41 @@ export const closeCurrentSegmentForSwitch = async (sessionId: string) => {
     await closeSegment(current.id);
   }
 
+  const allSegments = await getSegmentsForSession(sessionId);
+  const nextIndex = allSegments.length + 1;
+  const needsDirection = shouldResolveAttackDirection({
+    sessionType: session.session_type,
+    activityKind,
+    pitchId: session.pitch_id,
+  });
   const corners = cornersFromSessionRow(session);
-  if (!corners || !session.pitch_id) {
-    const allSegments = await getSegmentsForSession(sessionId);
-    const nextIndex = allSegments.length + 1;
+
+  if (!needsDirection || !corners) {
     const newSegmentId = await insertSegment({
       sessionId,
       segmentIndex: nextIndex,
       attackDirection: null,
+      activityKind,
     });
     await updateSessionFields(sessionId, {
       current_segment_id: newSegmentId,
       segment_clock_origin_ms: Date.now(),
     });
-    return { skippedCompass: true as const };
+    return { skippedCompass: true as const, nextIndex, activityKind };
   }
 
-  return { skippedCompass: false as const, corners };
+  return { skippedCompass: false as const, corners, nextIndex, activityKind };
 };
 
 export const completeSegmentSwitch = async ({
   sessionId,
   attackDirection,
+  activityKind = null,
   distanceUnit,
 }: {
   sessionId: string;
   attackDirection: AttackDirection | null;
+  activityKind?: ActivityKind | null;
   distanceUnit: 'km' | 'mi';
 }) => {
   const session = await getTrackingSession(sessionId);
@@ -157,6 +207,7 @@ export const completeSegmentSwitch = async ({
     sessionId,
     segmentIndex: nextIndex,
     attackDirection,
+    activityKind,
   });
 
   await updateSessionFields(sessionId, {
@@ -171,6 +222,7 @@ export const completeSegmentSwitch = async ({
       liveActivityId: updatedSession.live_activity_id,
       session: updatedSession,
       segment,
+      allSegments: await getSegmentsForSession(sessionId),
       snapshot: { elapsedSeconds: 0, distanceKm: 0, topSpeedKmh: 0 },
       distanceUnit,
     });
@@ -220,3 +272,8 @@ export const endTrackingSession = async (sessionId: string) => {
 
   enqueueSessionSync(sessionId);
 };
+
+export const sessionPlayStructure = (session: { play_structure: string }) =>
+  normalizePlayStructure(
+    session.play_structure as 'halves' | 'sets' | 'training_activities' | 'open',
+  );

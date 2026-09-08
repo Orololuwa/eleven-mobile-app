@@ -74,6 +74,7 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
   const openPause = await getOpenPause(session.id);
   const inManualPause = session.tracking_status === 'manual_pause';
   const inAutoPause = session.tracking_status === 'auto_pause';
+  const inActivity = session.current_segment_id != null;
 
   if (accepted) {
     await updateSessionFields(session.id, {
@@ -86,7 +87,7 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
     }
 
     // If we're not in a manual pause and there's no open pause, insert a track point. This is because manual pauses are handled by the app, not the OS.
-    if (!inManualPause && !(await getOpenPause(session.id))) {
+    if (inActivity && !inManualPause && !(await getOpenPause(session.id))) {
       const speedKmh = speedMsToKmh(coords.speed);
       const sequenceIndex = session.next_sequence_index;
       await insertTrackPoint({
@@ -101,7 +102,7 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
       });
       await updateSessionFields(session.id, { next_sequence_index: sequenceIndex + 1 });
     }
-  } else if (!inManualPause) {
+  } else if (!inManualPause && inActivity) {
     // Stay in "acquiring" until the first good lock — don't treat cold-start GPS as loss.
     if (!session.last_accepted_fix_at) return;
 

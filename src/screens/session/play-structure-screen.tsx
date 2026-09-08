@@ -11,57 +11,123 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip, Field, SegmentedControl } from '@/components';
 import { colors, typography, spacing } from '@/theme';
-import type { PlayStructure } from '@/features/sessions/types';
+import type { ActivityKind, PlayStructure, SessionType } from '@/features/sessions/types';
 import {
+  ACTIVITY_KINDS,
+  EXTRA_TIME_PRESETS,
   HALVES_PRESETS,
   SETS_PRESETS,
   parseSegmentMinutesInput,
+  validateExtraTime,
   validatePlannedSegmentLength,
+  validateTrainingActivityOptions,
 } from '@/features/sessions/validation';
 
-const STRUCTURE_OPTIONS: PlayStructure[] = ['halves', 'sets', 'open'];
-const STRUCTURE_LABELS = ['Halves', 'Sets', 'Open'];
+type WizardStep = 'structure' | 'extra-time';
 
 type PlayStructureScreenProps = {
+  sessionType: SessionType;
   playStructure: PlayStructure;
   plannedSegmentLengthMinutes: number | null;
+  extraTimeEnabled: boolean | null;
+  plannedExtraTimeSegmentLengthMinutes: number | null;
+  trainingActivityOptions: ActivityKind[];
   error?: string | null;
   onSelectStructure: (structure: PlayStructure) => void;
   onChangeMinutes: (minutes: number | null) => void;
+  onSelectExtraTimeEnabled: (enabled: boolean) => void;
+  onChangeExtraTimeMinutes: (minutes: number | null) => void;
+  onToggleTrainingActivity: (kind: ActivityKind) => void;
   onContinue: () => void;
   onBack: () => void;
 };
 
+const FUTSAL_OPTIONS: PlayStructure[] = ['halves', 'sets'];
+const FUTSAL_LABELS = ['Halves', 'Sets'];
+
+const activityLabel = (kind: ActivityKind) => {
+  if (kind === 'run') return 'Run';
+  if (kind === 'drill') return 'Drill';
+  return 'Set';
+};
+
 export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
+  sessionType,
   playStructure,
   plannedSegmentLengthMinutes,
+  extraTimeEnabled,
+  plannedExtraTimeSegmentLengthMinutes,
+  trainingActivityOptions,
   error = null,
   onSelectStructure,
   onChangeMinutes,
+  onSelectExtraTimeEnabled,
+  onChangeExtraTimeMinutes,
+  onToggleTrainingActivity,
   onContinue,
   onBack,
 }) => {
+  const [step, setStep] = useState<WizardStep>('structure');
   const [minutesInput, setMinutesInput] = useState(
     plannedSegmentLengthMinutes != null ? String(plannedSegmentLengthMinutes) : '',
   );
+  const [extraMinutesInput, setExtraMinutesInput] = useState(
+    plannedExtraTimeSegmentLengthMinutes != null
+      ? String(plannedExtraTimeSegmentLengthMinutes)
+      : '',
+  );
   const [minutesFocused, setMinutesFocused] = useState(false);
+  const [extraMinutesFocused, setExtraMinutesFocused] = useState(false);
+
+  const isTraining = sessionType === 'training';
+  const isMatch = sessionType === 'match';
+  const isFutsal = sessionType === 'futsal';
+  const showStructurePicker = isFutsal;
+  const needsExtraTimeStep = playStructure === 'halves';
 
   const presets = playStructure === 'halves' ? HALVES_PRESETS : SETS_PRESETS;
-  const selectedIndex = STRUCTURE_OPTIONS.indexOf(playStructure);
+  const selectedFutsalIndex = FUTSAL_OPTIONS.indexOf(playStructure);
 
   const lengthError = useMemo(() => {
-    if (playStructure === 'open') return undefined;
+    if (isTraining) return undefined;
     const parsed = parseSegmentMinutesInput(minutesInput);
     if (minutesInput.trim() && Number.isNaN(parsed)) return 'Enter a whole number of minutes';
     return validatePlannedSegmentLength({
       playStructure,
       minutes: parsed,
     });
-  }, [minutesInput, playStructure]);
+  }, [isTraining, minutesInput, playStructure]);
 
-  const canContinue =
-    playStructure === 'open' ||
-    (lengthError == null && (playStructure === 'sets' || plannedSegmentLengthMinutes != null));
+  const trainingError = useMemo(
+    () =>
+      validateTrainingActivityOptions({
+        sessionType,
+        options: trainingActivityOptions,
+      }),
+    [sessionType, trainingActivityOptions],
+  );
+
+  const extraTimeError = useMemo(() => {
+    if (!needsExtraTimeStep || step !== 'extra-time') return undefined;
+    const parsed = parseSegmentMinutesInput(extraMinutesInput);
+    if (extraMinutesInput.trim() && Number.isNaN(parsed)) {
+      return 'Enter a whole number of minutes';
+    }
+    return validateExtraTime({
+      playStructure,
+      enabled: extraTimeEnabled,
+      minutes: extraTimeEnabled === true ? parsed : null,
+    });
+  }, [needsExtraTimeStep, step, extraMinutesInput, playStructure, extraTimeEnabled]);
+
+  const canContinueStructure = isTraining
+    ? trainingError == null && trainingActivityOptions.length > 0
+    : lengthError == null && (playStructure === 'sets' || plannedSegmentLengthMinutes != null);
+
+  const canContinueExtraTime =
+    extraTimeError == null &&
+    extraTimeEnabled != null &&
+    (extraTimeEnabled === false || plannedExtraTimeSegmentLengthMinutes != null);
 
   const applyMinutes = (value: string) => {
     setMinutesInput(value);
@@ -74,13 +140,52 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
     onChangeMinutes(parsed);
   };
 
+  const applyExtraMinutes = (value: string) => {
+    setExtraMinutesInput(value);
+    const parsed = parseSegmentMinutesInput(value);
+    if (parsed == null) {
+      onChangeExtraTimeMinutes(null);
+      return;
+    }
+    if (Number.isNaN(parsed) || !Number.isInteger(parsed)) return;
+    onChangeExtraTimeMinutes(parsed);
+  };
+
+  const handleContinue = () => {
+    if (step === 'structure' && needsExtraTimeStep && !isTraining) {
+      setStep('extra-time');
+      return;
+    }
+    onContinue();
+  };
+
+  const handleBack = () => {
+    if (step === 'extra-time') {
+      setStep('structure');
+      return;
+    }
+    onBack();
+  };
+
+  const headerTitle =
+    step === 'extra-time'
+      ? 'Can this go to\nextra time?'
+      : isTraining
+        ? 'What are you\ntraining today?'
+        : isMatch
+          ? 'How long is\neach half?'
+          : 'How is the game\nstructured?';
+
+  const stepLabel =
+    step === 'extra-time' ? 'EXTRA TIME' : isTraining ? 'TRAINING ACTIVITIES' : 'PLAY STRUCTURE';
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <TouchableOpacity style={styles.backRow} onPress={onBack}>
+        <TouchableOpacity style={styles.backRow} onPress={handleBack}>
           <Text style={styles.backText}>◂ BACK</Text>
         </TouchableOpacity>
         <ScrollView
@@ -90,71 +195,157 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.stepLabel}>PLAY STRUCTURE</Text>
-            <Text style={styles.headerTitle}>How is the game{'\n'}structured?</Text>
+            <Text style={styles.stepLabel}>{stepLabel}</Text>
+            <Text style={styles.headerTitle}>{headerTitle}</Text>
           </View>
 
-          <View style={styles.section}>
-            <SegmentedControl
-              options={STRUCTURE_LABELS}
-              selectedIndex={selectedIndex}
-              onSelect={(index) => {
-                const next = STRUCTURE_OPTIONS[index];
-                if (next) onSelectStructure(next);
-              }}
-            />
-          </View>
-
-          {playStructure === 'open' ? (
-            <Text style={styles.hint}>
-              Solo drills and open training — no segment clock. You can still mark a pitch for a
-              heatmap on the next step, or skip it.
-            </Text>
-          ) : (
+          {step === 'structure' && isTraining ? (
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>
-                {playStructure === 'halves'
-                  ? 'PLANNED SEGMENT LENGTH'
-                  : 'PLANNED SEGMENT LENGTH — OPTIONAL'}
-              </Text>
+              <Text style={styles.sectionLabel}>SELECT ONE OR MORE</Text>
               <View style={styles.presets}>
-                {presets.map((preset) => (
+                {ACTIVITY_KINDS.map((kind) => (
                   <Chip
-                    key={preset}
-                    label={`${preset} min`}
-                    selected={plannedSegmentLengthMinutes === preset}
-                    onPress={() => {
-                      setMinutesInput(String(preset));
-                      onChangeMinutes(preset);
-                    }}
+                    key={kind}
+                    label={activityLabel(kind)}
+                    selected={trainingActivityOptions.includes(kind)}
+                    onPress={() => onToggleTrainingActivity(kind)}
                   />
                 ))}
               </View>
-              <Field
-                label="Custom minutes"
-                value={minutesInput}
-                onChangeText={applyMinutes}
-                keyboardType="number-pad"
-                placeholder="e.g. 30"
-                focused={minutesFocused}
-                onFocus={() => setMinutesFocused(true)}
-                onBlur={() => setMinutesFocused(false)}
-                error={lengthError}
-                optional={playStructure === 'sets'}
-              />
-              <Text style={styles.hint}>
-                {playStructure === 'halves'
-                  ? 'Drives the half-time nudge once the session is live.'
-                  : 'Soft reminder only — sets still end when you say so.'}
+              <Text style={styles.hintInline}>
+                You&apos;ll start and stop each run, drill, or set live. Choose Set if you want a
+                pitch heatmap.
               </Text>
+              {trainingError ? <Text style={styles.inlineError}>{trainingError}</Text> : null}
             </View>
-          )}
+          ) : null}
+
+          {step === 'structure' && !isTraining ? (
+            <>
+              {showStructurePicker ? (
+                <View style={styles.section}>
+                  <SegmentedControl
+                    options={FUTSAL_LABELS}
+                    selectedIndex={Math.max(0, selectedFutsalIndex)}
+                    onSelect={(index) => {
+                      const next = FUTSAL_OPTIONS[index];
+                      if (next) onSelectStructure(next);
+                    }}
+                  />
+                </View>
+              ) : null}
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>
+                  {playStructure === 'halves'
+                    ? 'PLANNED SEGMENT LENGTH'
+                    : 'PLANNED SEGMENT LENGTH — OPTIONAL'}
+                </Text>
+                <View style={styles.presets}>
+                  {presets.map((preset) => (
+                    <Chip
+                      key={preset}
+                      label={`${preset} min`}
+                      selected={plannedSegmentLengthMinutes === preset}
+                      onPress={() => {
+                        setMinutesInput(String(preset));
+                        onChangeMinutes(preset);
+                      }}
+                    />
+                  ))}
+                </View>
+                <Field
+                  label="Custom minutes"
+                  value={minutesInput}
+                  onChangeText={applyMinutes}
+                  keyboardType="number-pad"
+                  placeholder="e.g. 30"
+                  focused={minutesFocused}
+                  onFocus={() => setMinutesFocused(true)}
+                  onBlur={() => setMinutesFocused(false)}
+                  error={lengthError}
+                  optional={playStructure === 'sets'}
+                />
+                <Text style={styles.hintInline}>
+                  {playStructure === 'halves'
+                    ? 'Drives the half-time nudge once the session is live.'
+                    : 'Soft reminder only — sets still end when you say so.'}
+                </Text>
+              </View>
+            </>
+          ) : null}
+
+          {step === 'extra-time' ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>EXTRA TIME</Text>
+              <View style={styles.presets}>
+                <Chip
+                  label="Yes"
+                  selected={extraTimeEnabled === true}
+                  onPress={() => onSelectExtraTimeEnabled(true)}
+                />
+                <Chip
+                  label="No"
+                  selected={extraTimeEnabled === false}
+                  onPress={() => {
+                    setExtraMinutesInput('');
+                    onSelectExtraTimeEnabled(false);
+                  }}
+                />
+              </View>
+
+              {extraTimeEnabled === true ? (
+                <>
+                  <Text style={styles.sectionLabel}>PLANNED EXTRA TIME LENGTH</Text>
+                  <View style={styles.presets}>
+                    {EXTRA_TIME_PRESETS.map((preset) => (
+                      <Chip
+                        key={preset}
+                        label={`${preset} min`}
+                        selected={plannedExtraTimeSegmentLengthMinutes === preset}
+                        onPress={() => {
+                          setExtraMinutesInput(String(preset));
+                          onChangeExtraTimeMinutes(preset);
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <Field
+                    label="Custom minutes"
+                    value={extraMinutesInput}
+                    onChangeText={applyExtraMinutes}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 10"
+                    focused={extraMinutesFocused}
+                    onFocus={() => setExtraMinutesFocused(true)}
+                    onBlur={() => setExtraMinutesFocused(false)}
+                    error={extraTimeError}
+                  />
+                  <Text style={styles.hintInline}>
+                    Used if you tap Add Extra Time after the second half. You won&apos;t be asked
+                    again live.
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.hintInline}>
+                  You can still end after two halves. Extra time is only offered live if you enable
+                  it here.
+                </Text>
+              )}
+              {extraTimeError ? <Text style={styles.inlineError}>{extraTimeError}</Text> : null}
+            </View>
+          ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
         <View style={styles.actions}>
-          <Button title="Continue" onPress={onContinue} size="large" disabled={!canContinue} />
+          <Button
+            title="Continue"
+            onPress={handleContinue}
+            size="large"
+            disabled={step === 'structure' ? !canContinueStructure : !canContinueExtraTime}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -219,11 +410,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
-  hint: {
-    paddingHorizontal: spacing[6],
+  hintInline: {
     fontSize: 15,
     color: colors.text.secondary,
     lineHeight: 15 * 1.5,
+  },
+  inlineError: {
+    fontSize: 14,
+    color: colors.accent.danger,
   },
   error: {
     paddingHorizontal: spacing[6],

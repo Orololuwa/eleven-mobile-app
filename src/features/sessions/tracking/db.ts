@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import type { PitchRead } from '@/features/pitches/types';
-import type { SessionRead, SessionStartOut } from '../types';
+import type { ActivityKind, SessionRead, SessionStartOut } from '../types';
+import { normalizePlayStructure } from '../segment-display';
 import { createTrackingId } from './id';
 import type {
   BackgroundPermission,
@@ -12,10 +13,34 @@ import type {
   TrackingSessionRow,
   TrackingStatus,
 } from './types';
+import { serializeTrainingActivityOptions } from './types';
 
 const DB_NAME = 'eleven-tracking.db';
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+const addColumnIfMissing = async (
+  db: SQLite.SQLiteDatabase,
+  table: string,
+  column: string,
+  definition: string,
+) => {
+  const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  if (rows.some((row) => row.name === column)) return;
+  await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+};
+
+const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
+  await addColumnIfMissing(db, 'tracking_sessions', 'extra_time_enabled', 'INTEGER');
+  await addColumnIfMissing(
+    db,
+    'tracking_sessions',
+    'planned_extra_time_segment_length_minutes',
+    'INTEGER',
+  );
+  await addColumnIfMissing(db, 'tracking_sessions', 'training_activity_options', 'TEXT');
+  await addColumnIfMissing(db, 'tracking_segments', 'activity_kind', 'TEXT');
+};
 
 const getDb = () => {
   if (!dbPromise) {
@@ -27,6 +52,9 @@ const getDb = () => {
           session_type TEXT NOT NULL,
           play_structure TEXT NOT NULL,
           planned_segment_length_minutes INTEGER,
+          extra_time_enabled INTEGER,
+          planned_extra_time_segment_length_minutes INTEGER,
+          training_activity_options TEXT,
           pitch_id TEXT,
           pitch_name TEXT,
           end_a_corner_1_lat REAL,
@@ -57,6 +85,7 @@ const getDb = () => {
           session_id TEXT NOT NULL,
           segment_index INTEGER NOT NULL,
           attack_direction TEXT,
+          activity_kind TEXT,
           started_at TEXT NOT NULL,
           ended_at TEXT,
           FOREIGN KEY (session_id) REFERENCES tracking_sessions(id)
@@ -86,6 +115,7 @@ const getDb = () => {
         CREATE INDEX IF NOT EXISTS idx_tracking_pauses_session ON tracking_pauses(session_id);
         CREATE INDEX IF NOT EXISTS idx_tracking_segments_session ON tracking_segments(session_id);
       `);
+      await migrateTrackingSchema(db);
       return db;
     });
   }
@@ -126,10 +156,18 @@ export const seedTrackingSession = async ({
   startOut,
   pitchName,
   pitchCorners,
+  extraTimeEnabled = null,
+  plannedExtraTimeSegmentLengthMinutes = null,
+  trainingActivityOptions = [],
+  startingActivityKind = null,
 }: {
   startOut: SessionStartOut;
   pitchName: string | null;
   pitchCorners: StoredPitchCorners | null;
+  extraTimeEnabled?: boolean | null;
+  plannedExtraTimeSegmentLengthMinutes?: number | null;
+  trainingActivityOptions?: ActivityKind[];
+  startingActivityKind?: ActivityKind | null;
 }) => {
   const db = await getDb();
   const { session, segments } = startOut;
@@ -142,10 +180,21 @@ export const seedTrackingSession = async ({
   const cornerCols = cornersToColumns(pitchCorners);
   const segmentRows = segments ?? [];
   const currentSegment = segmentRows[0] ?? null;
+  const playStructure = normalizePlayStructure(session.play_structure);
+  const resolvedExtraTimeEnabled = extraTimeEnabled ?? session.extra_time_enabled ?? false;
+  const resolvedExtraMinutes =
+    plannedExtraTimeSegmentLengthMinutes ??
+    session.planned_extra_time_segment_length_minutes ??
+    null;
+  const resolvedActivityOptions =
+    trainingActivityOptions.length > 0
+      ? trainingActivityOptions
+      : (session.training_activity_options ?? []);
 
   await db.runAsync(
     `INSERT OR REPLACE INTO tracking_sessions (
       id, session_type, play_structure, planned_segment_length_minutes,
+      extra_time_enabled, planned_extra_time_segment_length_minutes, training_activity_options,
       pitch_id, pitch_name,
       end_a_corner_1_lat, end_a_corner_1_lng, end_a_corner_2_lat, end_a_corner_2_lng,
       end_b_corner_1_lat, end_b_corner_1_lng, end_b_corner_2_lat, end_b_corner_2_lng,
@@ -153,12 +202,15 @@ export const seedTrackingSession = async ({
       tracking_status, last_accepted_fix_at, auto_resume_cooldown_until,
       background_permission, live_activity_id, next_sequence_index,
       segment_clock_origin_ms, current_segment_id, gps_search_started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', 0, NULL, 'live', NULL, NULL, 'when_in_use', NULL, 0, ?, ?, NULL)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', 0, NULL, 'live', NULL, NULL, 'when_in_use', NULL, 0, ?, ?, NULL)`,
     [
       session.id,
       session.session_type,
-      session.play_structure,
+      playStructure,
       session.planned_segment_length_minutes,
+      resolvedExtraTimeEnabled ? 1 : 0,
+      resolvedExtraMinutes,
+      serializeTrainingActivityOptions(resolvedActivityOptions),
       session.pitch_id,
       pitchName,
       cornerCols.end_a_corner_1_lat,
@@ -176,17 +228,27 @@ export const seedTrackingSession = async ({
   );
 
   for (const segment of segmentRows) {
+    const activityKind =
+      segment.activity_kind ?? (segment.segment_index === 1 ? startingActivityKind : null) ?? null;
     await db.runAsync(
-      `INSERT OR REPLACE INTO tracking_segments (id, session_id, segment_index, attack_direction, started_at, ended_at)
-       VALUES (?, ?, ?, ?, ?, NULL)`,
+      `INSERT OR REPLACE INTO tracking_segments (id, session_id, segment_index, attack_direction, activity_kind, started_at, ended_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
       [
         segment.id,
         session.id,
         segment.segment_index,
         segment.attack_direction,
+        activityKind,
         segment.started_at ?? startedAt,
       ],
     );
+  }
+
+  if (currentSegment && startingActivityKind && !currentSegment.activity_kind) {
+    await db.runAsync(`UPDATE tracking_segments SET activity_kind = ? WHERE id = ?`, [
+      startingActivityKind,
+      currentSegment.id,
+    ]);
   }
 };
 
@@ -332,19 +394,21 @@ export const insertSegment = async ({
   sessionId,
   segmentIndex,
   attackDirection,
+  activityKind = null,
   startedAt = new Date().toISOString(),
 }: {
   sessionId: string;
   segmentIndex: number;
   attackDirection: TrackingSegmentRow['attack_direction'];
+  activityKind?: ActivityKind | null;
   startedAt?: string;
 }) => {
   const db = await getDb();
   const id = createTrackingId();
   await db.runAsync(
-    `INSERT INTO tracking_segments (id, session_id, segment_index, attack_direction, started_at, ended_at)
-     VALUES (?, ?, ?, ?, ?, NULL)`,
-    [id, sessionId, segmentIndex, attackDirection, startedAt],
+    `INSERT INTO tracking_segments (id, session_id, segment_index, attack_direction, activity_kind, started_at, ended_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+    [id, sessionId, segmentIndex, attackDirection, activityKind, startedAt],
   );
   return id;
 };

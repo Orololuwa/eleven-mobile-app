@@ -1,4 +1,4 @@
-import type { AttackDirection, PlayStructure, SessionType } from '../types';
+import type { ActivityKind, AttackDirection, PlayStructure, SessionType } from '../types';
 import type { LocationIn } from '@/features/pitches/types';
 
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
@@ -21,8 +21,11 @@ export type StoredPitchCorners = {
 export type TrackingSessionRow = {
   id: string;
   session_type: SessionType;
-  play_structure: PlayStructure;
+  play_structure: PlayStructure | 'open';
   planned_segment_length_minutes: number | null;
+  extra_time_enabled: number | null;
+  planned_extra_time_segment_length_minutes: number | null;
+  training_activity_options: string | null;
   pitch_id: string | null;
   pitch_name: string | null;
   end_a_corner_1_lat: number | null;
@@ -54,6 +57,7 @@ export type TrackingSegmentRow = {
   session_id: string;
   segment_index: number;
   attack_direction: AttackDirection | null;
+  activity_kind: ActivityKind | null;
   started_at: string;
   ended_at: string | null;
 };
@@ -82,6 +86,7 @@ export type TrackingPointRow = {
 export type SessionFinalizeSegment = {
   segment_index: number;
   attack_direction: AttackDirection | null;
+  activity_kind: ActivityKind | null;
   started_at: string;
   ended_at: string;
 };
@@ -117,3 +122,24 @@ export type LiveMetrics = {
   distanceKm: number;
   topSpeedKmh: number;
 };
+
+export const parseTrainingActivityOptions = (value: string | null | undefined): ActivityKind[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is ActivityKind => item === 'run' || item === 'drill' || item === 'set',
+    );
+  } catch {
+    return [];
+  }
+};
+
+export const serializeTrainingActivityOptions = (options: ActivityKind[]): string | null => {
+  if (!options.length) return null;
+  return JSON.stringify(options);
+};
+
+export const isExtraTimeEnabled = (value: number | boolean | null | undefined): boolean =>
+  value === true || value === 1;

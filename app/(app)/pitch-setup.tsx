@@ -9,12 +9,13 @@ import { useNearbyPitchesQuery } from '@/features/pitches/use-nearby-pitches-que
 import { useSavePitchMutation } from '@/features/pitches/use-save-pitch-mutation';
 import { validatePitchName } from '@/features/pitches/validation';
 import type { LocationIn, PitchRead } from '@/features/pitches/types';
+import { shouldResolveAttackDirection } from '@/features/sessions/segment-display';
 import { useStartSessionDraftStore } from '@/features/sessions/start-session-draft-store';
 import { bootstrapTrackingSession } from '@/features/sessions/tracking/session-lifecycle';
 import type { StoredPitchCorners } from '@/features/sessions/tracking/types';
 import { useCreateSessionMutation } from '@/features/sessions/use-create-session-mutation';
 import { useStartSessionMutation } from '@/features/sessions/use-start-session-mutation';
-import type { PlayStructure, SessionType } from '@/features/sessions/types';
+import type { ActivityKind, PlayStructure, SessionType } from '@/features/sessions/types';
 
 type CornerKey = 'end_a_corner_1' | 'end_a_corner_2' | 'end_b_corner_1' | 'end_b_corner_2';
 
@@ -29,15 +30,23 @@ const isSessionType = (value: string): value is SessionType =>
   value === 'match' || value === 'training' || value === 'futsal';
 
 export default function PitchSetupRoute() {
-  const { sessionType: sessionTypeParam = 'match' } = useLocalSearchParams<{
+  const { sessionType: sessionTypeParam = 'match', skipPitch } = useLocalSearchParams<{
     sessionType?: string;
+    skipPitch?: string;
   }>();
   const sessionType = isSessionType(sessionTypeParam) ? sessionTypeParam : 'match';
+  const forceSkipPitch = skipPitch === '1';
 
   const playStructure = useStartSessionDraftStore((s) => s.playStructure);
   const plannedSegmentLengthMinutes = useStartSessionDraftStore(
     (s) => s.plannedSegmentLengthMinutes,
   );
+  const extraTimeEnabled = useStartSessionDraftStore((s) => s.extraTimeEnabled);
+  const plannedExtraTimeSegmentLengthMinutes = useStartSessionDraftStore(
+    (s) => s.plannedExtraTimeSegmentLengthMinutes,
+  );
+  const trainingActivityOptions = useStartSessionDraftStore((s) => s.trainingActivityOptions);
+  const startingActivityKind = useStartSessionDraftStore((s) => s.startingActivityKind);
   const pitchId = useStartSessionDraftStore((s) => s.pitchId);
   const pitchNameDraft = useStartSessionDraftStore((s) => s.pitchName);
   const skipHeatmap = useStartSessionDraftStore((s) => s.skipHeatmap);
@@ -49,9 +58,10 @@ export default function PitchSetupRoute() {
   const clearPitchSelection = useStartSessionDraftStore((s) => s.clearPitchSelection);
   const setCorners = useStartSessionDraftStore((s) => s.setCorners);
   const setAttackDirection = useStartSessionDraftStore((s) => s.setAttackDirection);
+  const setStartingActivityKind = useStartSessionDraftStore((s) => s.setStartingActivityKind);
   const resetDraft = useStartSessionDraftStore((s) => s.reset);
 
-  const [step, setStep] = useState<PitchSetupStep>('source');
+  const [step, setStep] = useState<PitchSetupStep>(forceSkipPitch ? 'kickoff' : 'source');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [locationBusy, setLocationBusy] = useState(false);
@@ -79,6 +89,14 @@ export default function PitchSetupRoute() {
   }, [dismissedNearby, nearbyQuery.data]);
 
   useEffect(() => {
+    if (forceSkipPitch) {
+      setSkipHeatmap();
+      setStep('kickoff');
+    }
+  }, [forceSkipPitch, setSkipHeatmap]);
+
+  useEffect(() => {
+    if (forceSkipPitch) return;
     let cancelled = false;
     const load = async () => {
       setLocationBusy(true);
@@ -95,18 +113,27 @@ export default function PitchSetupRoute() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [forceSkipPitch]);
 
   useFocusEffect(
     useCallback(() => {
+      if (forceSkipPitch) return;
       if (pitchId && step === 'source') {
         setStep('kickoff');
       }
-    }, [pitchId, step]),
+    }, [forceSkipPitch, pitchId, step]),
   );
 
   const structure: PlayStructure = playStructure ?? 'halves';
-  const needsAttackDirection = structure !== 'open';
+  const resolvedStartingActivity: ActivityKind | null =
+    startingActivityKind ??
+    (trainingActivityOptions.length === 1 ? (trainingActivityOptions[0] ?? null) : null);
+
+  const needsAttackDirection = shouldResolveAttackDirection({
+    sessionType,
+    activityKind: sessionType === 'training' ? resolvedStartingActivity : null,
+    pitchId: skipHeatmap ? null : pitchId,
+  });
 
   const goKickoffWithPitch = (pitch: PitchRead) => {
     setPitchFromRead(pitch);
@@ -245,27 +272,51 @@ export default function PitchSetupRoute() {
 
   const handleKickOff = async () => {
     setError(null);
+
+    if (sessionType === 'training') {
+      if (!resolvedStartingActivity) {
+        setError('Choose which activity to start with');
+        return;
+      }
+    }
+
     try {
+      const isHalves = structure === 'halves';
       const session = await createSession.mutateAsync({
         session_type: sessionType,
         play_structure: structure,
         planned_segment_length_minutes:
-          structure === 'open' ? undefined : (plannedSegmentLengthMinutes ?? undefined),
+          structure === 'training_activities'
+            ? undefined
+            : (plannedSegmentLengthMinutes ?? undefined),
+        extra_time_enabled: isHalves ? (extraTimeEnabled ?? false) : false,
+        planned_extra_time_segment_length_minutes:
+          isHalves && extraTimeEnabled === true
+            ? (plannedExtraTimeSegmentLengthMinutes ?? undefined)
+            : undefined,
+        training_activity_options: sessionType === 'training' ? trainingActivityOptions : undefined,
         pitch_id: skipHeatmap ? null : pitchId,
       });
 
       const startOut = await startSession.mutateAsync({
         sessionId: session.id,
-        body:
-          needsAttackDirection && !skipHeatmap && pitchId
-            ? { attack_direction: attackDirection }
-            : {},
+        body: {
+          ...(needsAttackDirection ? { attack_direction: attackDirection } : {}),
+          ...(sessionType === 'training' && resolvedStartingActivity
+            ? { activity_kind: resolvedStartingActivity }
+            : {}),
+        },
       });
 
       await bootstrapTrackingSession({
         startOut,
         pitchName: pitchNameDraft,
         pitchCorners: resolvedPitchCorners(),
+        extraTimeEnabled: isHalves ? (extraTimeEnabled ?? false) : false,
+        plannedExtraTimeSegmentLengthMinutes:
+          isHalves && extraTimeEnabled === true ? plannedExtraTimeSegmentLengthMinutes : null,
+        trainingActivityOptions: sessionType === 'training' ? trainingActivityOptions : [],
+        startingActivityKind: sessionType === 'training' ? resolvedStartingActivity : null,
       });
 
       resetDraft();
@@ -305,9 +356,11 @@ export default function PitchSetupRoute() {
       pitchNameError={pitchNameError}
       similarPitches={similarPitches}
       selectedPitchName={pitchNameDraft}
-      skipHeatmap={skipHeatmap}
+      skipHeatmap={skipHeatmap || forceSkipPitch}
       needsAttackDirection={needsAttackDirection}
       attackDirection={attackDirection}
+      trainingActivityOptions={sessionType === 'training' ? trainingActivityOptions : []}
+      startingActivityKind={resolvedStartingActivity}
       busy={busy}
       error={error}
       onUseNearby={() => {
@@ -339,10 +392,15 @@ export default function PitchSetupRoute() {
         void handleCreateAnyway();
       }}
       onFlipAttack={() => setAttackDirection(attackDirection === 'end_a' ? 'end_b' : 'end_a')}
+      onSelectStartingActivity={setStartingActivityKind}
       onKickOff={() => {
         void handleKickOff();
       }}
       onBack={() => {
+        if (forceSkipPitch) {
+          router.back();
+          return;
+        }
         if (step === 'kickoff') {
           clearPitchSelection();
           setStep('source');

@@ -11,15 +11,27 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, HoldToConfirmButton, StatusPill } from '@/components';
 import { colors, typography, spacing } from '@/theme';
-import type { AttackDirection } from '@/features/sessions/types';
+import type { ActivityKind, AttackDirection, PlayStructure } from '@/features/sessions/types';
+import {
+  activityKindLabel,
+  canAddExtraTime,
+  canSwitchHalf,
+  halvesPhaseLabelLong,
+  plannedMinutesForSegment,
+} from '@/features/sessions/segment-display';
 import {
   formatDistance,
   formatElapsed,
   formatElapsedLong,
   formatSpeed,
 } from '@/features/sessions/tracking/live-metrics';
+import {
+  isExtraTimeEnabled,
+  parseTrainingActivityOptions,
+} from '@/features/sessions/tracking/types';
 import { useTrackingHudStore } from '@/features/sessions/tracking/tracking-store';
 import { useTrackingSession } from '@/features/sessions/tracking/use-tracking-session';
+import { HOLD_CONFIRM_SECONDS } from '@/features/sessions/tracking/constants';
 
 type ActiveSessionScreenProps = {
   sessionType: string;
@@ -28,10 +40,29 @@ type ActiveSessionScreenProps = {
   onEnd: () => void;
 };
 
-const segmentCtaLabel = ({ playStructure }: { playStructure: string | undefined }) => {
-  if (playStructure === 'sets') return 'START NEW SET';
-  if (playStructure === 'halves') return 'HALF TIME';
+const halvesCtaLabel = ({
+  playStructure,
+  extraTimeEnabled,
+  segmentIndex,
+}: {
+  playStructure: PlayStructure;
+  extraTimeEnabled: boolean;
+  segmentIndex: number;
+}): string => {
+  if (playStructure !== 'halves') return '';
+  if (canSwitchHalf({ playStructure, currentSegmentIndex: segmentIndex })) return 'HALF TIME';
+  if (canAddExtraTime({ playStructure, extraTimeEnabled, currentSegmentIndex: segmentIndex })) {
+    return 'ADD EXTRA TIME';
+  }
   return '';
+};
+
+const nextHalvesConfirmTitle = (closedSegmentIndex: number): string => {
+  const next = closedSegmentIndex + 1;
+  if (next === 2) return 'START SECOND HALF';
+  if (next === 3) return 'START ET 1';
+  if (next === 4) return 'START ET 2';
+  return `START SEGMENT ${next}`;
 };
 
 const PermissionScreen: React.FC<{
@@ -71,40 +102,62 @@ const PermissionScreen: React.FC<{
 );
 
 const SegmentSwitchScreen: React.FC<{
-  sessionType: string;
-  playStructure: string;
+  playStructure: PlayStructure;
   segmentIndex: number;
   closedElapsed: number;
   closedDistanceKm: number;
   attackDirection: AttackDirection | null;
   distanceUnit: 'km' | 'mi';
+  pendingActivityKind: ActivityKind | null;
   onFlip: () => void;
   onConfirm: () => void;
   busy?: boolean;
 }> = ({
-  sessionType,
   playStructure,
   segmentIndex,
   closedElapsed,
   closedDistanceKm,
   attackDirection,
   distanceUnit,
+  pendingActivityKind,
   onFlip,
   onConfirm,
   busy,
 }) => {
   const attackingEndA = attackDirection === 'end_a';
-  const halfLabel =
+  const closedLabel =
     playStructure === 'halves'
-      ? segmentIndex === 1
-        ? 'FIRST HALF'
-        : 'SECOND HALF'
-      : `SET ${segmentIndex}`;
+      ? halvesPhaseLabelLong(segmentIndex)
+      : playStructure === 'sets'
+        ? `SET ${segmentIndex}`
+        : pendingActivityKind
+          ? activityKindLabel(pendingActivityKind)
+          : `SEGMENT ${segmentIndex}`;
+
+  const confirmTitle =
+    playStructure === 'halves'
+      ? nextHalvesConfirmTitle(segmentIndex)
+      : playStructure === 'sets'
+        ? `START SET ${segmentIndex + 1}`
+        : pendingActivityKind
+          ? `START ${activityKindLabel(pendingActivityKind)}`
+          : 'START NEXT';
+
+  const segmentMeta =
+    playStructure === 'halves'
+      ? segmentIndex + 1 <= 2
+        ? `SEGMENT ${segmentIndex + 1} OF 2`
+        : `ET ${segmentIndex - 1}`
+      : playStructure === 'sets'
+        ? `SET ${segmentIndex + 1}`
+        : pendingActivityKind
+          ? activityKindLabel(pendingActivityKind)
+          : `SEGMENT ${segmentIndex + 1}`;
 
   return (
     <ScrollView style={styles.content} contentContainerStyle={styles.segmentSwitchContent}>
       <Text style={styles.eyebrow}>
-        {halfLabel} CLOSED · {formatElapsedLong(closedElapsed)}
+        {closedLabel} CLOSED · {formatElapsedLong(closedElapsed)}
       </Text>
       <Text style={styles.permissionTitle}>Swapped ends?</Text>
       <Text style={styles.permissionBody}>
@@ -126,30 +179,18 @@ const SegmentSwitchScreen: React.FC<{
         </Text>
       </View>
       <View style={styles.segmentMetaRow}>
+        <Text style={styles.segmentMetaChip}>{segmentMeta}</Text>
         <Text style={styles.segmentMetaChip}>
-          SEGMENT {segmentIndex + 1} OF {playStructure === 'halves' ? 2 : segmentIndex + 1}
-        </Text>
-        <Text style={styles.segmentMetaChip}>
-          {halfLabel} {formatDistance({ km: closedDistanceKm, unit: distanceUnit })}{' '}
+          {closedLabel} {formatDistance({ km: closedDistanceKm, unit: distanceUnit })}{' '}
           {distanceUnit === 'mi' ? 'MI' : 'KM'}
         </Text>
       </View>
       <TouchableOpacity onPress={onFlip}>
         <Text style={styles.flipLink}>FLIP DIRECTION</Text>
       </TouchableOpacity>
-      <Button
-        title={
-          playStructure === 'halves'
-            ? segmentIndex >= 1
-              ? 'START SECOND HALF'
-              : 'START FIRST HALF'
-            : `START SET ${segmentIndex + 1}`
-        }
-        onPress={onConfirm}
-        loading={busy}
-      />
+      <Button title={confirmTitle} onPress={onConfirm} loading={busy} />
       <Text style={styles.permissionFoot}>
-        NO PITCH MARKED? THIS STEP IS SKIPPED — THE HALF STILL COUNTS, THE DIRECTION STAYS BLANK.
+        NO PITCH MARKED? THIS STEP IS SKIPPED — THE SEGMENT STILL COUNTS, THE DIRECTION STAYS BLANK.
       </Text>
     </ScrollView>
   );
@@ -168,9 +209,12 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
     trackingStatus,
     gps,
     distanceUnit: distanceUnitFromHook,
+    playStructure: playStructureFromHook,
+    pendingActivityKind,
     grantPermissionAndStart,
     pause,
     resume,
+    stopCurrentActivity,
     beginSegmentSwitch,
     confirmSegmentSwitch,
     flipPendingDirection,
@@ -186,8 +230,11 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   const pendingAttackDirection = useTrackingHudStore((s) => s.pendingAttackDirection);
   const closedSegmentElapsed = useTrackingHudStore((s) => s.closedSegmentElapsed);
   const closedSegmentDistanceKm = useTrackingHudStore((s) => s.closedSegmentDistanceKm);
+  const closedSegmentIndex = useTrackingHudStore((s) => s.closedSegmentIndex);
   const gpsSearchSeconds = useTrackingHudStore((s) => s.gpsSearchSeconds);
   const segmentIndex = useTrackingHudStore((s) => s.segmentIndex);
+  const activityKind = useTrackingHudStore((s) => s.activityKind);
+  const closedSegmentLabel = useTrackingHudStore((s) => s.closedSegmentLabel);
 
   const [busy, setBusy] = React.useState(false);
 
@@ -199,16 +246,35 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
     );
   }
 
-  const playStructure = session?.play_structure ?? 'open';
-  const plannedMinutes = session?.planned_segment_length_minutes;
+  const playStructure = playStructureFromHook;
+  const plannedMinutes = plannedMinutesForSegment({
+    session: session ?? {
+      session_type: 'match',
+      play_structure: playStructure,
+      planned_segment_length_minutes: null,
+      planned_extra_time_segment_length_minutes: null,
+    },
+    segment: { segment_index: segmentIndex },
+  });
   const plannedSeconds = plannedMinutes ? plannedMinutes * 60 : null;
   const displayElapsed =
     plannedSeconds != null && extraSeconds > 0 ? plannedSeconds : elapsedSeconds;
-  const isExtraTime = plannedSeconds != null && extraSeconds > 0;
-  const isOpen = playStructure === 'open';
-  const segmentCta = segmentCtaLabel({ playStructure });
-  const statusLabel =
-    trackingStatus === 'manual_pause'
+  const isOverrun = plannedSeconds != null && extraSeconds > 0;
+  const isTraining = playStructure === 'training_activities';
+  const trainingOptions = parseTrainingActivityOptions(session?.training_activity_options);
+  const extraTimeEnabled = isExtraTimeEnabled(session?.extra_time_enabled);
+  const halvesCta = halvesCtaLabel({
+    playStructure,
+    extraTimeEnabled,
+    segmentIndex,
+  });
+  const setsCta = playStructure === 'sets' ? 'START NEW SET' : '';
+  const isActivityLive = isTraining && activityKind != null;
+  const trainingIdle = isTraining && !isActivityLive;
+  const activityNoun = activityKind ? activityKindLabel(activityKind) : 'ACTIVITY';
+  const statusLabel = trainingIdle
+    ? 'REST · TRAINING'
+    : trackingStatus === 'manual_pause'
       ? `PAUSED · ${sessionType.toUpperCase()} · ${segmentLabel}`
       : trackingStatus === 'auto_pause'
         ? `HOLDING · ${segmentLabel}`
@@ -226,6 +292,15 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
     try {
       await endSession();
       onEnd();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleEndActivity = async () => {
+    setBusy(true);
+    try {
+      await stopCurrentActivity();
     } finally {
       setBusy(false);
     }
@@ -257,13 +332,13 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
     return (
       <SafeAreaView style={styles.container}>
         <SegmentSwitchScreen
-          sessionType={sessionType}
           playStructure={playStructure}
-          segmentIndex={segmentIndex}
+          segmentIndex={closedSegmentIndex}
           closedElapsed={closedSegmentElapsed}
           closedDistanceKm={closedSegmentDistanceKm}
           attackDirection={pendingAttackDirection}
           distanceUnit={distanceUnit}
+          pendingActivityKind={pendingActivityKind}
           onFlip={flipPendingDirection}
           onConfirm={async () => {
             setBusy(true);
@@ -278,33 +353,64 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
 
   const isPaused = trackingStatus !== 'live';
   const metricsDimmed = trackingStatus === 'auto_pause';
+  const displayTime = trainingIdle ? closedSegmentElapsed : displayElapsed;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <StatusPill label={statusLabel} status={statusPillStatus} />
+          <StatusPill label={statusLabel} status={trainingIdle ? 'paused' : statusPillStatus} />
           <Text style={[styles.gpsStatus, metricsDimmed && styles.dimmed]}>
             {trackingStatus === 'auto_pause' ? 'GPS ▮ WEAK' : gps.label}
           </Text>
         </View>
 
+        {isTraining ? (
+          <View style={styles.activityHero}>
+            <Text style={styles.activityEyebrow}>
+              {trainingIdle
+                ? 'BETWEEN ACTIVITIES'
+                : trackingStatus === 'manual_pause'
+                  ? `${segmentLabel} · PAUSED`
+                  : `${segmentLabel} · IN PROGRESS`}
+            </Text>
+            <Text style={styles.activityTitle}>
+              {trainingIdle
+                ? closedSegmentLabel
+                  ? `${closedSegmentLabel} done.`
+                  : 'Ready when you are.'
+                : segmentLabel}
+            </Text>
+            <Text style={styles.activityHint}>
+              {trainingIdle
+                ? 'GPS is holding. Start the next run, drill, or set when you are ready.'
+                : `Clock and distance count this ${activityNoun.toLowerCase()} only. End it when you stop.`}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.timeSection}>
           <Text style={styles.timeLabel}>
-            {trackingStatus === 'manual_pause'
-              ? 'ELAPSED · YOU STOPPED IT'
-              : trackingStatus === 'auto_pause'
-                ? 'ELAPSED · CLOCK STOPPED'
-                : plannedMinutes
-                  ? `ELAPSED · PLANNED ${formatElapsed(plannedMinutes * 60)}`
-                  : 'ELAPSED'}
+            {trainingIdle
+              ? closedSegmentLabel
+                ? `${closedSegmentLabel} · LAST`
+                : 'ELAPSED'
+              : trackingStatus === 'manual_pause'
+                ? 'ELAPSED · YOU STOPPED IT'
+                : trackingStatus === 'auto_pause'
+                  ? 'ELAPSED · CLOCK STOPPED'
+                  : plannedMinutes
+                    ? `ELAPSED · PLANNED ${formatElapsed(plannedMinutes * 60)}`
+                    : isActivityLive
+                      ? `THIS ${activityNoun}`
+                      : 'ELAPSED'}
           </Text>
-          <Text style={[styles.timeValue, isExtraTime && styles.timeValueMuted]}>
-            {formatElapsed(displayElapsed)}
+          <Text style={[styles.timeValue, (isOverrun || trainingIdle) && styles.timeValueMuted]}>
+            {formatElapsed(displayTime)}
           </Text>
         </View>
 
-        {isExtraTime && trackingStatus === 'live' ? (
+        {isOverrun && trackingStatus === 'live' ? (
           <View style={styles.extraTimeCard}>
             <View>
               <Text style={styles.extraTimeLabel}>EXTRA TIME</Text>
@@ -326,7 +432,12 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
           <View style={styles.manualPauseBlock}>
             <Text style={styles.autoPauseTitle}>Take your time.</Text>
             <Text style={styles.pauseListLabel}>
-              BREAKS THIS {playStructure === 'halves' ? 'HALF' : 'SET'}
+              BREAKS THIS{' '}
+              {playStructure === 'halves'
+                ? 'HALF'
+                : playStructure === 'sets'
+                  ? 'SET'
+                  : activityNoun}
             </Text>
             <Text style={styles.pauseListItem}>YOUR PAUSE · RUNNING</Text>
           </View>
@@ -334,22 +445,32 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
 
         <View style={[styles.primaryStats, metricsDimmed && styles.dimmed]}>
           <View style={styles.primaryStat}>
-            <Text style={styles.primaryStatLabel}>DISTANCE</Text>
+            <Text style={styles.primaryStatLabel}>
+              {trainingIdle ? 'LAST DISTANCE' : 'DISTANCE'}
+            </Text>
             <Text style={styles.primaryStatValue}>
-              {formatDistance({ km: metrics.distanceKm, unit: distanceUnit })}
+              {formatDistance({
+                km: trainingIdle ? closedSegmentDistanceKm : metrics.distanceKm,
+                unit: distanceUnit,
+              })}
               <Text style={styles.primaryStatUnit}> {distanceUnit === 'mi' ? 'MI' : 'KM'}</Text>
             </Text>
           </View>
-          <View style={[styles.primaryStat, styles.primaryStatBorder]}>
-            <Text style={styles.primaryStatLabel}>TOP SPEED</Text>
-            <Text style={[styles.primaryStatValue, styles.speedHighlight]}>
-              {formatSpeed({ kmh: metrics.topSpeedKmh, unit: distanceUnit })}
-              <Text style={styles.primaryStatUnit}> {distanceUnit === 'mi' ? 'MPH' : 'KM/H'}</Text>
-            </Text>
-          </View>
+          {trainingIdle ? null : (
+            <View style={[styles.primaryStat, styles.primaryStatBorder]}>
+              <Text style={styles.primaryStatLabel}>TOP SPEED</Text>
+              <Text style={[styles.primaryStatValue, styles.speedHighlight]}>
+                {formatSpeed({ kmh: metrics.topSpeedKmh, unit: distanceUnit })}
+                <Text style={styles.primaryStatUnit}>
+                  {' '}
+                  {distanceUnit === 'mi' ? 'MPH' : 'KM/H'}
+                </Text>
+              </Text>
+            </View>
+          )}
         </View>
 
-        {isExtraTime && trackingStatus === 'live' ? (
+        {isOverrun && trackingStatus === 'live' ? (
           <Text style={styles.helperCopy}>
             The clock keeps running past the planned mark. Eleven never auto-switches halves — you
             decide when to switch.
@@ -361,29 +482,59 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
         {trackingStatus === 'manual_pause' ? (
           <>
             <Button title="RESUME" onPress={() => void resume()} />
+            {isActivityLive ? (
+              <HoldToConfirmButton
+                title={`HOLD TO END CURRENT ${activityNoun}`}
+                variant="secondary"
+                onConfirm={() => void handleEndActivity()}
+                disabled={busy}
+                style={styles.holdFullWidth}
+              />
+            ) : null}
             <HoldToConfirmButton
               title="HOLD TO END SESSION"
-              hint="HOLD 3 SECONDS · NO ACCIDENTAL STOPS"
               onConfirm={() => void handleEnd()}
               disabled={busy}
+              style={styles.holdFullWidth}
             />
           </>
         ) : trackingStatus === 'auto_pause' ? null : (
           <>
-            {!isOpen && !isPaused && segmentCta ? (
-              <Button
-                title={segmentCta}
-                onPress={() => void beginSegmentSwitch()}
+            {isActivityLive ? (
+              <HoldToConfirmButton
+                title={`HOLD TO END CURRENT ${activityNoun}`}
+                variant="secondary"
+                onConfirm={() => void handleEndActivity()}
                 disabled={busy}
+                style={styles.holdFullWidth}
               />
             ) : null}
+            {trainingIdle
+              ? trainingOptions.map((kind) => (
+                  <Button
+                    key={kind}
+                    title={`START ${activityKindLabel(kind)}`}
+                    onPress={() => void beginSegmentSwitch({ activityKind: kind })}
+                    disabled={busy}
+                    variant="secondary"
+                  />
+                ))
+              : null}
+            {!isTraining && !isPaused && halvesCta ? (
+              <Button title={halvesCta} onPress={() => void beginSegmentSwitch()} disabled={busy} />
+            ) : null}
+            {!isTraining && !isPaused && setsCta ? (
+              <Button title={setsCta} onPress={() => void beginSegmentSwitch()} disabled={busy} />
+            ) : null}
             <View style={styles.holdRow}>
-              <HoldToConfirmButton
-                title="HOLD TO PAUSE"
-                onConfirm={() => void pause()}
-                variant="secondary"
-                disabled={busy}
-              />
+              {trainingIdle ? null : (
+                <HoldToConfirmButton
+                  title="HOLD TO PAUSE"
+                  onConfirm={() => void pause()}
+                  variant="secondary"
+                  disabled={busy}
+                />
+              )}
               <HoldToConfirmButton
                 title="HOLD TO END"
                 onConfirm={() => void handleEnd()}
@@ -391,7 +542,9 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
                 disabled={busy}
               />
             </View>
-            <Text style={styles.endHint}>HOLD 3 SECONDS · NO ACCIDENTAL STOPS</Text>
+            <Text style={styles.endHint}>
+              {`HOLD ${HOLD_CONFIRM_SECONDS} SECONDS · NO ACCIDENTAL STOPS`}
+            </Text>
           </>
         )}
       </View>
@@ -426,6 +579,31 @@ const styles = StyleSheet.create({
   },
   dimmed: {
     opacity: 0.45,
+  },
+  activityHero: {
+    paddingHorizontal: spacing[6],
+    paddingTop: spacing[8],
+    gap: 10,
+  },
+  activityEyebrow: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 11,
+    letterSpacing: 0.2 * 11,
+    color: colors.brand.primary,
+  },
+  activityTitle: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 30,
+    lineHeight: 32,
+    letterSpacing: -0.025 * 30,
+    fontWeight: typography.fontWeight.extrabold,
+    color: colors.text.primary,
+  },
+  activityHint: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.text.secondary,
   },
   timeSection: {
     paddingHorizontal: spacing[6],
@@ -528,6 +706,10 @@ const styles = StyleSheet.create({
   holdRow: {
     flexDirection: 'row',
     gap: 12,
+  },
+  holdFullWidth: {
+    flex: 0,
+    alignSelf: 'stretch',
   },
   endHint: {
     fontFamily: typography.fontFamily.mono,

@@ -8,10 +8,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Field } from '@/components';
+import { Button, Chip, Field } from '@/components';
 import { colors, typography, spacing } from '@/theme';
 import type { PitchNearby, PitchRead } from '@/features/pitches/types';
-import type { AttackDirection } from '@/features/sessions/types';
+import type { ActivityKind, AttackDirection } from '@/features/sessions/types';
+import { activityKindLabel } from '@/features/sessions/segment-display';
 
 export type PitchSetupStep = 'source' | 'mark' | 'name' | 'similar' | 'kickoff';
 
@@ -46,6 +47,8 @@ type PitchSetupScreenProps = {
   skipHeatmap: boolean;
   needsAttackDirection: boolean;
   attackDirection: AttackDirection;
+  trainingActivityOptions?: ActivityKind[];
+  startingActivityKind?: ActivityKind | null;
   busy?: boolean;
   error?: string | null;
   onUseNearby: () => void;
@@ -59,6 +62,7 @@ type PitchSetupScreenProps = {
   onSelectSimilar: (pitch: PitchRead) => void;
   onCreateAnyway: () => void;
   onFlipAttack: () => void;
+  onSelectStartingActivity?: (kind: ActivityKind) => void;
   onKickOff: () => void;
   onBack: () => void;
 };
@@ -78,6 +82,8 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
   skipHeatmap,
   needsAttackDirection,
   attackDirection,
+  trainingActivityOptions = [],
+  startingActivityKind = null,
   busy = false,
   error = null,
   onUseNearby,
@@ -91,12 +97,14 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
   onSelectSimilar,
   onCreateAnyway,
   onFlipAttack,
+  onSelectStartingActivity,
   onKickOff,
   onBack,
 }) => {
   const [nameFocused, setNameFocused] = useState(false);
   const nextCorner = CORNER_ORDER[markedCornerCount];
   const attackingEndA = attackDirection === 'end_a';
+  const showStartingActivity = trainingActivityOptions.length > 1;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -335,16 +343,32 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
                   ? 'READY · NO HEATMAP'
                   : needsAttackDirection
                     ? 'KICKOFF · ATTACK'
-                    : 'READY · OPEN'}
+                    : 'READY · TRAINING'}
               </Text>
               <Text style={styles.headerTitle}>
                 {skipHeatmap
                   ? 'Track without a\nheatmap.'
                   : needsAttackDirection
                     ? 'Which end are you\nattacking?'
-                    : 'Pitch set. No ends\nto defend.'}
+                    : 'Ready when\nyou are.'}
               </Text>
             </View>
+
+            {showStartingActivity && onSelectStartingActivity ? (
+              <View style={styles.startingActivitySection}>
+                <Text style={styles.sectionMonoLabel}>STARTING WITH</Text>
+                <View style={styles.startingActivityChips}>
+                  {trainingActivityOptions.map((kind) => (
+                    <Chip
+                      key={kind}
+                      label={activityKindLabel(kind)}
+                      selected={startingActivityKind === kind}
+                      onPress={() => onSelectStartingActivity(kind)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : null}
 
             {needsAttackDirection && !skipHeatmap ? (
               <>
@@ -405,7 +429,7 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
               <Text style={styles.hintPadded}>
                 {skipHeatmap
                   ? 'No corners, no attack direction. You can still track distance and time.'
-                  : 'Open sessions keep the pitch for heatmap context but skip attack direction.'}
+                  : 'Runs and drills skip attack direction. Sets use the pitch for heatmaps.'}
               </Text>
             )}
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -608,6 +632,22 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 15 * 1.5,
     marginBottom: spacing[5],
+  },
+  startingActivitySection: {
+    paddingHorizontal: spacing[6],
+    gap: 12,
+    marginBottom: spacing[5],
+  },
+  sectionMonoLabel: {
+    fontFamily: typography.fontFamily.mono,
+    fontSize: 10,
+    letterSpacing: 0.16 * 10,
+    color: colors.text.secondary,
+  },
+  startingActivityChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   primaryButton: {
     height: 64,

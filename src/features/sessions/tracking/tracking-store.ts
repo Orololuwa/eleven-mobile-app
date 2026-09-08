@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AttackDirection } from '../types';
+import type { ActivityKind, AttackDirection } from '../types';
 import type { LiveMetrics, TrackingPhase } from './types';
 
 type TrackingHudStore = {
@@ -10,10 +10,13 @@ type TrackingHudStore = {
   gpsAccuracyM: number | null;
   segmentIndex: number;
   segmentLabel: string;
+  activityKind: ActivityKind | null;
   attackDirection: AttackDirection | null;
   pendingAttackDirection: AttackDirection | null;
   closedSegmentElapsed: number;
   closedSegmentDistanceKm: number;
+  closedSegmentIndex: number;
+  closedSegmentLabel: string;
   gpsSearchSeconds: number;
   setPhase: (phase: TrackingPhase) => void;
   setHud: (patch: Partial<Omit<TrackingHudStore, 'setPhase' | 'setHud' | 'reset'>>) => void;
@@ -27,11 +30,14 @@ const initialHud = {
   metrics: { distanceKm: 0, topSpeedKmh: 0 },
   gpsAccuracyM: null as number | null,
   segmentIndex: 1,
-  segmentLabel: '1ST HALF',
+  segmentLabel: 'SESSION',
+  activityKind: null as ActivityKind | null,
   attackDirection: null as AttackDirection | null,
   pendingAttackDirection: null as AttackDirection | null,
   closedSegmentElapsed: 0,
   closedSegmentDistanceKm: 0,
+  closedSegmentIndex: 1,
+  closedSegmentLabel: '',
   gpsSearchSeconds: 0,
 };
 

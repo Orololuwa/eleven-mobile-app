@@ -9,7 +9,7 @@ import {
   type TextStyle,
 } from 'react-native';
 import { colors, typography } from '@/theme';
-import { HOLD_CONFIRM_MS } from '@/features/sessions/tracking/constants';
+import { HOLD_CONFIRM_MS, HOLD_CONFIRM_SECONDS } from '@/features/sessions/tracking/constants';
 
 type HoldToConfirmButtonProps = {
   title: string;
