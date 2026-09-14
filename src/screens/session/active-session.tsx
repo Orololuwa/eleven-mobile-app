@@ -93,11 +93,20 @@ const PermissionScreen: React.FC<{
       Keeping While Using still works — tracking pauses when the screen locks and resumes when you
       open the app again.
     </Text>
-    {Platform.OS === 'android' ? (
-      <Text style={styles.permissionFoot}>
-        Android uses a persistent notification — no &quot;All the time&quot; permission needed.
-      </Text>
-    ) : null}
+  </ScrollView>
+);
+
+const AndroidPermissionScreen: React.FC<{
+  onAllow: () => void;
+  busy?: boolean;
+}> = ({ onAllow, busy }) => (
+  <ScrollView style={styles.content} contentContainerStyle={styles.permissionContent}>
+    <Text style={styles.eyebrow}>BEFORE KICKOFF</Text>
+    <Text style={styles.permissionTitle}>Allow location to start tracking.</Text>
+    <Text style={styles.permissionBody}>
+      Android uses a persistent notification — no &quot;All the time&quot; permission needed.
+    </Text>
+    <Button title="ALLOW LOCATION" onPress={onAllow} loading={busy} />
   </ScrollView>
 );
 
@@ -306,24 +315,36 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
     }
   };
 
-  if (phase === 'permission' && Platform.OS === 'ios') {
+  if (phase === 'permission') {
     return (
       <SafeAreaView style={styles.container}>
-        <PermissionScreen
-          busy={busy}
-          onAlways={async () => {
-            setBusy(true);
-            const ok = await grantPermissionAndStart(true);
-            setBusy(false);
-            if (!ok) return;
-          }}
-          onWhenInUse={async () => {
-            setBusy(true);
-            const ok = await grantPermissionAndStart(false);
-            setBusy(false);
-            if (!ok) return;
-          }}
-        />
+        {Platform.OS === 'ios' ? (
+          <PermissionScreen
+            busy={busy}
+            onAlways={async () => {
+              setBusy(true);
+              const ok = await grantPermissionAndStart(true);
+              setBusy(false);
+              if (!ok) return;
+            }}
+            onWhenInUse={async () => {
+              setBusy(true);
+              const ok = await grantPermissionAndStart(false);
+              setBusy(false);
+              if (!ok) return;
+            }}
+          />
+        ) : (
+          <AndroidPermissionScreen
+            busy={busy}
+            onAllow={async () => {
+              setBusy(true);
+              const ok = await grantPermissionAndStart(false);
+              setBusy(false);
+              if (!ok) return;
+            }}
+          />
+        )}
       </SafeAreaView>
     );
   }

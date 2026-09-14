@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { Platform } from 'react-native';
 import { ActiveSessionScreen } from '@/screens';
 import { getActiveTrackingSession, initTrackingDb } from '@/features/sessions/tracking/db';
-import { isLocationTaskRunning } from '@/features/sessions/tracking/location-task';
-import { beginTrackingAfterPermission } from '@/features/sessions/tracking/session-lifecycle';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ActiveSessionRoute() {
@@ -29,19 +26,9 @@ export default function ActiveSessionRoute() {
           pathname: '/(app)/active-session',
           params: { sessionType: active.session_type, sessionId: active.id },
         });
-        return;
-      }
-      if (Platform.OS === 'android' && sessionId) {
-        const running = await isLocationTaskRunning();
-        if (!running) {
-          await beginTrackingAfterPermission({
-            backgroundPermission: 'when_in_use',
-            distanceUnit,
-          });
-        }
       }
     })();
-  }, [sessionId, distanceUnit]);
+  }, [sessionId]);
 
   return (
     <ActiveSessionScreen

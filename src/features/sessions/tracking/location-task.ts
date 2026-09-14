@@ -17,7 +17,16 @@ import {
   insertTrackPoint,
   updateSessionFields,
 } from './db';
+import { getForegroundPermissionStatus } from './permissions';
 import type { PauseReason } from './types';
+
+let startLock: Promise<void> = Promise.resolve();
+
+const isForegroundServiceStartNotAllowed = (error: unknown) =>
+  error instanceof Error &&
+  error.message.includes(
+    'Foreground service cannot be started when the application is in the background',
+  );
 
 type LocationTaskData = {
   locations?: Location.LocationObject[];
@@ -176,8 +185,11 @@ const whenAppActive = () => {
   });
 };
 
-export const startLocationTracking = async ({ notificationBody }: { notificationBody: string }) => {
+const startLocationTrackingOnce = async ({ notificationBody }: { notificationBody: string }) => {
   if (await isLocationTaskRunning()) return;
+  if (!(await getForegroundPermissionStatus())) {
+    throw new Error('Location permission is required to start tracking');
+  }
 
   if (Platform.OS === 'android' && AppState.currentState !== 'active') {
     await whenAppActive();
@@ -190,13 +202,27 @@ export const startLocationTracking = async ({ notificationBody }: { notification
       buildLocationOptions({ notificationBody }),
     );
   } catch (error) {
-    if (Platform.OS !== 'android') throw error;
+    if (Platform.OS !== 'android' || !isForegroundServiceStartNotAllowed(error)) throw error;
     await whenAppActive();
     if (await isLocationTaskRunning()) return;
     await Location.startLocationUpdatesAsync(
       LOCATION_TASK_NAME,
       buildLocationOptions({ notificationBody }),
     );
+  }
+};
+
+export const startLocationTracking = async ({ notificationBody }: { notificationBody: string }) => {
+  const previous = startLock;
+  let release = () => {};
+  startLock = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    await startLocationTrackingOnce({ notificationBody });
+  } finally {
+    release();
   }
 };
 
