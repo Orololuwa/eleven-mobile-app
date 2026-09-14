@@ -28,6 +28,9 @@ const msSince = (iso: string | null) => (iso ? Date.now() - new Date(iso).getTim
 const speedMsToKmh = (speedMs: number | null) =>
   speedMs != null && speedMs >= 0 ? speedMs * 3.6 : null;
 
+const normalizeSpeedAccuracyMps = (value: number | null | undefined) =>
+  value != null && value >= 0 ? value : null;
+
 const startAutoPause = async ({
   sessionId,
   segmentId,
@@ -89,6 +92,9 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
     // If we're not in a manual pause and there's no open pause, insert a track point. This is because manual pauses are handled by the app, not the OS.
     if (inActivity && !inManualPause && !(await getOpenPause(session.id))) {
       const speedKmh = speedMsToKmh(coords.speed);
+      const coordsWithSpeedAccuracy = coords as typeof coords & {
+        speedAccuracy?: number | null;
+      };
       const sequenceIndex = session.next_sequence_index;
       await insertTrackPoint({
         sessionId: session.id,
@@ -98,6 +104,7 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
         lat: coords.latitude,
         lng: coords.longitude,
         speedKmh,
+        speedAccuracyMps: normalizeSpeedAccuracyMps(coordsWithSpeedAccuracy.speedAccuracy),
         horizontalAccuracyM: accuracy,
       });
       await updateSessionFields(session.id, { next_sequence_index: sequenceIndex + 1 });

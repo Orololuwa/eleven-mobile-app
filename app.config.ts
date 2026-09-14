@@ -54,5 +54,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     './plugins/with-safe-react-delegate.js',
+    './plugins/with-speed-accuracy.js',
   ],
 });

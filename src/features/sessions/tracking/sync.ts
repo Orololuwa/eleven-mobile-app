@@ -95,6 +95,7 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
           lat: point.lat,
           lng: point.lng,
           speed_kmh: point.speed_kmh,
+          speed_accuracy_mps: point.speed_accuracy_mps,
           horizontal_accuracy_m: point.horizontal_accuracy_m,
         },
       ];

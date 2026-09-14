@@ -40,6 +40,7 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   );
   await addColumnIfMissing(db, 'tracking_sessions', 'training_activity_options', 'TEXT');
   await addColumnIfMissing(db, 'tracking_segments', 'activity_kind', 'TEXT');
+  await addColumnIfMissing(db, 'tracking_points', 'speed_accuracy_mps', 'REAL');
 };
 
 const getDb = () => {
@@ -108,6 +109,7 @@ const getDb = () => {
           lat REAL NOT NULL,
           lng REAL NOT NULL,
           speed_kmh REAL,
+          speed_accuracy_mps REAL,
           horizontal_accuracy_m REAL,
           FOREIGN KEY (session_id) REFERENCES tracking_sessions(id)
         );
@@ -421,6 +423,7 @@ export const insertTrackPoint = async ({
   lat,
   lng,
   speedKmh,
+  speedAccuracyMps,
   horizontalAccuracyM,
 }: {
   sessionId: string;
@@ -430,14 +433,26 @@ export const insertTrackPoint = async ({
   lat: number;
   lng: number;
   speedKmh: number | null;
+  speedAccuracyMps: number | null;
   horizontalAccuracyM: number | null;
 }) => {
   const db = await getDb();
   const id = createTrackingId();
   await db.runAsync(
-    `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, horizontal_accuracy_m)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, sessionId, segmentId, sequenceIndex, recordedAt, lat, lng, speedKmh, horizontalAccuracyM],
+    `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      sessionId,
+      segmentId,
+      sequenceIndex,
+      recordedAt,
+      lat,
+      lng,
+      speedKmh,
+      speedAccuracyMps,
+      horizontalAccuracyM,
+    ],
   );
 };
 

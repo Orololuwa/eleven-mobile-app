@@ -1,4 +1,5 @@
 import type { TrackingPointRow } from './types';
+import { determineTopSpeedKmh } from './speed-filter';
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -58,9 +59,7 @@ export const computeLiveMetrics = ({
     return sum + haversineMetres(prev, point);
   }, 0);
 
-  const topSpeedKmh = activePoints.reduce((max, point) => Math.max(max, point.speed_kmh ?? 0), 0);
-
-  return { distanceKm: distanceM / 1000, topSpeedKmh };
+  return { distanceKm: distanceM / 1000, topSpeedKmh: determineTopSpeedKmh(activePoints) };
 };
 
 export const formatDistance = ({ km, unit }: { km: number; unit: 'km' | 'mi' }) => {

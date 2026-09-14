@@ -80,6 +80,7 @@ export type TrackingPointRow = {
   lat: number;
   lng: number;
   speed_kmh: number | null;
+  speed_accuracy_mps: number | null;
   horizontal_accuracy_m: number | null;
 };
 
@@ -111,6 +112,7 @@ export type TrackPointUpload = {
   lat: number;
   lng: number;
   speed_kmh: number | null;
+  speed_accuracy_mps: number | null;
   horizontal_accuracy_m: number;
 };
 

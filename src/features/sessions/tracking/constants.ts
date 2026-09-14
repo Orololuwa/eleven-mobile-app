@@ -40,3 +40,21 @@ export const HOLD_CONFIRM_SECONDS = HOLD_CONFIRM_MS / 1_000;
 export const LOCATION_TASK_NAME = 'eleven-location-tracking';
 
 export const ANDROID_FGS_TITLE = 'Eleven — tracking your session';
+
+/** F1 — max OS speed accuracy (m/s). Null speed_accuracy_mps skips F1. */
+export const SPEED_ACCURACY_MAX_MPS = 2.0;
+
+/** F2 — physically implausible top-speed ceiling (km/h). Reject at or above. */
+export const TOP_SPEED_CEILING_KMH = 40;
+
+/** F3 — reject when position-delta speed is below this fraction of averaged OS speed. */
+export const SPEED_CROSSCHECK_MIN_RATIO = 0.5;
+
+/** F4 — sustained peak must span at least this duration (ms). */
+export const TOP_SPEED_SUSTAINED_MS = 3_000;
+
+/** F4 — sustained peak must include at least this many candidate fixes. */
+export const TOP_SPEED_MIN_FIXES = 2;
+
+/** F4 — ( |reading − anchor| / anchor ) must stay within this band. */
+export const TOP_SPEED_BAND_RATIO = 0.15;
