@@ -169,6 +169,18 @@ const getDb = () => {
   return dbPromise;
 };
 
+let dbQueue: Promise<unknown> = Promise.resolve();
+
+const withDb = async <T>(fn: (db: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> => {
+  const db = await getDb();
+  const run = dbQueue.then(() => fn(db));
+  dbQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+};
+
 const cornersToColumns = (corners: StoredPitchCorners | null) =>
   corners
     ? {
@@ -216,7 +228,6 @@ export const seedTrackingSession = async ({
   trainingActivityOptions?: ActivityKind[];
   startingActivityKind?: ActivityKind | null;
 }) => {
-  const db = await getDb();
   const { session, segments } = startOut;
   if (!session?.id) {
     throw new Error('Kickoff response missing session id');
@@ -238,8 +249,9 @@ export const seedTrackingSession = async ({
       ? trainingActivityOptions
       : (session.training_activity_options ?? []);
 
-  await db.runAsync(
-    `INSERT OR REPLACE INTO tracking_sessions (
+  await withDb(async (db) => {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO tracking_sessions (
       id, session_type, play_structure, planned_segment_length_minutes,
       extra_time_enabled, planned_extra_time_segment_length_minutes, training_activity_options,
       pitch_id, pitch_name,
@@ -250,124 +262,127 @@ export const seedTrackingSession = async ({
       background_permission, live_activity_id, next_sequence_index,
       segment_clock_origin_ms, current_segment_id, gps_search_started_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', 0, NULL, 'live', NULL, NULL, 'when_in_use', NULL, 0, ?, ?, NULL)`,
-    [
-      session.id,
-      session.session_type,
-      playStructure,
-      session.planned_segment_length_minutes,
-      resolvedExtraTimeEnabled ? 1 : 0,
-      resolvedExtraMinutes,
-      serializeTrainingActivityOptions(resolvedActivityOptions),
-      session.pitch_id,
-      pitchName,
-      cornerCols.end_a_corner_1_lat,
-      cornerCols.end_a_corner_1_lng,
-      cornerCols.end_a_corner_2_lat,
-      cornerCols.end_a_corner_2_lng,
-      cornerCols.end_b_corner_1_lat,
-      cornerCols.end_b_corner_1_lng,
-      cornerCols.end_b_corner_2_lat,
-      cornerCols.end_b_corner_2_lng,
-      startedAt,
-      segmentClockOriginMs,
-      currentSegment?.id ?? null,
-    ],
-  );
-
-  for (const segment of segmentRows) {
-    const activityKind =
-      segment.activity_kind ?? (segment.segment_index === 1 ? startingActivityKind : null) ?? null;
-    await db.runAsync(
-      `INSERT OR REPLACE INTO tracking_segments (id, session_id, segment_index, attack_direction, activity_kind, started_at, ended_at)
-       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
       [
-        segment.id,
         session.id,
-        segment.segment_index,
-        segment.attack_direction,
-        activityKind,
-        segment.started_at ?? startedAt,
+        session.session_type,
+        playStructure,
+        session.planned_segment_length_minutes,
+        resolvedExtraTimeEnabled ? 1 : 0,
+        resolvedExtraMinutes,
+        serializeTrainingActivityOptions(resolvedActivityOptions),
+        session.pitch_id,
+        pitchName,
+        cornerCols.end_a_corner_1_lat,
+        cornerCols.end_a_corner_1_lng,
+        cornerCols.end_a_corner_2_lat,
+        cornerCols.end_a_corner_2_lng,
+        cornerCols.end_b_corner_1_lat,
+        cornerCols.end_b_corner_1_lng,
+        cornerCols.end_b_corner_2_lat,
+        cornerCols.end_b_corner_2_lng,
+        startedAt,
+        segmentClockOriginMs,
+        currentSegment?.id ?? null,
       ],
     );
-  }
 
-  if (currentSegment && startingActivityKind && !currentSegment.activity_kind) {
-    await db.runAsync(`UPDATE tracking_segments SET activity_kind = ? WHERE id = ?`, [
-      startingActivityKind,
-      currentSegment.id,
-    ]);
-  }
+    for (const segment of segmentRows) {
+      const activityKind =
+        segment.activity_kind ??
+        (segment.segment_index === 1 ? startingActivityKind : null) ??
+        null;
+      await db.runAsync(
+        `INSERT OR REPLACE INTO tracking_segments (id, session_id, segment_index, attack_direction, activity_kind, started_at, ended_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)`,
+        [
+          segment.id,
+          session.id,
+          segment.segment_index,
+          segment.attack_direction,
+          activityKind,
+          segment.started_at ?? startedAt,
+        ],
+      );
+    }
+
+    if (currentSegment && startingActivityKind && !currentSegment.activity_kind) {
+      await db.runAsync(`UPDATE tracking_segments SET activity_kind = ? WHERE id = ?`, [
+        startingActivityKind,
+        currentSegment.id,
+      ]);
+    }
+  });
 };
 
-export const getActiveTrackingSession = async (): Promise<TrackingSessionRow | null> => {
-  const db = await getDb();
-  return db.getFirstAsync<TrackingSessionRow>(
-    `SELECT * FROM tracking_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
+export const getActiveTrackingSession = async (): Promise<TrackingSessionRow | null> =>
+  withDb((db) =>
+    db.getFirstAsync<TrackingSessionRow>(
+      `SELECT * FROM tracking_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
+    ),
   );
-};
 
-export const getTrackingSession = async (sessionId: string): Promise<TrackingSessionRow | null> => {
-  const db = await getDb();
-  return db.getFirstAsync<TrackingSessionRow>(`SELECT * FROM tracking_sessions WHERE id = ?`, [
-    sessionId,
-  ]);
-};
-
-export const getSegmentsForSession = async (sessionId: string): Promise<TrackingSegmentRow[]> => {
-  const db = await getDb();
-  return db.getAllAsync<TrackingSegmentRow>(
-    `SELECT * FROM tracking_segments WHERE session_id = ? ORDER BY segment_index ASC`,
-    [sessionId],
+export const getTrackingSession = async (sessionId: string): Promise<TrackingSessionRow | null> =>
+  withDb((db) =>
+    db.getFirstAsync<TrackingSessionRow>(`SELECT * FROM tracking_sessions WHERE id = ?`, [
+      sessionId,
+    ]),
   );
-};
 
-export const getCurrentSegment = async (sessionId: string): Promise<TrackingSegmentRow | null> => {
-  const db = await getDb();
-  return db.getFirstAsync<TrackingSegmentRow>(
-    `SELECT * FROM tracking_segments WHERE session_id = ? AND ended_at IS NULL ORDER BY segment_index DESC LIMIT 1`,
-    [sessionId],
+export const getSegmentsForSession = async (sessionId: string): Promise<TrackingSegmentRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingSegmentRow>(
+      `SELECT * FROM tracking_segments WHERE session_id = ? ORDER BY segment_index ASC`,
+      [sessionId],
+    ),
   );
-};
 
-export const getPausesForSession = async (sessionId: string): Promise<TrackingPauseRow[]> => {
-  const db = await getDb();
-  return db.getAllAsync<TrackingPauseRow>(
-    `SELECT * FROM tracking_pauses WHERE session_id = ? ORDER BY started_at ASC`,
-    [sessionId],
+export const getCurrentSegment = async (sessionId: string): Promise<TrackingSegmentRow | null> =>
+  withDb((db) =>
+    db.getFirstAsync<TrackingSegmentRow>(
+      `SELECT * FROM tracking_segments WHERE session_id = ? AND ended_at IS NULL ORDER BY segment_index DESC LIMIT 1`,
+      [sessionId],
+    ),
   );
-};
 
-export const getPausesForSegment = async (segmentId: string): Promise<TrackingPauseRow[]> => {
-  const db = await getDb();
-  return db.getAllAsync<TrackingPauseRow>(
-    `SELECT * FROM tracking_pauses WHERE segment_id = ? ORDER BY started_at ASC`,
-    [segmentId],
+export const getPausesForSession = async (sessionId: string): Promise<TrackingPauseRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingPauseRow>(
+      `SELECT * FROM tracking_pauses WHERE session_id = ? ORDER BY started_at ASC`,
+      [sessionId],
+    ),
   );
-};
 
-export const getOpenPause = async (sessionId: string): Promise<TrackingPauseRow | null> => {
-  const db = await getDb();
-  return db.getFirstAsync<TrackingPauseRow>(
-    `SELECT * FROM tracking_pauses WHERE session_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
-    [sessionId],
+export const getPausesForSegment = async (segmentId: string): Promise<TrackingPauseRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingPauseRow>(
+      `SELECT * FROM tracking_pauses WHERE segment_id = ? ORDER BY started_at ASC`,
+      [segmentId],
+    ),
   );
-};
 
-export const getPointsForSession = async (sessionId: string): Promise<TrackingPointRow[]> => {
-  const db = await getDb();
-  return db.getAllAsync<TrackingPointRow>(
-    `SELECT * FROM tracking_points WHERE session_id = ? ORDER BY recorded_at ASC, id ASC`,
-    [sessionId],
+export const getOpenPause = async (sessionId: string): Promise<TrackingPauseRow | null> =>
+  withDb((db) =>
+    db.getFirstAsync<TrackingPauseRow>(
+      `SELECT * FROM tracking_pauses WHERE session_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
+      [sessionId],
+    ),
   );
-};
 
-export const getPointsForSegment = async (segmentId: string): Promise<TrackingPointRow[]> => {
-  const db = await getDb();
-  return db.getAllAsync<TrackingPointRow>(
-    `SELECT * FROM tracking_points WHERE segment_id = ? ORDER BY recorded_at ASC, id ASC`,
-    [segmentId],
+export const getPointsForSession = async (sessionId: string): Promise<TrackingPointRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingPointRow>(
+      `SELECT * FROM tracking_points WHERE session_id = ? ORDER BY recorded_at ASC, id ASC`,
+      [sessionId],
+    ),
   );
-};
+
+export const getPointsForSegment = async (segmentId: string): Promise<TrackingPointRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingPointRow>(
+      `SELECT * FROM tracking_points WHERE segment_id = ? ORDER BY recorded_at ASC, id ASC`,
+      [segmentId],
+    ),
+  );
 
 export const updateSessionFields = async (
   sessionId: string,
@@ -387,15 +402,13 @@ export const updateSessionFields = async (
     last_sync_attempt_at: string | null;
   }>,
 ) => {
-  const db = await getDb();
   const entries = Object.entries(fields).filter(([, value]) => value !== undefined);
   if (entries.length === 0) return;
   const setClause = entries.map(([key]) => `${key} = ?`).join(', ');
   const values = entries.map(([, value]) => value);
-  await db.runAsync(`UPDATE tracking_sessions SET ${setClause} WHERE id = ?`, [
-    ...values,
-    sessionId,
-  ]);
+  await withDb((db) =>
+    db.runAsync(`UPDATE tracking_sessions SET ${setClause} WHERE id = ?`, [...values, sessionId]),
+  );
 };
 
 export const insertPause = async ({
@@ -409,32 +422,36 @@ export const insertPause = async ({
   reason: TrackingPauseRow['reason'];
   startedAt?: string;
 }) => {
-  const db = await getDb();
   const id = createTrackingId();
-  await db.runAsync(
-    `INSERT INTO tracking_pauses (id, session_id, segment_id, reason, started_at, ended_at)
+  await withDb((db) =>
+    db.runAsync(
+      `INSERT INTO tracking_pauses (id, session_id, segment_id, reason, started_at, ended_at)
      VALUES (?, ?, ?, ?, ?, NULL)`,
-    [id, sessionId, segmentId, reason, startedAt],
+      [id, sessionId, segmentId, reason, startedAt],
+    ),
   );
   return id;
 };
 
 export const closePause = async (pauseId: string, endedAt = new Date().toISOString()) => {
-  const db = await getDb();
-  await db.runAsync(`UPDATE tracking_pauses SET ended_at = ? WHERE id = ?`, [endedAt, pauseId]);
+  await withDb((db) =>
+    db.runAsync(`UPDATE tracking_pauses SET ended_at = ? WHERE id = ?`, [endedAt, pauseId]),
+  );
 };
 
 export const closeOpenPause = async (sessionId: string, endedAt = new Date().toISOString()) => {
-  const db = await getDb();
-  await db.runAsync(
-    `UPDATE tracking_pauses SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL`,
-    [endedAt, sessionId],
+  await withDb((db) =>
+    db.runAsync(
+      `UPDATE tracking_pauses SET ended_at = ? WHERE session_id = ? AND ended_at IS NULL`,
+      [endedAt, sessionId],
+    ),
   );
 };
 
 export const closeSegment = async (segmentId: string, endedAt = new Date().toISOString()) => {
-  const db = await getDb();
-  await db.runAsync(`UPDATE tracking_segments SET ended_at = ? WHERE id = ?`, [endedAt, segmentId]);
+  await withDb((db) =>
+    db.runAsync(`UPDATE tracking_segments SET ended_at = ? WHERE id = ?`, [endedAt, segmentId]),
+  );
 };
 
 export const insertSegment = async ({
@@ -450,12 +467,13 @@ export const insertSegment = async ({
   activityKind?: ActivityKind | null;
   startedAt?: string;
 }) => {
-  const db = await getDb();
   const id = createTrackingId();
-  await db.runAsync(
-    `INSERT INTO tracking_segments (id, session_id, segment_index, attack_direction, activity_kind, started_at, ended_at)
+  await withDb((db) =>
+    db.runAsync(
+      `INSERT INTO tracking_segments (id, session_id, segment_index, attack_direction, activity_kind, started_at, ended_at)
      VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-    [id, sessionId, segmentIndex, attackDirection, activityKind, startedAt],
+      [id, sessionId, segmentIndex, attackDirection, activityKind, startedAt],
+    ),
   );
   return id;
 };
@@ -479,44 +497,50 @@ export const insertTrackPoint = async ({
   speedAccuracyMps: number | null;
   horizontalAccuracyM: number | null;
 }) => {
-  const db = await getDb();
   const id = createTrackingId();
-  const allocated = await db.getFirstAsync<{ next_sequence_index: number }>(
-    `UPDATE tracking_sessions SET next_sequence_index = next_sequence_index + 1 WHERE id = ? RETURNING next_sequence_index`,
-    [sessionId],
-  );
-  if (allocated == null) {
-    throw new Error('Tracking session not found');
-  }
-  await db.runAsync(
-    `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m)
+  await withDb(async (db) => {
+    await db.runAsync(
+      `UPDATE tracking_sessions SET next_sequence_index = next_sequence_index + 1 WHERE id = ?`,
+      [sessionId],
+    );
+    const allocated = await db.getFirstAsync<{ next_sequence_index: number }>(
+      `SELECT next_sequence_index FROM tracking_sessions WHERE id = ?`,
+      [sessionId],
+    );
+    if (allocated == null) {
+      throw new Error('Tracking session not found');
+    }
+    await db.runAsync(
+      `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      sessionId,
-      segmentId,
-      allocated.next_sequence_index - 1,
-      recordedAt,
-      lat,
-      lng,
-      speedKmh,
-      speedAccuracyMps,
-      horizontalAccuracyM,
-    ],
-  );
+      [
+        id,
+        sessionId,
+        segmentId,
+        allocated.next_sequence_index - 1,
+        recordedAt,
+        lat,
+        lng,
+        speedKmh,
+        speedAccuracyMps,
+        horizontalAccuracyM,
+      ],
+    );
+  });
 };
 
 export const deletePointsForSession = async (sessionId: string) => {
-  const db = await getDb();
-  await db.runAsync(`DELETE FROM tracking_points WHERE session_id = ?`, [sessionId]);
-};
-
-export const getSessionsPendingSync = async (): Promise<TrackingSessionRow[]> => {
-  const db = await getDb();
-  return db.getAllAsync<TrackingSessionRow>(
-    `SELECT * FROM tracking_sessions WHERE ended_at IS NOT NULL AND sync_status IN ('pending', 'failed') ORDER BY ended_at ASC`,
+  await withDb((db) =>
+    db.runAsync(`DELETE FROM tracking_points WHERE session_id = ?`, [sessionId]),
   );
 };
+
+export const getSessionsPendingSync = async (): Promise<TrackingSessionRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingSessionRow>(
+      `SELECT * FROM tracking_sessions WHERE ended_at IS NOT NULL AND sync_status IN ('pending', 'failed', 'syncing') ORDER BY ended_at ASC`,
+    ),
+  );
 
 export const initTrackingDb = () => getDb();
 

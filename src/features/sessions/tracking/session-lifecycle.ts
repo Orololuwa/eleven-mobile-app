@@ -262,13 +262,17 @@ export const endTrackingSession = async (sessionId: string) => {
     await closeSegment(current.id);
   }
 
+  await stopLocationTracking();
+  try {
+    await stopTrackingIndicator(session.live_activity_id);
+  } catch (error) {
+    console.warn('[tracking] indicator stop failed', error);
+  }
+
   await updateSessionFields(sessionId, {
     ended_at: new Date().toISOString(),
     tracking_status: 'ended',
   });
-
-  await stopTrackingIndicator(session.live_activity_id);
-  await stopLocationTracking();
 
   enqueueSessionSync(sessionId);
 };

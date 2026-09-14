@@ -21,6 +21,8 @@ import { getForegroundPermissionStatus } from './permissions';
 import type { PauseReason } from './types';
 
 let startLock: Promise<void> = Promise.resolve();
+let lastProcessedAt = 0;
+let foregroundWatch: Location.LocationSubscription | null = null;
 
 const isForegroundServiceStartNotAllowed = (error: unknown) =>
   error instanceof Error &&
@@ -71,66 +73,99 @@ const resumeFromAutoPause = async (sessionId: string) => {
   });
 };
 
-export const processLocationUpdate = async (locations: Location.LocationObject[]) => {
+export const processLocationUpdate = async (
+  locations: Location.LocationObject[],
+  { source = 'task' }: { source?: 'task' | 'watch' } = {},
+) => {
   const session = await getActiveTrackingSession();
-  if (!session || session.tracking_status === 'ended' || session.ended_at) return;
+  if (!session || session.tracking_status === 'ended' || session.ended_at) {
+    void stopLocationTracking();
+    return;
+  }
 
   const latest = locations[locations.length - 1];
   if (!latest) return;
+  if (latest.timestamp <= lastProcessedAt) return;
+  lastProcessedAt = latest.timestamp;
 
   const { coords, timestamp } = latest;
   const accuracy = coords.accuracy;
-  const accepted =
-    accuracy != null && accuracy < ACCEPTED_FIX_ACCURACY_M && coords.latitude && coords.longitude;
+  const hasCoords = coords.latitude != null && coords.longitude != null;
+  const isAccurate = accuracy == null || accuracy < ACCEPTED_FIX_ACCURACY_M;
 
   const openPause = await getOpenPause(session.id);
   const inManualPause = session.tracking_status === 'manual_pause';
   const inAutoPause = session.tracking_status === 'auto_pause';
   const inActivity = session.current_segment_id != null;
 
-  if (accepted) {
+  if (hasCoords && isAccurate) {
     await updateSessionFields(session.id, {
       last_accepted_fix_at: new Date(timestamp).toISOString(),
     });
 
-    // If we're in an auto-pause and there's an open pause, resume from the auto-pause.
     if (inAutoPause && openPause && openPause.reason !== 'manual') {
       await resumeFromAutoPause(session.id);
     }
+  }
 
-    // If we're not in a manual pause and there's no open pause, insert a track point. This is because manual pauses are handled by the app, not the OS.
-    if (inActivity && !inManualPause && !(await getOpenPause(session.id))) {
-      const speedKmh = speedMsToKmh(coords.speed);
-      const coordsWithSpeedAccuracy = coords as typeof coords & {
-        speedAccuracy?: number | null;
-      };
-      await insertTrackPoint({
-        sessionId: session.id,
-        segmentId: session.current_segment_id,
-        recordedAt: new Date(timestamp).toISOString(),
-        lat: coords.latitude,
-        lng: coords.longitude,
-        speedKmh,
-        speedAccuracyMps: normalizeSpeedAccuracyMps(coordsWithSpeedAccuracy.speedAccuracy),
-        horizontalAccuracyM: accuracy,
-      });
-    }
-  } else if (!inManualPause && inActivity) {
-    // Stay in "acquiring" until the first good lock — don't treat cold-start GPS as loss.
-    if (!session.last_accepted_fix_at) return;
+  const canInsert = hasCoords && inActivity && !inManualPause && !(await getOpenPause(session.id));
 
-    const lastFixMs = msSince(session.last_accepted_fix_at);
-    const cooldownActive =
-      session.auto_resume_cooldown_until != null &&
-      Date.now() < new Date(session.auto_resume_cooldown_until).getTime();
+  if (canInsert) {
+    const speedKmh = speedMsToKmh(coords.speed);
+    const coordsWithSpeedAccuracy = coords as typeof coords & {
+      speedAccuracy?: number | null;
+    };
+    await insertTrackPoint({
+      sessionId: session.id,
+      segmentId: session.current_segment_id,
+      recordedAt: new Date(timestamp).toISOString(),
+      lat: coords.latitude,
+      lng: coords.longitude,
+      speedKmh,
+      speedAccuracyMps: normalizeSpeedAccuracyMps(coordsWithSpeedAccuracy.speedAccuracy),
+      horizontalAccuracyM: accuracy,
+    });
+    console.log('[location-task] point', {
+      source,
+      sessionId: session.id,
+      accuracy,
+      lat: coords.latitude,
+      lng: coords.longitude,
+      speedKmh,
+    });
+    return;
+  }
 
-    if (!inAutoPause && !cooldownActive && lastFixMs > GPS_LOSS_PAUSE_MS) {
-      await startAutoPause({
-        sessionId: session.id,
-        segmentId: session.current_segment_id,
-        reason: 'gps_loss',
-      });
-    }
+  console.log('[location-task] skip', {
+    source,
+    reason: !hasCoords
+      ? 'no-coords'
+      : !inActivity
+        ? 'no-activity'
+        : inManualPause
+          ? 'manual-pause'
+          : openPause
+            ? `pause:${openPause.reason}`
+            : 'unknown',
+    accuracy,
+    trackingStatus: session.tracking_status,
+  });
+
+  if (!hasCoords || inManualPause || !inActivity) return;
+  if (isAccurate) return;
+  if (!session.last_accepted_fix_at) return;
+
+  const lastFixMs = msSince(session.last_accepted_fix_at);
+  const cooldownActive =
+    session.auto_resume_cooldown_until != null &&
+    Date.now() < new Date(session.auto_resume_cooldown_until).getTime();
+
+  if (!inAutoPause && !cooldownActive && lastFixMs > GPS_LOSS_PAUSE_MS) {
+    await startAutoPause({
+      sessionId: session.id,
+      segmentId: session.current_segment_id,
+      reason: 'gps_loss',
+    });
   }
 };
 
@@ -141,7 +176,12 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   }
   const { locations } = (data ?? {}) as LocationTaskData;
   if (!locations?.length) return;
-  await processLocationUpdate(locations);
+  try {
+    await processLocationUpdate(locations, { source: 'task' });
+  } catch (taskError) {
+    console.warn('[location-task] process failed', taskError);
+    return;
+  }
   try {
     const { refreshTrackingIndicator } = await import('./indicator');
     await refreshTrackingIndicator();
@@ -185,31 +225,60 @@ const whenAppActive = () => {
   });
 };
 
+const stopForegroundWatch = () => {
+  foregroundWatch?.remove();
+  foregroundWatch = null;
+};
+
+const ensureForegroundWatch = async () => {
+  if (foregroundWatch) return;
+  foregroundWatch = await Location.watchPositionAsync(
+    {
+      accuracy: Location.Accuracy.BestForNavigation,
+      timeInterval: 1000,
+      distanceInterval: 0,
+    },
+    (location) => {
+      void processLocationUpdate([location], { source: 'watch' }).catch((error) => {
+        console.warn('[location-task] watch process failed', error);
+      });
+    },
+  );
+};
+
 const startLocationTrackingOnce = async ({ notificationBody }: { notificationBody: string }) => {
-  if (await isLocationTaskRunning()) return;
   if (!(await getForegroundPermissionStatus())) {
     throw new Error('Location permission is required to start tracking');
   }
 
-  if (Platform.OS === 'android' && AppState.currentState !== 'active') {
-    await whenAppActive();
-    if (await isLocationTaskRunning()) return;
+  if (!(await isLocationTaskRunning())) {
+    if (Platform.OS === 'android' && AppState.currentState !== 'active') {
+      await whenAppActive();
+      if (await isLocationTaskRunning()) {
+        await ensureForegroundWatch();
+        return;
+      }
+    }
+
+    try {
+      await Location.startLocationUpdatesAsync(
+        LOCATION_TASK_NAME,
+        buildLocationOptions({ notificationBody }),
+      );
+    } catch (error) {
+      if (Platform.OS !== 'android' || !isForegroundServiceStartNotAllowed(error)) throw error;
+      await whenAppActive();
+      if (!(await isLocationTaskRunning())) {
+        await Location.startLocationUpdatesAsync(
+          LOCATION_TASK_NAME,
+          buildLocationOptions({ notificationBody }),
+        );
+      }
+    }
   }
 
-  try {
-    await Location.startLocationUpdatesAsync(
-      LOCATION_TASK_NAME,
-      buildLocationOptions({ notificationBody }),
-    );
-  } catch (error) {
-    if (Platform.OS !== 'android' || !isForegroundServiceStartNotAllowed(error)) throw error;
-    await whenAppActive();
-    if (await isLocationTaskRunning()) return;
-    await Location.startLocationUpdatesAsync(
-      LOCATION_TASK_NAME,
-      buildLocationOptions({ notificationBody }),
-    );
-  }
+  await ensureForegroundWatch();
+  console.log('[location-task] started');
 };
 
 export const startLocationTracking = async ({ notificationBody }: { notificationBody: string }) => {
@@ -226,11 +295,22 @@ export const startLocationTracking = async ({ notificationBody }: { notification
   }
 };
 
+let stopInFlight: Promise<void> | null = null;
+
 export const stopLocationTracking = async () => {
-  const running = await isLocationTaskRunning();
-  if (running) {
-    await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-  }
+  if (stopInFlight) return stopInFlight;
+  stopInFlight = (async () => {
+    stopForegroundWatch();
+    lastProcessedAt = 0;
+    try {
+      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    } catch {
+      // Task was already stopped.
+    }
+  })().finally(() => {
+    stopInFlight = null;
+  });
+  return stopInFlight;
 };
 
 /** Called when app backgrounds under When-In-Use iOS permission. */
@@ -257,6 +337,12 @@ export const handleAppBackgrounded = async () => {
 export const handleAppForegrounded = async () => {
   const session = await getActiveTrackingSession();
   if (!session) return;
+
+  if (session.tracking_status !== 'ended' && !session.ended_at) {
+    if (await getForegroundPermissionStatus()) {
+      await ensureForegroundWatch();
+    }
+  }
 
   const openPause = await getOpenPause(session.id);
   if (openPause?.reason === 'backgrounded') {

@@ -4,6 +4,7 @@ import { AuthLoadingScreen } from '@/screens';
 import { colors } from '@/theme';
 import { selectIsAuthenticated, useAppStore } from '@/stores/app-store';
 import { getActiveTrackingSession, initTrackingDb } from '@/features/sessions/tracking/db';
+import { startSyncListeners } from '@/features/sessions/tracking/sync';
 
 export default function AppLayout() {
   const authStatus = useAppStore((state) => state.authStatus);
@@ -13,6 +14,7 @@ export default function AppLayout() {
     if (!isAuthenticated) return;
     void (async () => {
       await initTrackingDb();
+      startSyncListeners();
       const active = await getActiveTrackingSession();
       if (active) {
         router.replace({

@@ -16,6 +16,7 @@ import {
 import type { SessionFinalizeBody, TrackingSegmentRow, TrackPointUpload } from './types';
 
 const retryDelays = new Map<string, number>();
+const inFlight = new Set<string>();
 let syncLoopStarted = false;
 let appStateSubscription: { remove: () => void } | null = null;
 let netInfoUnsubscribe: (() => void) | null = null;
@@ -46,20 +47,23 @@ const segmentIndexFor = (indexById: Map<string, number>, segmentId: string | nul
   segmentId == null ? null : (indexById.get(segmentId) ?? null);
 
 export const syncSession = async (sessionId: string): Promise<boolean> => {
-  const session = await getTrackingSession(sessionId);
-  if (!session?.ended_at) return false;
-  if (session.sync_status === 'synced') return true;
-
-  const net = await NetInfo.fetch();
-  if (!net.isConnected) return false;
-
-  await updateSessionFields(sessionId, {
-    sync_status: 'syncing',
-    sync_attempts: session.sync_attempts + 1,
-    last_sync_attempt_at: new Date().toISOString(),
-  });
+  if (inFlight.has(sessionId)) return false;
+  inFlight.add(sessionId);
 
   try {
+    const session = await getTrackingSession(sessionId);
+    if (!session?.ended_at) return false;
+    if (session.sync_status === 'synced') return true;
+
+    const net = await NetInfo.fetch();
+    if (net.isConnected === false) return false;
+
+    await updateSessionFields(sessionId, {
+      sync_status: 'syncing',
+      sync_attempts: session.sync_attempts + 1,
+      last_sync_attempt_at: new Date().toISOString(),
+    });
+
     const segments = await getSegmentsForSession(sessionId);
     const pauses = await getPausesForSession(sessionId);
     const allPoints = await getPointsForSession(sessionId);
@@ -102,6 +106,16 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
       ];
     });
 
+    console.log('[sync] track points', {
+      sessionId,
+      storedCount: allPoints.length,
+      downsampledCount: downsampled.length,
+      uploadCount: uploads.length,
+      stored: allPoints,
+      downsampled,
+      uploads,
+    });
+
     for (const chunk of chunkPoints(uploads)) {
       await uploadTrackPoints({ sessionId, body: { points: chunk } });
     }
@@ -118,6 +132,8 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
       void processSyncQueue();
     }, delay);
     return false;
+  } finally {
+    inFlight.delete(sessionId);
   }
 };
 
