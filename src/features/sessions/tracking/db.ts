@@ -30,6 +30,50 @@ const addColumnIfMissing = async (
   await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 };
 
+const ensureUniqueTrackPointSequence = async (db: SQLite.SQLiteDatabase) => {
+  const indexes = await db.getAllAsync<{ name: string; unique: number }>(
+    `PRAGMA index_list(tracking_points)`,
+  );
+  const sessionIndex = indexes.find((index) => index.name === 'idx_tracking_points_session');
+  if (sessionIndex?.unique) return;
+
+  const duplicate = await db.getFirstAsync(
+    `SELECT 1 AS present FROM tracking_points GROUP BY session_id, sequence_index HAVING COUNT(*) > 1`,
+  );
+  if (duplicate) {
+    await db.execAsync(`
+      DROP TABLE IF EXISTS tracking_point_seq;
+      CREATE TEMP TABLE tracking_point_seq AS
+      SELECT id,
+        (ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY recorded_at ASC, id ASC) - 1) AS new_index
+      FROM tracking_points;
+      UPDATE tracking_points
+      SET sequence_index = (
+        SELECT new_index FROM tracking_point_seq WHERE tracking_point_seq.id = tracking_points.id
+      );
+      DROP TABLE tracking_point_seq;
+      UPDATE tracking_sessions SET next_sequence_index = (
+        SELECT COALESCE(MAX(sequence_index) + 1, 0)
+        FROM tracking_points
+        WHERE tracking_points.session_id = tracking_sessions.id
+      );
+    `);
+  }
+
+  await db.execAsync(`
+    UPDATE tracking_sessions SET next_sequence_index = MAX(
+      next_sequence_index,
+      (
+        SELECT COALESCE(MAX(sequence_index) + 1, 0)
+        FROM tracking_points
+        WHERE tracking_points.session_id = tracking_sessions.id
+      )
+    );
+    DROP INDEX IF EXISTS idx_tracking_points_session;
+    CREATE UNIQUE INDEX idx_tracking_points_session ON tracking_points(session_id, sequence_index);
+  `);
+};
+
 const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await addColumnIfMissing(db, 'tracking_sessions', 'extra_time_enabled', 'INTEGER');
   await addColumnIfMissing(
@@ -41,6 +85,7 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await addColumnIfMissing(db, 'tracking_sessions', 'training_activity_options', 'TEXT');
   await addColumnIfMissing(db, 'tracking_segments', 'activity_kind', 'TEXT');
   await addColumnIfMissing(db, 'tracking_points', 'speed_accuracy_mps', 'REAL');
+  await ensureUniqueTrackPointSequence(db);
 };
 
 const getDb = () => {
@@ -113,7 +158,7 @@ const getDb = () => {
           horizontal_accuracy_m REAL,
           FOREIGN KEY (session_id) REFERENCES tracking_sessions(id)
         );
-        CREATE INDEX IF NOT EXISTS idx_tracking_points_session ON tracking_points(session_id, sequence_index);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tracking_points_session ON tracking_points(session_id, sequence_index);
         CREATE INDEX IF NOT EXISTS idx_tracking_pauses_session ON tracking_pauses(session_id);
         CREATE INDEX IF NOT EXISTS idx_tracking_segments_session ON tracking_segments(session_id);
       `);
@@ -311,7 +356,7 @@ export const getOpenPause = async (sessionId: string): Promise<TrackingPauseRow 
 export const getPointsForSession = async (sessionId: string): Promise<TrackingPointRow[]> => {
   const db = await getDb();
   return db.getAllAsync<TrackingPointRow>(
-    `SELECT * FROM tracking_points WHERE session_id = ? ORDER BY sequence_index ASC`,
+    `SELECT * FROM tracking_points WHERE session_id = ? ORDER BY recorded_at ASC, id ASC`,
     [sessionId],
   );
 };
@@ -319,7 +364,7 @@ export const getPointsForSession = async (sessionId: string): Promise<TrackingPo
 export const getPointsForSegment = async (segmentId: string): Promise<TrackingPointRow[]> => {
   const db = await getDb();
   return db.getAllAsync<TrackingPointRow>(
-    `SELECT * FROM tracking_points WHERE segment_id = ? ORDER BY sequence_index ASC`,
+    `SELECT * FROM tracking_points WHERE segment_id = ? ORDER BY recorded_at ASC, id ASC`,
     [segmentId],
   );
 };
@@ -418,7 +463,6 @@ export const insertSegment = async ({
 export const insertTrackPoint = async ({
   sessionId,
   segmentId,
-  sequenceIndex,
   recordedAt,
   lat,
   lng,
@@ -428,7 +472,6 @@ export const insertTrackPoint = async ({
 }: {
   sessionId: string;
   segmentId: string | null;
-  sequenceIndex: number;
   recordedAt: string;
   lat: number;
   lng: number;
@@ -438,6 +481,13 @@ export const insertTrackPoint = async ({
 }) => {
   const db = await getDb();
   const id = createTrackingId();
+  const allocated = await db.getFirstAsync<{ next_sequence_index: number }>(
+    `UPDATE tracking_sessions SET next_sequence_index = next_sequence_index + 1 WHERE id = ? RETURNING next_sequence_index`,
+    [sessionId],
+  );
+  if (allocated == null) {
+    throw new Error('Tracking session not found');
+  }
   await db.runAsync(
     `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -445,7 +495,7 @@ export const insertTrackPoint = async ({
       id,
       sessionId,
       segmentId,
-      sequenceIndex,
+      allocated.next_sequence_index - 1,
       recordedAt,
       lat,
       lng,

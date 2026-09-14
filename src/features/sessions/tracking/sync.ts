@@ -3,6 +3,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { finalizeSession, uploadTrackPoints } from '../session-api';
 import { SYNC_RETRY_INITIAL_MS, SYNC_RETRY_MAX_MS, TRACK_POINTS_CHUNK_SIZE } from './constants';
 import { downsampleTrackPoints } from './downsample';
+import { withUniqueSequenceIndexes } from './sequence-index';
 import {
   deletePointsForSession,
   getPausesForSession,
@@ -62,7 +63,7 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
     const segments = await getSegmentsForSession(sessionId);
     const pauses = await getPausesForSession(sessionId);
     const allPoints = await getPointsForSession(sessionId);
-    const downsampled = downsampleTrackPoints(allPoints);
+    const downsampled = withUniqueSequenceIndexes(downsampleTrackPoints(allPoints));
     const segmentIndexes = indexBySegmentId(segments);
     const endedAt = session.ended_at;
 

@@ -95,11 +95,9 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
       const coordsWithSpeedAccuracy = coords as typeof coords & {
         speedAccuracy?: number | null;
       };
-      const sequenceIndex = session.next_sequence_index;
       await insertTrackPoint({
         sessionId: session.id,
         segmentId: session.current_segment_id,
-        sequenceIndex,
         recordedAt: new Date(timestamp).toISOString(),
         lat: coords.latitude,
         lng: coords.longitude,
@@ -107,7 +105,6 @@ export const processLocationUpdate = async (locations: Location.LocationObject[]
         speedAccuracyMps: normalizeSpeedAccuracyMps(coordsWithSpeedAccuracy.speedAccuracy),
         horizontalAccuracyM: accuracy,
       });
-      await updateSessionFields(session.id, { next_sequence_index: sequenceIndex + 1 });
     }
   } else if (!inManualPause && inActivity) {
     // Stay in "acquiring" until the first good lock — don't treat cold-start GPS as loss.
