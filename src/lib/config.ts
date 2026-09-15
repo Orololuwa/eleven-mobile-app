@@ -1,13 +1,13 @@
-const read = (name: string) => process.env[name]?.trim() ?? '';
+const trimEnv = (value?: string) => value?.trim() ?? '';
 
 export const AUTH_SCOPE = 'openid profile email offline_access';
 export const AUTH0_SCHEME = 'eleven';
 
 export const config = {
-  apiUrl: (read('EXPO_PUBLIC_API_URL') || 'http://localhost:8000').replace(/\/$/, ''),
-  auth0Domain: read('EXPO_PUBLIC_AUTH0_DOMAIN'),
-  auth0ClientId: read('EXPO_PUBLIC_AUTH0_CLIENT_ID'),
-  auth0Audience: read('EXPO_PUBLIC_AUTH0_AUDIENCE'),
+  apiUrl: (trimEnv(process.env.EXPO_PUBLIC_API_URL) || 'http://localhost:8000').replace(/\/$/, ''),
+  auth0Domain: trimEnv(process.env.EXPO_PUBLIC_AUTH0_DOMAIN),
+  auth0ClientId: trimEnv(process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID),
+  auth0Audience: trimEnv(process.env.EXPO_PUBLIC_AUTH0_AUDIENCE),
 };
 
 export const assertAuthConfig = () => {

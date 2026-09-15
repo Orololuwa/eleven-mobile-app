@@ -1,11 +1,17 @@
-import type { ConfigContext, ExpoConfig } from 'expo/config';
-
 const auth0Domain = process.env.EXPO_PUBLIC_AUTH0_DOMAIN ?? '';
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+/** @param {{ config: import('expo/config').ExpoConfig }} ctx */
+module.exports = ({ config }) => ({
   ...config,
   name: config.name ?? 'Eleven',
   slug: config.slug ?? 'eleven-app',
+  owner: 'orololuwa',
+  extra: {
+    ...config.extra,
+    eas: {
+      projectId: '5a813834-3842-4946-b721-3c6add708755',
+    },
+  },
   android: {
     ...config.android,
     permissions: [
