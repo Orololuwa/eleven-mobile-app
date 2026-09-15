@@ -58,6 +58,7 @@ export default function HomeRoute() {
         onStartSession={() => setShowSessionSheet(true)}
         onNavigateToHistory={() => router.push('/(app)/(tabs)/history')}
         onNavigateToProfile={() => router.push('/(app)/(tabs)/profile')}
+        onNavigateToPlayerDetails={() => router.push('/(app)/player-details')}
         showEmptyWallBanner={showEmptyWallBanner && sessionCount === 0}
         onFindWall={() => router.push('/(app)/find-wall')}
         weeklyStats={weeklyStats}

@@ -11,6 +11,7 @@ type HomeScreenProps = {
   onStartSession: () => void;
   onNavigateToHistory: () => void;
   onNavigateToProfile: () => void;
+  onNavigateToPlayerDetails: () => void;
   showEmptyWallBanner?: boolean;
   onFindWall?: () => void;
   weeklyStats?: {
@@ -36,6 +37,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onStartSession,
   onNavigateToHistory,
   onNavigateToProfile,
+  onNavigateToPlayerDetails,
   showEmptyWallBanner = false,
   onFindWall,
   weeklyStats,
@@ -53,7 +55,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.headerSubtitle}>PROJECT //</Text>
             <Text style={styles.headerTitle}>{userName.toUpperCase()}</Text>
           </View>
-          <TouchableOpacity style={styles.avatar} onPress={onNavigateToProfile}>
+          <TouchableOpacity style={styles.avatar} onPress={onNavigateToPlayerDetails}>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
             ) : (
@@ -211,9 +213,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderWidth: 1,
-    borderColor: colors.border.strong,
+    borderColor: colors.brand.primary,
     backgroundColor: colors.background.secondary,
     overflow: 'hidden',
+    borderRadius: 100,
   },
   avatarImage: {
     width: '100%',
