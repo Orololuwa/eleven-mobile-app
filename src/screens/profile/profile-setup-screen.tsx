@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Field, SegmentedControl, Button } from '@/components';
+import { Field, SegmentedControl, Button, Chip } from '@/components';
 import { colors, typography, spacing } from '@/theme';
-import type { PositionIn, PreferredFoot } from '@/features/profile/types';
-import { PREFERRED_FOOT_OPTIONS } from '@/features/profile/types';
+import type { PositionIn, PreferredFoot, Sex } from '@/features/profile/types';
+import { PREFERRED_FOOT_OPTIONS, SEX_OPTIONS } from '@/features/profile/types';
+import { displayToKg, sexLabel, weightUnitLabel } from '@/features/profile/weight';
+import {
+  validateWeightKg,
+  validateDisplayName,
+  validatePositionSet,
+} from '@/features/profile/validation';
+import type { MassUnit } from '@/types/profile';
 import { preferredPosition } from '@/features/profile/display';
-import { validateDisplayName, validatePositionSet } from '@/features/profile/validation';
 
 type ProfileSetupScreenProps = {
   displayName: string;
@@ -16,10 +22,13 @@ type ProfileSetupScreenProps = {
   error?: string | null;
   onDisplayNameChange: (displayName: string) => void;
   onPreferredFootIndexChange: (index: number) => void;
+  massUnit: MassUnit;
   onComplete: (data: {
     display_name: string;
     preferred_foot: PreferredFoot;
     positions: PositionIn[];
+    weight_kg: number | null;
+    sex: Sex | null;
   }) => void;
   onOpenPositionPicker: () => void;
 };
@@ -32,12 +41,16 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
   error = null,
   onDisplayNameChange,
   onPreferredFootIndexChange,
+  massUnit,
   onComplete,
   onOpenPositionPicker,
 }) => {
   const progress = 2;
   const [displayNameTouched, setDisplayNameTouched] = useState(false);
   const [positionsTouched, setPositionsTouched] = useState(false);
+  const [weightInput, setWeightInput] = useState('');
+  const [sex, setSex] = useState<Sex | null>(null);
+  const [weightError, setWeightError] = useState<string | undefined>();
 
   const displayNameError = validateDisplayName(displayName);
   const positionError = validatePositionSet(initialPositions);
@@ -45,10 +58,17 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
 
   const handleComplete = () => {
     if (!canComplete) return;
+    const trimmed = weightInput.trim();
+    const weightKg = trimmed ? displayToKg(Number(trimmed), massUnit) : null;
+    const nextWeightError = trimmed ? validateWeightKg(weightKg) : undefined;
+    setWeightError(nextWeightError);
+    if (nextWeightError || (trimmed && weightKg == null)) return;
     onComplete({
       display_name: displayName.trim(),
       preferred_foot: PREFERRED_FOOT_OPTIONS[preferredFootIndex],
       positions: initialPositions,
+      weight_kg: weightKg,
+      sex,
     });
   };
 
@@ -119,12 +139,43 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
             />
           </View>
 
+          <Field
+            label={`Weight · optional · ${weightUnitLabel(massUnit)}`}
+            value={weightInput}
+            onChangeText={(value) => {
+              setWeightInput(value);
+              setWeightError(undefined);
+            }}
+            placeholder={massUnit === 'lb' ? '160' : '72'}
+            keyboardType="decimal-pad"
+            focused={weightInput.length > 0}
+            error={weightError}
+          />
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>SEX · OPTIONAL</Text>
+            <View style={styles.chipRow}>
+              {SEX_OPTIONS.map((option) => (
+                <Chip
+                  key={option}
+                  label={sexLabel(option)}
+                  selected={sex === option}
+                  onPress={() => setSex(sex === option ? null : option)}
+                  variant="position"
+                />
+              ))}
+            </View>
+            <Text style={styles.hint}>
+              Biological sex — some energy formulas use it. Prefer not to say works just as well.
+            </Text>
+          </View>
+
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Height, bio and avatar can wait. You can play first.
+            Weight is optional here — we'll ask before you play if you skip it. Height, bio and
+            avatar can wait.
           </Text>
           <Button title="Into the App" onPress={handleComplete} disabled={!canComplete} />
         </View>
@@ -227,6 +278,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[6],
     paddingBottom: spacing[9],
     gap: 12,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hint: {
+    marginTop: 8,
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text.tertiary,
   },
   footerText: {
     fontFamily: typography.fontFamily.primary,

@@ -23,6 +23,7 @@ import {
 } from './indicator';
 import { elapsedSecondsFromPauses } from './live-metrics';
 import { requestTrackingPermissions } from './permissions';
+import { computeAndStoreSessionMetrics } from '../summary/run-computation';
 import { enqueueSessionSync } from './sync';
 import type { BackgroundPermission, StoredPitchCorners } from './types';
 
@@ -100,18 +101,14 @@ export const requestAndBeginTracking = async (
 };
 
 export const computeSegmentElapsedSeconds = async (sessionId: string, segmentId: string | null) => {
+  if (!segmentId) return 0;
   const session = await getTrackingSession(sessionId);
   if (!session) return 0;
 
   const segments = await getSegmentsForSession(sessionId);
-  const segment = segmentId ? segments.find((s) => s.id === segmentId) : null;
+  const segment = segments.find((row) => row.id === segmentId);
   const segmentStart = segment?.started_at ?? session.started_at;
-
-  const pauses = segmentId
-    ? await getPausesForSegment(segmentId)
-    : (await import('./db').then((m) => m.getPausesForSession(sessionId))).filter(
-        (p) => p.segment_id == null,
-      );
+  const pauses = await getPausesForSegment(segmentId);
 
   return elapsedSecondsFromPauses({ startedAt: segmentStart, pausedRanges: pauses });
 };
@@ -130,10 +127,11 @@ export const endCurrentActivity = async (sessionId: string) => {
   const session = await getTrackingSession(sessionId);
   if (!session) return;
 
-  await closeOpenPause(sessionId);
+  const closedAt = new Date().toISOString();
+  await closeOpenPause(sessionId, closedAt);
   const current = await getCurrentSegment(sessionId);
   if (current) {
-    await closeSegment(current.id);
+    await closeSegment(current.id, closedAt);
   }
 
   await updateSessionFields(sessionId, {
@@ -154,10 +152,11 @@ export const closeCurrentSegmentForSwitch = async ({
   const session = await getTrackingSession(sessionId);
   if (!session) return null;
 
-  await closeOpenPause(sessionId);
+  const closedAt = new Date().toISOString();
+  await closeOpenPause(sessionId, closedAt);
   const current = await getCurrentSegment(sessionId);
   if (current) {
-    await closeSegment(current.id);
+    await closeSegment(current.id, closedAt);
   }
 
   const allSegments = await getSegmentsForSession(sessionId);
@@ -252,14 +251,21 @@ export const resolveCompassAttackDirection = async (
   });
 };
 
-export const endTrackingSession = async (sessionId: string) => {
+export const endTrackingSession = async ({
+  sessionId,
+  massKg,
+}: {
+  sessionId: string;
+  massKg: number | null;
+}) => {
   const session = await getTrackingSession(sessionId);
   if (!session) return;
 
-  await closeOpenPause(sessionId);
+  const closedAt = new Date().toISOString();
+  await closeOpenPause(sessionId, closedAt);
   const current = await getCurrentSegment(sessionId);
   if (current && !current.ended_at) {
-    await closeSegment(current.id);
+    await closeSegment(current.id, closedAt);
   }
 
   await stopLocationTracking();
@@ -270,10 +276,11 @@ export const endTrackingSession = async (sessionId: string) => {
   }
 
   await updateSessionFields(sessionId, {
-    ended_at: new Date().toISOString(),
+    ended_at: closedAt,
     tracking_status: 'ended',
   });
 
+  await computeAndStoreSessionMetrics({ sessionId, massKg });
   enqueueSessionSync(sessionId);
 };
 

@@ -1,21 +1,6 @@
 import type { TrackingPointRow } from './types';
+import { planeMetres, scaleAtLatitude } from './geodesic';
 import { determineTopSpeedKmh } from './speed-filter';
-
-const EARTH_RADIUS_M = 6_371_000;
-
-const toRadians = (deg: number) => (deg * Math.PI) / 180;
-
-export const haversineMetres = (
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number },
-) => {
-  const dLat = toRadians(b.lat - a.lat);
-  const dLng = toRadians(b.lng - a.lng);
-  const lat1 = toRadians(a.lat);
-  const lat2 = toRadians(b.lat);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
-};
 
 export const elapsedSecondsFromPauses = ({
   startedAt,
@@ -53,10 +38,12 @@ export const computeLiveMetrics = ({
 
   const activePoints = points.filter((p) => !isPausedAt(p.recorded_at));
 
+  const scale = scaleAtLatitude(activePoints[0]?.lat ?? 0);
   const distanceM = activePoints.reduce((sum, point, index) => {
     if (index === 0) return sum;
     const prev = activePoints[index - 1];
-    return sum + haversineMetres(prev, point);
+    if (!prev) return sum;
+    return sum + planeMetres(prev, point, scale);
   }, 0);
 
   return { distanceKm: distanceM / 1000, topSpeedKmh: determineTopSpeedKmh(activePoints) };

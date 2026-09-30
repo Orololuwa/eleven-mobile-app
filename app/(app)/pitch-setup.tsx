@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { PitchSetupScreen, type PitchSetupStep } from '@/screens/session/pitch-setup';
+import { WeightGateSheet } from '@/screens/session/weight-gate-sheet';
+import { useMyProfileQuery } from '@/features/profile/use-profile-query';
+import { useUpdateProfileMutation } from '@/features/profile/use-update-profile-mutation';
+import { weightGateMode } from '@/features/profile/weight';
+import type { Sex } from '@/features/profile/types';
 import { ApiError } from '@/lib/api-client';
 import { getCurrentDeviceLocation } from '@/features/pitches/location';
 import { useCheckSimilarPitches } from '@/features/pitches/use-check-similar-pitches';
@@ -16,6 +21,7 @@ import type { StoredPitchCorners } from '@/features/sessions/tracking/types';
 import { useCreateSessionMutation } from '@/features/sessions/use-create-session-mutation';
 import { useStartSessionMutation } from '@/features/sessions/use-start-session-mutation';
 import type { ActivityKind, PlayStructure, SessionType } from '@/features/sessions/types';
+import { useAppStore } from '@/stores/app-store';
 
 type CornerKey = 'end_a_corner_1' | 'end_a_corner_2' | 'end_b_corner_1' | 'end_b_corner_2';
 
@@ -70,6 +76,11 @@ export default function PitchSetupRoute() {
   const [pitchNameError, setPitchNameError] = useState<string | undefined>();
   const [similarPitches, setSimilarPitches] = useState<PitchRead[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [gateOpen, setGateOpen] = useState(false);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const profileQuery = useMyProfileQuery();
+  const updateProfile = useUpdateProfileMutation();
+  const massUnit = useAppStore((state) => state.units.mass);
 
   const nearbyQuery = useNearbyPitchesQuery({
     lat: coords?.lat ?? null,
@@ -270,9 +281,12 @@ export default function PitchSetupRoute() {
     return cornersPayload();
   };
 
-  const handleKickOff = async () => {
-    setError(null);
+  const gateMode = weightGateMode({
+    weightKg: profileQuery.data?.weight_kg,
+    weightUpdatedAt: profileQuery.data?.weight_updated_at,
+  });
 
+  const startSessionFlow = async () => {
     if (sessionType === 'training') {
       if (!resolvedStartingActivity) {
         setError('Choose which activity to start with');
@@ -336,91 +350,135 @@ export default function PitchSetupRoute() {
     }
   };
 
+  const handleKickOff = async () => {
+    setError(null);
+    if (profileQuery.isLoading) return;
+    if (gateMode) {
+      setGateOpen(true);
+      return;
+    }
+    await startSessionFlow();
+  };
+
+  const handleSaveWeight = async ({ weightKg, sex }: { weightKg: number; sex: Sex | null }) => {
+    setGateError(null);
+    try {
+      await updateProfile.mutateAsync({
+        weight_kg: weightKg,
+        ...(sex ? { sex } : {}),
+      });
+      setGateOpen(false);
+      await startSessionFlow();
+    } catch (err) {
+      setGateError(err instanceof ApiError ? err.detail : 'Could not save weight');
+    }
+  };
+
   const busy =
     savePitch.isPending ||
     createPitch.isPending ||
     checkSimilar.isPending ||
     createSession.isPending ||
-    startSession.isPending;
+    startSession.isPending ||
+    updateProfile.isPending;
 
   return (
-    <PitchSetupScreen
-      sessionType={sessionType}
-      step={step}
-      markedCornerCount={markedCornerCount}
-      gpsAccuracy={gpsAccuracy}
-      locationBusy={locationBusy}
-      nearbyPitch={nearbyPitch}
-      nearbyLoading={nearbyQuery.isFetching && !nearbyPitch}
-      pitchName={pitchName}
-      pitchNameError={pitchNameError}
-      similarPitches={similarPitches}
-      selectedPitchName={pitchNameDraft}
-      skipHeatmap={skipHeatmap || forceSkipPitch}
-      needsAttackDirection={needsAttackDirection}
-      attackDirection={attackDirection}
-      trainingActivityOptions={sessionType === 'training' ? trainingActivityOptions : []}
-      startingActivityKind={resolvedStartingActivity}
-      busy={busy}
-      error={error}
-      onUseNearby={() => {
-        void handleUseNearby();
-      }}
-      onDismissNearby={() => setDismissedNearby(true)}
-      onUseSaved={() => router.push('/(app)/select-saved-pitch')}
-      onMarkNew={() => {
-        void handleMarkNew();
-      }}
-      onSkip={() => {
-        setSkipHeatmap();
-        setStep('kickoff');
-      }}
-      onMarkCorner={() => {
-        void handleMarkCorner();
-      }}
-      onChangePitchName={(name) => {
-        setPitchName(name);
-        setPitchNameError(undefined);
-      }}
-      onSubmitName={() => {
-        void handleSubmitName();
-      }}
-      onSelectSimilar={(pitch) => {
-        void handleSelectSimilar(pitch);
-      }}
-      onCreateAnyway={() => {
-        void handleCreateAnyway();
-      }}
-      onFlipAttack={() => setAttackDirection(attackDirection === 'end_a' ? 'end_b' : 'end_a')}
-      onSelectStartingActivity={setStartingActivityKind}
-      onKickOff={() => {
-        void handleKickOff();
-      }}
-      onBack={() => {
-        if (forceSkipPitch) {
+    <>
+      <PitchSetupScreen
+        sessionType={sessionType}
+        step={step}
+        markedCornerCount={markedCornerCount}
+        gpsAccuracy={gpsAccuracy}
+        locationBusy={locationBusy}
+        nearbyPitch={nearbyPitch}
+        nearbyLoading={nearbyQuery.isFetching && !nearbyPitch}
+        pitchName={pitchName}
+        pitchNameError={pitchNameError}
+        similarPitches={similarPitches}
+        selectedPitchName={pitchNameDraft}
+        skipHeatmap={skipHeatmap || forceSkipPitch}
+        needsAttackDirection={needsAttackDirection}
+        attackDirection={attackDirection}
+        trainingActivityOptions={sessionType === 'training' ? trainingActivityOptions : []}
+        startingActivityKind={resolvedStartingActivity}
+        busy={busy}
+        error={error}
+        onUseNearby={() => {
+          void handleUseNearby();
+        }}
+        onDismissNearby={() => setDismissedNearby(true)}
+        onUseSaved={() => router.push('/(app)/select-saved-pitch')}
+        onMarkNew={() => {
+          void handleMarkNew();
+        }}
+        onSkip={() => {
+          setSkipHeatmap();
+          setStep('kickoff');
+        }}
+        onMarkCorner={() => {
+          void handleMarkCorner();
+        }}
+        onChangePitchName={(name) => {
+          setPitchName(name);
+          setPitchNameError(undefined);
+        }}
+        onSubmitName={() => {
+          void handleSubmitName();
+        }}
+        onSelectSimilar={(pitch) => {
+          void handleSelectSimilar(pitch);
+        }}
+        onCreateAnyway={() => {
+          void handleCreateAnyway();
+        }}
+        onFlipAttack={() => setAttackDirection(attackDirection === 'end_a' ? 'end_b' : 'end_a')}
+        onSelectStartingActivity={setStartingActivityKind}
+        onKickOff={() => {
+          void handleKickOff();
+        }}
+        onBack={() => {
+          if (forceSkipPitch) {
+            router.back();
+            return;
+          }
+          if (step === 'kickoff') {
+            clearPitchSelection();
+            setStep('source');
+            return;
+          }
+          if (step === 'similar') {
+            setStep('name');
+            return;
+          }
+          if (step === 'name') {
+            setStep('mark');
+            return;
+          }
+          if (step === 'mark') {
+            clearPitchSelection();
+            setStep('source');
+            return;
+          }
           router.back();
-          return;
-        }
-        if (step === 'kickoff') {
-          clearPitchSelection();
-          setStep('source');
-          return;
-        }
-        if (step === 'similar') {
-          setStep('name');
-          return;
-        }
-        if (step === 'name') {
-          setStep('mark');
-          return;
-        }
-        if (step === 'mark') {
-          clearPitchSelection();
-          setStep('source');
-          return;
-        }
-        router.back();
-      }}
-    />
+        }}
+      />
+      {gateOpen && gateMode ? (
+        <WeightGateSheet
+          key={`${gateMode}-${profileQuery.data?.weight_kg ?? 'new'}`}
+          visible
+          mode={gateMode}
+          sexMissing={profileQuery.data?.sex == null}
+          massUnit={massUnit}
+          savedWeightKg={profileQuery.data?.weight_kg ?? null}
+          weightUpdatedAt={profileQuery.data?.weight_updated_at ?? null}
+          busy={updateProfile.isPending}
+          error={gateError}
+          onDismiss={() => setGateOpen(false)}
+          onSave={(update) => {
+            void handleSaveWeight(update);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

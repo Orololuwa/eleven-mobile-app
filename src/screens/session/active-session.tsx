@@ -37,6 +37,7 @@ type ActiveSessionScreenProps = {
   sessionType: string;
   sessionId: string;
   distanceUnit: 'km' | 'mi';
+  massKg?: number | null;
   onEnd: () => void;
 };
 
@@ -209,6 +210,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   sessionType,
   sessionId,
   distanceUnit: distanceUnitProp,
+  massKg = null,
   onEnd,
 }) => {
   const {
@@ -228,7 +230,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
     confirmSegmentSwitch,
     flipPendingDirection,
     endSession,
-  } = useTrackingSession({ sessionId });
+  } = useTrackingSession({ sessionId, massKg });
 
   const distanceUnit = distanceUnitProp ?? distanceUnitFromHook;
 

@@ -6,7 +6,7 @@ import { usePositionPickerDraftStore } from '@/features/profile/position-picker-
 import { useUpdatePositionsMutation } from '@/features/profile/use-update-positions-mutation';
 import { useUpdateProfileMutation } from '@/features/profile/use-update-profile-mutation';
 import { useAppStore } from '@/stores/app-store';
-import type { PositionIn, PreferredFoot } from '@/features/profile/types';
+import type { PositionIn, PreferredFoot, Sex } from '@/features/profile/types';
 import { ensureOnePreferred } from '@/features/profile/validation';
 
 export default function ProfileSetupRoute() {
@@ -27,10 +27,14 @@ export default function ProfileSetupRoute() {
       display_name,
       preferred_foot,
       positions: nextPositions,
+      weight_kg,
+      sex,
     }: {
       display_name: string;
       preferred_foot: PreferredFoot;
       positions: PositionIn[];
+      weight_kg: number | null;
+      sex: Sex | null;
     }) => {
       setError(null);
       try {
@@ -39,6 +43,8 @@ export default function ProfileSetupRoute() {
           display_name,
           preferred_foot,
           onboarding_completed: true,
+          ...(weight_kg != null ? { weight_kg } : {}),
+          ...(sex ? { sex } : {}),
         });
         setOnboardingCompleted(true);
         resetPositions();
@@ -50,6 +56,7 @@ export default function ProfileSetupRoute() {
     [resetPositions, setOnboardingCompleted, updatePositions, updateProfile],
   );
 
+  const massUnit = useAppStore((state) => state.units.mass);
   const busy = updateProfile.isPending || updatePositions.isPending;
 
   return (
@@ -59,6 +66,7 @@ export default function ProfileSetupRoute() {
       initialPositions={positions}
       busy={busy}
       error={error}
+      massUnit={massUnit}
       onDisplayNameChange={setDisplayName}
       onPreferredFootIndexChange={setPreferredFootIndex}
       onComplete={(data) => {

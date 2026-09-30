@@ -1,6 +1,15 @@
 import NetInfo from '@react-native-community/netinfo';
 import { AppState, type AppStateStatus } from 'react-native';
+import { ApiError } from '@/lib/api-client';
 import { finalizeSession, uploadTrackPoints } from '../session-api';
+import {
+  getStoredSegmentMetrics,
+  getStoredSessionMetrics,
+  getStoredSprintEfforts,
+  toSegmentMetricsPayload,
+  toSessionMetricsPayload,
+  toSprintEffortPayload,
+} from '../summary/metrics-store';
 import { SYNC_RETRY_INITIAL_MS, SYNC_RETRY_MAX_MS, TRACK_POINTS_CHUNK_SIZE } from './constants';
 import { downsampleTrackPoints } from './downsample';
 import { withUniqueSequenceIndexes } from './sequence-index';
@@ -43,8 +52,16 @@ const chunkPoints = (points: TrackPointUpload[]) => {
 const indexBySegmentId = (segments: TrackingSegmentRow[]) =>
   new Map(segments.map((segment) => [segment.id, segment.segment_index]));
 
-const segmentIndexFor = (indexById: Map<string, number>, segmentId: string | null) =>
-  segmentId == null ? null : (indexById.get(segmentId) ?? null);
+const segmentIndexFor = (indexById: Map<string, number>, segmentId: string) =>
+  indexById.get(segmentId);
+
+const isTerminalClientError = (error: unknown) =>
+  error instanceof ApiError &&
+  error.status >= 400 &&
+  error.status < 500 &&
+  error.status !== 401 &&
+  error.status !== 408 &&
+  error.status !== 429;
 
 export const syncSession = async (sessionId: string): Promise<boolean> => {
   if (inFlight.has(sessionId)) return false;
@@ -71,6 +88,10 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
     const segmentIndexes = indexBySegmentId(segments);
     const endedAt = session.ended_at;
 
+    const metrics = await getStoredSessionMetrics(sessionId);
+    const segmentMetrics = metrics ? await getStoredSegmentMetrics(sessionId) : [];
+    const sprintEfforts = metrics ? await getStoredSprintEfforts(sessionId) : [];
+
     const finalizeBody: SessionFinalizeBody = {
       ended_at: endedAt,
       segments: segments.map((segment) => ({
@@ -80,22 +101,51 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
         started_at: segment.started_at,
         ended_at: segment.ended_at ?? endedAt,
       })),
-      pauses: pauses.map((pause) => ({
-        segment_index: segmentIndexFor(segmentIndexes, pause.segment_id),
-        reason: pause.reason,
-        started_at: pause.started_at,
-        ended_at: pause.ended_at ?? endedAt,
-      })),
+      pauses: pauses.flatMap((pause) => {
+        const segmentIndex = segmentIndexFor(segmentIndexes, pause.segment_id);
+        if (segmentIndex == null) {
+          console.warn('[sync] drop pause without segment', pause.id);
+          return [];
+        }
+        return [
+          {
+            segment_index: segmentIndex,
+            reason: pause.reason,
+            started_at: pause.started_at,
+            ended_at: pause.ended_at ?? endedAt,
+          },
+        ];
+      }),
+      ...(metrics
+        ? {
+            session_metrics: toSessionMetricsPayload(metrics),
+            segment_metrics: segmentMetrics.flatMap((row) => {
+              const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
+              if (segmentIndex == null) return [];
+              return [toSegmentMetricsPayload(row, segmentIndex)];
+            }),
+            sprint_efforts: sprintEfforts.flatMap((row) => {
+              const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
+              if (segmentIndex == null) return [];
+              return [toSprintEffortPayload(row, segmentIndex)];
+            }),
+          }
+        : {}),
     };
 
     await finalizeSession({ sessionId, body: finalizeBody });
 
     const uploads: TrackPointUpload[] = downsampled.flatMap((point) => {
       if (point.horizontal_accuracy_m == null || point.horizontal_accuracy_m <= 0) return [];
+      const segmentIndex = segmentIndexFor(segmentIndexes, point.segment_id);
+      if (segmentIndex == null) {
+        console.warn('[sync] drop point without segment', point.id);
+        return [];
+      }
       return [
         {
           sequence_index: point.sequence_index,
-          segment_index: segmentIndexFor(segmentIndexes, point.segment_id),
+          segment_index: segmentIndex,
           recorded_at: point.recorded_at,
           lat: point.lat,
           lng: point.lng,
@@ -126,6 +176,11 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
     return true;
   } catch (error) {
     console.error('[sync]', sessionId, error);
+    if (isTerminalClientError(error)) {
+      await updateSessionFields(sessionId, { sync_status: 'rejected' });
+      resetDelay(sessionId);
+      return false;
+    }
     await updateSessionFields(sessionId, { sync_status: 'failed' });
     const delay = nextDelay(sessionId);
     setTimeout(() => {

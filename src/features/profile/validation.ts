@@ -1,10 +1,14 @@
-import type { PositionIn, PreferredFoot, ProfileUpdate, SkillLevel } from './types';
+import type { PositionIn, PreferredFoot, ProfileUpdate, Sex, SkillLevel } from './types';
 import { parseIsoDate, startOfToday } from './date';
 
 export const DISPLAY_NAME_MAX = 100;
 export const BIO_MAX = 500;
 export const HEIGHT_MIN = 100;
 export const HEIGHT_MAX = 230;
+/** Smallest positive value `numeric(4,1)` can store. */
+export const WEIGHT_MIN_KG = 0.1;
+/** Largest value `numeric(4,1)` can store. */
+export const WEIGHT_MAX_KG = 999.9;
 export const POSITION_MIN = 1;
 export const POSITION_MAX = 5;
 
@@ -27,6 +31,24 @@ export const validateDateOfBirth = (value: string) => {
   if (!date) return 'Enter a valid date';
   if (date > startOfToday()) return 'Date of birth cannot be in the future';
   return undefined;
+};
+
+export const roundWeightKg = (value: number) => Math.round(value * 10) / 10;
+
+export const validateWeightKg = (value: number | null | undefined) => {
+  if (value == null) return undefined;
+  if (!Number.isFinite(value)) return 'Enter a weight';
+  const rounded = roundWeightKg(value);
+  if (Math.abs(rounded - value) > 0.001) return 'Use one decimal place';
+  if (rounded < WEIGHT_MIN_KG) return 'Enter a weight';
+  if (rounded > WEIGHT_MAX_KG) return `Enter a weight up to ${WEIGHT_MAX_KG} kg`;
+  return undefined;
+};
+
+export const validateSex = (value: Sex | null | undefined) => {
+  if (value == null) return undefined;
+  if (value === 'male' || value === 'female' || value === 'prefer_not_to_say') return undefined;
+  return 'Choose male, female, or prefer not to say';
 };
 
 export const validateHeightCm = (value: number | null | undefined) => {
@@ -77,6 +99,14 @@ export const validateProfileUpdate = (update: ProfileUpdate) => {
   }
   if (update.height_cm != null) {
     const error = validateHeightCm(update.height_cm);
+    if (error) return error;
+  }
+  if (update.weight_kg != null) {
+    const error = validateWeightKg(update.weight_kg);
+    if (error) return error;
+  }
+  if (update.sex != null) {
+    const error = validateSex(update.sex);
     if (error) return error;
   }
   return undefined;

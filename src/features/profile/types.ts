@@ -19,6 +19,8 @@ export type PreferredFoot = 'left' | 'right' | 'both';
 
 export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'pro';
 
+export type Sex = 'male' | 'female' | 'prefer_not_to_say';
+
 export type ProfileVisibility = 'public' | 'private';
 
 export type LocationIn = {
@@ -50,6 +52,9 @@ export type ProfileRead = {
   date_of_birth: string | null;
   preferred_foot: PreferredFoot | null;
   height_cm: number | null;
+  weight_kg: number | null;
+  sex: Sex | null;
+  weight_updated_at: string | null;
   skill_level: SkillLevel | null;
   bio: string | null;
   location: LocationOut | null;
@@ -80,6 +85,8 @@ export type ProfileUpdate = {
   date_of_birth?: string | null;
   preferred_foot?: PreferredFoot | null;
   height_cm?: number | null;
+  weight_kg?: number | null;
+  sex?: Sex | null;
   skill_level?: SkillLevel | null;
   bio?: string | null;
   location?: LocationIn | null;
@@ -121,5 +128,7 @@ export const POSITION_CODES: PositionCode[] = [
 export const PREFERRED_FOOT_OPTIONS: PreferredFoot[] = ['left', 'right', 'both'];
 
 export const SKILL_LEVELS: SkillLevel[] = ['beginner', 'intermediate', 'advanced', 'pro'];
+
+export const SEX_OPTIONS: Sex[] = ['male', 'female', 'prefer_not_to_say'];
 
 export const PROFILE_VISIBILITY_OPTIONS: ProfileVisibility[] = ['public', 'private'];

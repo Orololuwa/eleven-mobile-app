@@ -38,7 +38,13 @@ import { useTrackingHudStore } from './tracking-store';
 import type { TrackingSessionRow } from './types';
 import { computeLiveMetrics, gpsStrengthBars } from './live-metrics';
 
-export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
+export const useTrackingSession = ({
+  sessionId,
+  massKg = null,
+}: {
+  sessionId: string;
+  massKg?: number | null;
+}) => {
   const units = useAppStore((s) => s.units);
   const distanceUnit = units.distance === 'mi' ? 'mi' : 'km';
   const phase = useTrackingHudStore((s) => s.phase);
@@ -287,7 +293,7 @@ export const useTrackingSession = ({ sessionId }: { sessionId: string }) => {
   };
 
   const endSession = async () => {
-    await endTrackingSession(sessionId);
+    await endTrackingSession({ sessionId, massKg });
     const row = await loadSession();
     setSession(row);
   };

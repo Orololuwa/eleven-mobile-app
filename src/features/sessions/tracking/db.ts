@@ -86,6 +86,63 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await addColumnIfMissing(db, 'tracking_segments', 'activity_kind', 'TEXT');
   await addColumnIfMissing(db, 'tracking_points', 'speed_accuracy_mps', 'REAL');
   await ensureUniqueTrackPointSequence(db);
+  await ensureSegmentIdNotNull(db, 'tracking_pauses');
+  await ensureSegmentIdNotNull(db, 'tracking_points');
+};
+
+const columnIsNotNull = async (db: SQLite.SQLiteDatabase, table: string, column: string) => {
+  const rows = await db.getAllAsync<{ name: string; notnull: number }>(
+    `PRAGMA table_info(${table})`,
+  );
+  return rows.some((row) => row.name === column && row.notnull === 1);
+};
+
+const ensureSegmentIdNotNull = async (
+  db: SQLite.SQLiteDatabase,
+  table: 'tracking_pauses' | 'tracking_points',
+) => {
+  if (await columnIsNotNull(db, table, 'segment_id')) return;
+  await db.execAsync(`DELETE FROM ${table} WHERE segment_id IS NULL;`);
+  if (table === 'tracking_pauses') {
+    await db.execAsync(`
+      CREATE TABLE tracking_pauses_next (
+        id TEXT PRIMARY KEY NOT NULL,
+        session_id TEXT NOT NULL,
+        segment_id TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT
+      );
+      INSERT INTO tracking_pauses_next (id, session_id, segment_id, reason, started_at, ended_at)
+      SELECT id, session_id, segment_id, reason, started_at, ended_at FROM tracking_pauses;
+      DROP TABLE tracking_pauses;
+      ALTER TABLE tracking_pauses_next RENAME TO tracking_pauses;
+      CREATE INDEX IF NOT EXISTS idx_tracking_pauses_session ON tracking_pauses(session_id);
+    `);
+    return;
+  }
+  await db.execAsync(`
+    CREATE TABLE tracking_points_next (
+      id TEXT PRIMARY KEY NOT NULL,
+      session_id TEXT NOT NULL,
+      segment_id TEXT NOT NULL,
+      sequence_index INTEGER NOT NULL,
+      recorded_at TEXT NOT NULL,
+      lat REAL NOT NULL,
+      lng REAL NOT NULL,
+      speed_kmh REAL,
+      speed_accuracy_mps REAL,
+      horizontal_accuracy_m REAL
+    );
+    INSERT INTO tracking_points_next (
+      id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m
+    )
+    SELECT id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m
+    FROM tracking_points;
+    DROP TABLE tracking_points;
+    ALTER TABLE tracking_points_next RENAME TO tracking_points;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tracking_points_session ON tracking_points(session_id, sequence_index);
+  `);
 };
 
 const getDb = () => {
@@ -139,7 +196,7 @@ const getDb = () => {
         CREATE TABLE IF NOT EXISTS tracking_pauses (
           id TEXT PRIMARY KEY NOT NULL,
           session_id TEXT NOT NULL,
-          segment_id TEXT,
+          segment_id TEXT NOT NULL,
           reason TEXT NOT NULL,
           started_at TEXT NOT NULL,
           ended_at TEXT,
@@ -148,7 +205,7 @@ const getDb = () => {
         CREATE TABLE IF NOT EXISTS tracking_points (
           id TEXT PRIMARY KEY NOT NULL,
           session_id TEXT NOT NULL,
-          segment_id TEXT,
+          segment_id TEXT NOT NULL,
           sequence_index INTEGER NOT NULL,
           recorded_at TEXT NOT NULL,
           lat REAL NOT NULL,
@@ -161,6 +218,62 @@ const getDb = () => {
         CREATE UNIQUE INDEX IF NOT EXISTS idx_tracking_points_session ON tracking_points(session_id, sequence_index);
         CREATE INDEX IF NOT EXISTS idx_tracking_pauses_session ON tracking_pauses(session_id);
         CREATE INDEX IF NOT EXISTS idx_tracking_segments_session ON tracking_segments(session_id);
+        CREATE TABLE IF NOT EXISTS session_metrics (
+          session_id TEXT PRIMARY KEY NOT NULL,
+          active_duration_seconds INTEGER NOT NULL,
+          distance_m REAL NOT NULL,
+          top_speed_kmh REAL,
+          top_speed_lat REAL,
+          top_speed_lng REAL,
+          sprint_count INTEGER NOT NULL,
+          sprint_distance_m REAL NOT NULL,
+          zone_walk_seconds INTEGER NOT NULL,
+          zone_jog_seconds INTEGER NOT NULL,
+          zone_run_seconds INTEGER NOT NULL,
+          zone_high_run_seconds INTEGER NOT NULL,
+          zone_sprint_seconds INTEGER NOT NULL,
+          calories_kcal INTEGER,
+          mass_kg_at_computation REAL,
+          speed_source TEXT NOT NULL,
+          data_quality TEXT NOT NULL,
+          speed_band_bucket TEXT NOT NULL,
+          speed_band_boundaries_json TEXT NOT NULL,
+          pitch_long_axis_m REAL,
+          accepted_fix_count INTEGER NOT NULL,
+          gap_seconds INTEGER NOT NULL,
+          algorithm_version TEXT NOT NULL,
+          computed_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS segment_metrics (
+          id TEXT PRIMARY KEY NOT NULL,
+          session_id TEXT NOT NULL,
+          segment_id TEXT NOT NULL,
+          active_duration_seconds INTEGER NOT NULL,
+          distance_m REAL NOT NULL,
+          gap_seconds INTEGER NOT NULL,
+          top_speed_kmh REAL,
+          sprint_count INTEGER NOT NULL,
+          sprint_distance_m REAL NOT NULL,
+          zone_walk_seconds INTEGER NOT NULL,
+          zone_jog_seconds INTEGER NOT NULL,
+          zone_run_seconds INTEGER NOT NULL,
+          zone_high_run_seconds INTEGER NOT NULL,
+          zone_sprint_seconds INTEGER NOT NULL,
+          calories_kcal INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS sprint_efforts (
+          id TEXT PRIMARY KEY NOT NULL,
+          session_id TEXT NOT NULL,
+          segment_id TEXT NOT NULL,
+          effort_index INTEGER NOT NULL,
+          started_at TEXT NOT NULL,
+          ended_at TEXT NOT NULL,
+          duration_s REAL NOT NULL,
+          distance_m REAL NOT NULL,
+          peak_speed_kmh REAL NOT NULL,
+          peak_lat REAL,
+          peak_lng REAL
+        );
       `);
       await migrateTrackingSchema(db);
       return db;
@@ -171,7 +284,7 @@ const getDb = () => {
 
 let dbQueue: Promise<unknown> = Promise.resolve();
 
-const withDb = async <T>(fn: (db: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> => {
+export const withDb = async <T>(fn: (db: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> => {
   const db = await getDb();
   const run = dbQueue.then(() => fn(db));
   dbQueue = run.then(
@@ -418,7 +531,7 @@ export const insertPause = async ({
   startedAt = new Date().toISOString(),
 }: {
   sessionId: string;
-  segmentId: string | null;
+  segmentId: string;
   reason: TrackingPauseRow['reason'];
   startedAt?: string;
 }) => {
@@ -489,7 +602,7 @@ export const insertTrackPoint = async ({
   horizontalAccuracyM,
 }: {
   sessionId: string;
-  segmentId: string | null;
+  segmentId: string;
   recordedAt: string;
   lat: number;
   lng: number;

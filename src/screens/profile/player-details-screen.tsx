@@ -21,19 +21,23 @@ import type {
   ProfileRead,
   ProfileUpdate,
   ProfileVisibility,
+  Sex,
   SkillLevel,
 } from '@/features/profile/types';
 import {
   PREFERRED_FOOT_OPTIONS,
   PROFILE_VISIBILITY_OPTIONS,
+  SEX_OPTIONS,
   SKILL_LEVELS,
 } from '@/features/profile/types';
+import { displayToKg, formatWeight, sexLabel, weightUnitLabel } from '@/features/profile/weight';
 import {
   BIO_MAX,
   validateBio,
   validateDateOfBirth,
   validateDisplayName,
   validateHeightCm,
+  validateWeightKg,
 } from '@/features/profile/validation';
 import { parseIsoDate } from '@/features/profile/date';
 
@@ -42,6 +46,8 @@ type PlayerDetailsFormValues = {
   bio: string;
   date_of_birth: string;
   height_input: string;
+  weight_input: string;
+  sex: Sex | null;
   preferred_foot: PreferredFoot;
   skill_level: SkillLevel | null;
   visibility: ProfileVisibility;
@@ -107,6 +113,8 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
       bio: profile.bio ?? '',
       date_of_birth: profile.date_of_birth ?? '',
       height_input: heightInputFromProfile({ height_cm: profile.height_cm, units }),
+      weight_input: profile.weight_kg == null ? '' : formatWeight(profile.weight_kg, units.mass),
+      sex: profile.sex,
       preferred_foot: profile.preferred_foot ?? 'left',
       skill_level: profile.skill_level,
       visibility: profile.visibility,
@@ -116,6 +124,8 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
       profile.date_of_birth,
       profile.display_name,
       profile.height_cm,
+      profile.sex,
+      profile.weight_kg,
       profile.preferred_foot,
       profile.skill_level,
       profile.visibility,
@@ -141,6 +151,8 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
       skill_level: 'skill_level',
       visibility: 'visibility',
       height_cm: 'height_input',
+      weight_kg: 'weight_input',
+      sex: 'sex',
     };
 
     Object.entries(fieldErrors).forEach(([field, message]) => {
@@ -171,6 +183,13 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
     const height_cm = heightCmFromInput({ value: values.height_input, units });
     const heightError = validateHeightCm(height_cm ?? undefined);
     if (heightError) return;
+    const weightTrimmed = values.weight_input.trim();
+    const weight_kg = weightTrimmed ? displayToKg(Number(weightTrimmed), units.mass) : null;
+    const weightError = weightTrimmed ? validateWeightKg(weight_kg) : undefined;
+    if (weightError) {
+      setError('weight_input', { type: 'validate', message: weightError });
+      return;
+    }
 
     onSave(
       {
@@ -178,6 +197,8 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
         bio: values.bio.trim() || null,
         date_of_birth: parseIsoDate(values.date_of_birth) ? values.date_of_birth.trim() : null,
         height_cm,
+        weight_kg,
+        sex: values.sex,
         preferred_foot: values.preferred_foot,
         skill_level: values.skill_level,
         visibility: values.visibility,
@@ -339,6 +360,59 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
                 />
                 <Text style={styles.metricUnit}>{heightUnit}</Text>
               </View>
+            </View>
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="weight_input"
+          render={({ field: { value, onChange }, fieldState }) => (
+            <View style={styles.metricField}>
+              <Text style={styles.sectionLabel}>WEIGHT · {weightUnitLabel(units.mass)}</Text>
+              <View
+                style={[styles.metricUnderline, value.length > 0 && styles.metricUnderlineFocused]}
+              >
+                <TextInput
+                  style={styles.metricValue}
+                  value={value}
+                  onChangeText={onChange}
+                  keyboardType="decimal-pad"
+                  placeholder={units.mass === 'lb' ? '160' : '72'}
+                  placeholderTextColor={colors.text.quaternary}
+                />
+                <Text style={styles.metricUnit}>{weightUnitLabel(units.mass)}</Text>
+              </View>
+              <Text style={styles.weightNote}>
+                Used to estimate calories. Past sessions keep the weight they were recorded with.
+              </Text>
+              {fieldState.error ? (
+                <Text style={styles.inlineError}>{fieldState.error.message}</Text>
+              ) : null}
+            </View>
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="sex"
+          render={({ field: { value, onChange } }) => (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>SEX</Text>
+              <View style={styles.chipRow}>
+                {SEX_OPTIONS.map((option) => (
+                  <Chip
+                    key={option}
+                    label={sexLabel(option)}
+                    selected={value === option}
+                    onPress={() => onChange(value === option ? null : option)}
+                    variant="position"
+                  />
+                ))}
+              </View>
+              <Text style={styles.weightNote}>
+                Biological sex — some energy formulas use it. Prefer not to say works just as well.
+              </Text>
             </View>
           )}
         />
@@ -551,6 +625,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.mono,
     fontSize: 10,
     color: colors.text.secondary,
+  },
+  weightNote: {
+    fontFamily: typography.fontFamily.primary,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.text.tertiary,
   },
   inlineError: {
     fontFamily: typography.fontFamily.mono,

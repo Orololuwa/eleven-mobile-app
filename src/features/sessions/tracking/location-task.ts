@@ -48,7 +48,7 @@ const startAutoPause = async ({
   reason,
 }: {
   sessionId: string;
-  segmentId: string | null;
+  segmentId: string;
   reason: PauseReason;
 }) => {
   const existing = await getOpenPause(sessionId);
@@ -108,9 +108,14 @@ export const processLocationUpdate = async (
     }
   }
 
-  const canInsert = hasCoords && inActivity && !inManualPause && !(await getOpenPause(session.id));
+  const canInsert =
+    hasCoords &&
+    inActivity &&
+    session.current_segment_id != null &&
+    !inManualPause &&
+    !(await getOpenPause(session.id));
 
-  if (canInsert) {
+  if (canInsert && session.current_segment_id) {
     const speedKmh = speedMsToKmh(coords.speed);
     const coordsWithSpeedAccuracy = coords as typeof coords & {
       speedAccuracy?: number | null;
@@ -160,7 +165,12 @@ export const processLocationUpdate = async (
     session.auto_resume_cooldown_until != null &&
     Date.now() < new Date(session.auto_resume_cooldown_until).getTime();
 
-  if (!inAutoPause && !cooldownActive && lastFixMs > GPS_LOSS_PAUSE_MS) {
+  if (
+    !inAutoPause &&
+    !cooldownActive &&
+    lastFixMs > GPS_LOSS_PAUSE_MS &&
+    session.current_segment_id
+  ) {
     await startAutoPause({
       sessionId: session.id,
       segmentId: session.current_segment_id,
@@ -321,6 +331,7 @@ export const handleAppBackgrounded = async () => {
   const session = await getActiveTrackingSession();
   if (!session || session.tracking_status !== 'live') return;
   if (session.background_permission === 'always') return;
+  if (!session.current_segment_id) return;
 
   const openPause = await getOpenPause(session.id);
   if (openPause) return;
@@ -356,7 +367,7 @@ export const handleAppForegrounded = async () => {
 
 export const startManualPause = async (sessionId: string) => {
   const session = await getActiveTrackingSession();
-  if (!session || session.id !== sessionId) return;
+  if (!session || session.id !== sessionId || !session.current_segment_id) return;
 
   await closeOpenPause(sessionId);
   await insertPause({
