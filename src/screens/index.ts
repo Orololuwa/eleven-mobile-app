@@ -10,7 +10,6 @@ export { UnitsScreen } from './profile/units-screen';
 export { AppearanceScreen } from './profile/appearance-screen';
 export { SavedPitchesScreen } from './profile/saved-pitches-screen';
 export { PrivacyDataScreen } from './profile/privacy-data-screen';
-export { BackupMethodSheet } from './identity/backup-method-sheet';
 export { LinkConflictScreen } from './identity/link-conflict-screen';
 export { FindWallScreen } from './identity/find-wall-screen';
 export { HomeScreen } from './home/home-screen';

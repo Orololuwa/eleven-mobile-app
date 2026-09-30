@@ -1,7 +1,16 @@
 import React, { useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Button, Chip } from '@/components';
-import { spacing, typography, type Colors, useThemedStyles } from '@/theme';
+import { spacing, typography, type Colors, useColors, useThemedStyles } from '@/theme';
 import { SEX_OPTIONS, type Sex } from '@/features/profile/types';
 import {
   displayToKg,
@@ -12,7 +21,12 @@ import {
   weightUnitLabel,
   type WeightGateMode,
 } from '@/features/profile/weight';
-import { WEIGHT_MAX_KG, WEIGHT_MIN_KG, roundWeightKg } from '@/features/profile/validation';
+import {
+  WEIGHT_MAX_KG,
+  WEIGHT_MIN_KG,
+  roundWeightKg,
+  validateWeightKg,
+} from '@/features/profile/validation';
 
 type WeightGateSheetProps = {
   visible: boolean;
@@ -29,6 +43,24 @@ type WeightGateSheetProps = {
 
 const stepDisplay = (unit: 'kg' | 'lb') => (unit === 'lb' ? 1 : 0.5);
 
+const sanitizeWeightDraft = (value: string) => {
+  const cleaned = value.replace(/[^\d.]/g, '');
+  const dot = cleaned.indexOf('.');
+  if (dot === -1) return cleaned;
+  const whole = cleaned.slice(0, dot);
+  const fraction = cleaned
+    .slice(dot + 1)
+    .replace(/\./g, '')
+    .slice(0, 1);
+  return `${whole}.${fraction}`;
+};
+
+const parseWeightDraft = (draft: string) => {
+  if (!draft || draft === '.') return null;
+  const value = Number(draft);
+  return Number.isFinite(value) ? value : null;
+};
+
 export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
   visible,
   mode,
@@ -41,25 +73,51 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
   onDismiss,
   onSave,
 }) => {
+  const colors = useColors();
   const styles = useThemedStyles(createStyles);
   const [weightKg, setWeightKg] = useState<number | null>(mode === 'stale' ? savedWeightKg : null);
+  const [draft, setDraft] = useState(
+    mode === 'stale' && savedWeightKg != null ? formatWeight(savedWeightKg, massUnit) : '',
+  );
+  const [inputError, setInputError] = useState<string | null>(null);
   const [sex, setSex] = useState<Sex | null>(null);
   const updated = formatWeightUpdated(weightUpdatedAt);
   const unit = weightUnitLabel(massUnit);
-  const shown = weightKg == null ? '— —' : formatWeight(weightKg, massUnit);
   const unchanged =
     mode === 'stale' &&
     savedWeightKg != null &&
     weightKg != null &&
     roundWeightKg(weightKg) === roundWeightKg(savedWeightKg);
-  const canSave = weightKg != null && !busy;
+  const canSave = weightKg != null && inputError == null && !busy;
+
+  const commitKg = (kg: number) => {
+    const rounded = roundWeightKg(kg);
+    setWeightKg(rounded);
+    setDraft(formatWeight(rounded, massUnit));
+    setInputError(null);
+  };
+
+  const onType = (value: string) => {
+    const next = sanitizeWeightDraft(value);
+    setDraft(next);
+    const display = parseWeightDraft(next);
+    if (display == null) {
+      setWeightKg(null);
+      setInputError(null);
+      return;
+    }
+    const kg = displayToKg(display, massUnit);
+    const message = validateWeightKg(kg);
+    setInputError(message ?? null);
+    setWeightKg(message ? null : kg);
+  };
 
   const nudge = (direction: 1 | -1) => {
     const current = weightKg ?? savedWeightKg ?? 70;
     const nextDisplay = kgToDisplay(current, massUnit) + direction * stepDisplay(massUnit);
     const nextKg = displayToKg(nextDisplay, massUnit);
     const clamped = Math.min(WEIGHT_MAX_KG, Math.max(WEIGHT_MIN_KG, nextKg));
-    setWeightKg(roundWeightKg(clamped));
+    commitKg(clamped);
   };
 
   const title =
@@ -73,7 +131,10 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onDismiss}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.sheet}>
           <View style={styles.kickerRow}>
             <Text style={styles.kicker}>
@@ -95,7 +156,18 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
               <Text style={styles.stepLabel}>−</Text>
             </TouchableOpacity>
             <View style={styles.valueBlock}>
-              <Text style={styles.value}>{shown}</Text>
+              <TextInput
+                style={styles.value}
+                value={draft}
+                onChangeText={onType}
+                keyboardType="decimal-pad"
+                placeholder="— —"
+                placeholderTextColor={colors.text.quaternary}
+                textAlign="center"
+                editable={!busy}
+                selectTextOnFocus
+                accessibilityLabel="Weight"
+              />
               <Text style={styles.unit}>{unit}</Text>
             </View>
             <TouchableOpacity style={styles.step} onPress={() => nudge(1)} disabled={busy}>
@@ -123,6 +195,7 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
             </View>
           ) : null}
 
+          {inputError ? <Text style={styles.error}>{inputError}</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Button
@@ -139,9 +212,11 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
             loading={busy}
           />
           <Text style={styles.private}>PRIVATE · NEVER ON YOUR PUBLIC PROFILE</Text>
-          {mode === 'stale' ? <Text style={styles.hint}>CHANGED? USE − / + AND SAVE</Text> : null}
+          {mode === 'stale' ? (
+            <Text style={styles.hint}>CHANGED? TYPE IT, OR USE − / + AND SAVE</Text>
+          ) : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -221,9 +296,13 @@ const createStyles = (colors: Colors) =>
       color: colors.text.primary,
     },
     valueBlock: {
+      flex: 1,
       alignItems: 'center',
     },
     value: {
+      minWidth: 140,
+      padding: 0,
+      includeFontPadding: false,
       fontFamily: typography.fontFamily.primary,
       fontSize: 40,
       fontWeight: typography.fontWeight.black,

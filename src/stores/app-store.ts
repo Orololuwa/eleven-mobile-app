@@ -10,7 +10,6 @@ type AppStore = {
   sessionCount: number;
   units: UnitsPreference;
   signInMethods: SignInMethod[];
-  backupNudgeDismissed: boolean;
   showEmptyWallBanner: boolean;
   setAuthStatus: (status: AuthStatus) => void;
   applyAuthUser: (authUser: AuthUser) => void;
@@ -24,7 +23,6 @@ type AppStore = {
   setOnboardingCompleted: (completed: boolean) => void;
   incrementSessionCount: () => void;
   setUnits: (units: UnitsPreference) => void;
-  dismissBackupNudge: () => void;
   setShowEmptyWallBanner: (show: boolean) => void;
   resetAuth: () => void;
 };
@@ -38,7 +36,6 @@ export const useAppStore = create<AppStore>((set) => ({
   sessionCount: 0,
   units: defaultUnits,
   signInMethods: emptySignInMethods(),
-  backupNudgeDismissed: false,
   showEmptyWallBanner: false,
   setAuthStatus: (authStatus) => set({ authStatus }),
   applyAuthUser: (authUser) =>
@@ -56,7 +53,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setOnboardingCompleted: (onboardingCompleted) => set({ onboardingCompleted }),
   incrementSessionCount: () => set((state) => ({ sessionCount: state.sessionCount + 1 })),
   setUnits: (units) => set({ units }),
-  dismissBackupNudge: () => set({ backupNudgeDismissed: true }),
   setShowEmptyWallBanner: (show) => set({ showEmptyWallBanner: show }),
   resetAuth: () =>
     set({
@@ -64,7 +60,6 @@ export const useAppStore = create<AppStore>((set) => ({
       authUser: null,
       onboardingCompleted: false,
       sessionCount: 0,
-      backupNudgeDismissed: false,
       showEmptyWallBanner: false,
       signInMethods: emptySignInMethods(),
       units: defaultUnits,
