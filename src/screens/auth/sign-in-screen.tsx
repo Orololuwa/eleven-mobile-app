@@ -3,9 +3,8 @@ import { View, Text, StyleSheet, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LogoText, Button } from '@/components';
-import { colors, typography, spacing } from '@/theme';
-
-const WOODSMOKE = colors.background.primary; // #060706
+import { StatusBar } from 'expo-status-bar';
+import { typography, spacing, type Colors, ForceColorScheme, useThemedStyles } from '@/theme';
 
 type SignInProvider = 'apple' | 'google' | 'email';
 
@@ -17,17 +16,19 @@ type SignInScreenProps = {
   errorMessage?: string | null;
 };
 
-export const SignInScreen: React.FC<SignInScreenProps> = ({
+const SignInContent: React.FC<SignInScreenProps> = ({
   onContinueWithApple,
   onContinueWithGoogle,
   onUseEmail,
   busyProvider = null,
   errorMessage = null,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const busy = Boolean(busyProvider);
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
       <Image
         source={require('@assets/hero-bg.png')}
         style={styles.heroBackground}
@@ -97,81 +98,89 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: WOODSMOKE,
-    overflow: 'hidden',
-  },
-  heroBackground: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-    pointerEvents: 'none',
-  },
-  heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.overlay.light,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  header: {
-    paddingHorizontal: spacing[8],
-    paddingTop: spacing[7],
-  },
-  heroText: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingHorizontal: spacing[8],
-    paddingBottom: spacing[6],
-    gap: 12,
-  },
-  heroTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 44,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.04 * 44,
-    lineHeight: 44 * 0.95,
-    color: colors.text.primary,
-  },
-  heroTitleAccent: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 44,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.04 * 44,
-    lineHeight: 44 * 0.95,
-    color: colors.brand.primary,
-  },
-  actionsGradient: {
-    paddingTop: spacing[10],
-  },
-  actions: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[9],
-    gap: 12,
-  },
-  appleButton: {
-    backgroundColor: colors.text.primary,
-  },
-  providerIcon: {
-    width: 20,
-    height: 20,
-  },
-  error: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    lineHeight: 14 * 1.4,
-    color: colors.accent.danger,
-    textAlign: 'center',
-  },
-  footer: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.24 * 10,
-    color: colors.text.disabled,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-});
+/** Sits on the night pitch photo, so it stays on the dark palette in either appearance. */
+export const SignInScreen: React.FC<SignInScreenProps> = (props) => (
+  <ForceColorScheme scheme="dark">
+    <SignInContent {...props} />
+  </ForceColorScheme>
+);
+
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+      overflow: 'hidden',
+    },
+    heroBackground: {
+      ...StyleSheet.absoluteFillObject,
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+    },
+    heroOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay.light,
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'space-between',
+    },
+    header: {
+      paddingHorizontal: spacing[8],
+      paddingTop: spacing[7],
+    },
+    heroText: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      paddingHorizontal: spacing[8],
+      paddingBottom: spacing[6],
+      gap: 12,
+    },
+    heroTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 44,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.04 * 44,
+      lineHeight: 44 * 0.95,
+      color: colors.text.primary,
+    },
+    heroTitleAccent: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 44,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.04 * 44,
+      lineHeight: 44 * 0.95,
+      color: colors.brand.ink,
+    },
+    actionsGradient: {
+      paddingTop: spacing[10],
+    },
+    actions: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[9],
+      gap: 12,
+    },
+    appleButton: {
+      backgroundColor: colors.text.primary,
+    },
+    providerIcon: {
+      width: 20,
+      height: 20,
+    },
+    error: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      lineHeight: 14 * 1.4,
+      color: colors.accent.danger,
+      textAlign: 'center',
+    },
+    footer: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.24 * 10,
+      color: colors.text.disabled,
+      textAlign: 'center',
+      marginTop: 6,
+    },
+  });

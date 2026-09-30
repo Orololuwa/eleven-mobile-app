@@ -7,6 +7,7 @@ export { PlayerDetailsScreen } from './profile/player-details-screen';
 export { PositionPickerScreen } from './profile/position-picker-screen';
 export { SignInMethodsScreen } from './profile/sign-in-methods-screen';
 export { UnitsScreen } from './profile/units-screen';
+export { AppearanceScreen } from './profile/appearance-screen';
 export { SavedPitchesScreen } from './profile/saved-pitches-screen';
 export { PrivacyDataScreen } from './profile/privacy-data-screen';
 export { BackupMethodSheet } from './identity/backup-method-sheet';

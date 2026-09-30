@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 type WallProps = {
   total: number;
@@ -9,6 +9,7 @@ type WallProps = {
 };
 
 export const Wall: React.FC<WallProps> = ({ total, built, style }) => {
+  const colors = useColors();
   return (
     <View style={[styles.container, style]}>
       {Array.from({ length: total }).map((_, index) => {
@@ -22,7 +23,7 @@ export const Wall: React.FC<WallProps> = ({ total, built, style }) => {
             style={[
               styles.brick,
               {
-                backgroundColor: isBrick ? colors.brand.primary : colors.border.subtle,
+                backgroundColor: isBrick ? colors.brand.ink : colors.border.subtle,
                 opacity: isBrick ? opacity : 1,
               },
             ]}

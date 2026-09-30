@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip, Field, SegmentedControl } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 import type { ActivityKind, PlayStructure, SessionType } from '@/features/sessions/types';
 import {
   ACTIVITY_KINDS,
@@ -67,6 +67,7 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
   onContinue,
   onBack,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [step, setStep] = useState<WizardStep>('structure');
   const [minutesInput, setMinutesInput] = useState(
     plannedSegmentLengthMinutes != null ? String(plannedSegmentLengthMinutes) : '',
@@ -352,81 +353,82 @@ export const PlayStructureScreen: React.FC<PlayStructureScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  flex: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: spacing[6],
-  },
-  backRow: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-  },
-  backText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  header: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    paddingBottom: spacing[5],
-    gap: 10,
-  },
-  stepLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.2 * 11,
-    color: colors.brand.primary,
-  },
-  headerTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 30,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: -0.025 * 30,
-    lineHeight: 30 * 1.05,
-    color: colors.text.primary,
-  },
-  section: {
-    paddingHorizontal: spacing[6],
-    gap: 14,
-    marginBottom: spacing[6],
-  },
-  sectionLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-  presets: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  hintInline: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 15 * 1.5,
-  },
-  inlineError: {
-    fontSize: 14,
-    color: colors.accent.danger,
-  },
-  error: {
-    paddingHorizontal: spacing[6],
-    marginTop: spacing[4],
-    fontSize: 14,
-    color: colors.accent.danger,
-  },
-  actions: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[9],
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    flex: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: spacing[6],
+    },
+    backRow: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+    },
+    backText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    header: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      paddingBottom: spacing[5],
+      gap: 10,
+    },
+    stepLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.2 * 11,
+      color: colors.brand.ink,
+    },
+    headerTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 30,
+      fontWeight: typography.fontWeight.extrabold,
+      letterSpacing: -0.025 * 30,
+      lineHeight: 30 * 1.05,
+      color: colors.text.primary,
+    },
+    section: {
+      paddingHorizontal: spacing[6],
+      gap: 14,
+      marginBottom: spacing[6],
+    },
+    sectionLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+    presets: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    hintInline: {
+      fontSize: 15,
+      color: colors.text.secondary,
+      lineHeight: 15 * 1.5,
+    },
+    inlineError: {
+      fontSize: 14,
+      color: colors.accent.danger,
+    },
+    error: {
+      paddingHorizontal: spacing[6],
+      marginTop: spacing[4],
+      fontSize: 14,
+      color: colors.accent.danger,
+    },
+    actions: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[9],
+    },
+  });

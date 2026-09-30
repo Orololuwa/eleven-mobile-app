@@ -5,6 +5,7 @@ import { signOut } from '@/features/auth/use-auth-actions';
 import { useSavedPitchesQuery } from '@/features/pitches/use-saved-pitches-query';
 import { useMyProfileQuery } from '@/features/profile/use-profile-query';
 import { useAppStore } from '@/stores/app-store';
+import { useAppearanceStore } from '@/stores/appearance-store';
 
 export default function ProfileRoute() {
   const { data: profile, isLoading } = useMyProfileQuery();
@@ -12,6 +13,7 @@ export default function ProfileRoute() {
   const sessionCount = useAppStore((state) => state.sessionCount);
   const units = useAppStore((state) => state.units);
   const signInMethods = useAppStore((state) => state.signInMethods);
+  const appearance = useAppearanceStore((state) => state.preference);
 
   const signInSummary = signInMethods
     .filter((method) => method.connected)
@@ -29,6 +31,7 @@ export default function ProfileRoute() {
       totalKm={totalKm}
       totalHours={totalHours}
       units={units}
+      appearance={appearance}
       signInSummary={signInSummary || 'NONE'}
       savedPitchCount={savedPitches.length}
       onNavigateToHome={() => router.push('/(app)/(tabs)')}
@@ -36,6 +39,7 @@ export default function ProfileRoute() {
       onPlayerDetails={() => router.push('/(app)/player-details')}
       onSignInMethods={() => router.push('/(app)/sign-in-methods')}
       onUnits={() => router.push('/(app)/units')}
+      onAppearance={() => router.push('/(app)/appearance')}
       onSavedPitches={() => router.push('/(app)/saved-pitches')}
       onPrivacyData={() => router.push('/(app)/privacy-data')}
       onSignOut={() => {

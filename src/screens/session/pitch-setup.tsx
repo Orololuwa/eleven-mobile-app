@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip, Field } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles, useColors, darkColors } from '@/theme';
 import type { PitchNearby, PitchRead } from '@/features/pitches/types';
 import type { ActivityKind, AttackDirection } from '@/features/sessions/types';
 import { activityKindLabel } from '@/features/sessions/segment-display';
@@ -101,6 +101,8 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
   onKickOff,
   onBack,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const [nameFocused, setNameFocused] = useState(false);
   const nextCorner = CORNER_ORDER[markedCornerCount];
   const attackingEndA = attackDirection === 'end_a';
@@ -125,7 +127,7 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
 
           {nearbyLoading ? (
             <View style={styles.nearbyCard}>
-              <ActivityIndicator color={colors.brand.primary} />
+              <ActivityIndicator color={colors.brand.ink} />
               <Text style={styles.nearbyMeta}>Checking for nearby pitches…</Text>
             </View>
           ) : null}
@@ -193,35 +195,39 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
           </View>
 
           <View style={styles.directionPitch}>
-            <View style={styles.centreLine} />
-            <View style={styles.centreCircle} />
-            <View style={[styles.goalBox, styles.goalBoxLeft]} />
-            <View style={[styles.goalBox, styles.goalBoxRight]} />
-            <View style={[styles.goalPost, styles.goalPostLeft, styles.goalPostDim]} />
-            <View style={[styles.goalPost, styles.goalPostRight, styles.goalPostDim]} />
+            <View style={pitchStyles.centreLine} />
+            <View style={pitchStyles.centreCircle} />
+            <View style={[pitchStyles.goalBox, pitchStyles.goalBoxLeft]} />
+            <View style={[pitchStyles.goalBox, pitchStyles.goalBoxRight]} />
+            <View
+              style={[pitchStyles.goalPost, pitchStyles.goalPostLeft, pitchStyles.goalPostDim]}
+            />
+            <View
+              style={[pitchStyles.goalPost, pitchStyles.goalPostRight, pitchStyles.goalPostDim]}
+            />
 
-            <Text style={[styles.endSideLabel, styles.endSideLabelLeft]}>HOME</Text>
-            <Text style={[styles.endSideLabel, styles.endSideLabelRight]}>AWAY</Text>
+            <Text style={[pitchStyles.endSideLabel, pitchStyles.endSideLabelLeft]}>HOME</Text>
+            <Text style={[pitchStyles.endSideLabel, pitchStyles.endSideLabelRight]}>AWAY</Text>
 
             {CORNER_ORDER.map((key, index) => {
               const marked = index < markedCornerCount;
               // Landscape: Home = left short side (1 top, 2 bottom); Away = right (3 top, 4 bottom)
               const posStyle =
                 key === 'end_a_corner_1'
-                  ? styles.cornerHomeTop
+                  ? pitchStyles.cornerHomeTop
                   : key === 'end_a_corner_2'
-                    ? styles.cornerHomeBottom
+                    ? pitchStyles.cornerHomeBottom
                     : key === 'end_b_corner_1'
-                      ? styles.cornerAwayTop
-                      : styles.cornerAwayBottom;
+                      ? pitchStyles.cornerAwayTop
+                      : pitchStyles.cornerAwayBottom;
               return (
-                <View key={key} style={[styles.corner, posStyle]}>
+                <View key={key} style={[pitchStyles.corner, posStyle]}>
                   <CornerMarker number={index + 1} marked={marked} />
                 </View>
               );
             })}
 
-            <Text style={styles.gpsLabel}>
+            <Text style={pitchStyles.gpsLabel}>
               {gpsAccuracy != null ? `GPS ±${gpsAccuracy.toFixed(1)} M` : 'GPS'}
             </Text>
           </View>
@@ -229,7 +235,7 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
           <View style={styles.statsRow}>
             <View style={styles.statBlock}>
               <Text style={styles.statLabel}>CORNERS</Text>
-              <Text style={[styles.statValue, { color: colors.brand.primary }]}>
+              <Text style={[styles.statValue, { color: colors.brand.ink }]}>
                 {markedCornerCount} / 4
               </Text>
             </View>
@@ -373,47 +379,47 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
             {needsAttackDirection && !skipHeatmap ? (
               <>
                 <View style={styles.directionPitch}>
-                  <View style={styles.centreLine} />
-                  <View style={styles.centreCircle} />
-                  <View style={[styles.goalBox, styles.goalBoxLeft]} />
-                  <View style={[styles.goalBox, styles.goalBoxRight]} />
+                  <View style={pitchStyles.centreLine} />
+                  <View style={pitchStyles.centreCircle} />
+                  <View style={[pitchStyles.goalBox, pitchStyles.goalBoxLeft]} />
+                  <View style={[pitchStyles.goalBox, pitchStyles.goalBoxRight]} />
                   <View
                     style={[
-                      styles.goalPost,
-                      styles.goalPostLeft,
+                      pitchStyles.goalPost,
+                      pitchStyles.goalPostLeft,
                       {
                         backgroundColor: attackingEndA
-                          ? colors.brand.primary
+                          ? darkColors.brand.fill
                           : 'rgba(242,241,236,0.16)',
                       },
                     ]}
                   />
                   <View
                     style={[
-                      styles.goalPost,
-                      styles.goalPostRight,
+                      pitchStyles.goalPost,
+                      pitchStyles.goalPostRight,
                       {
                         backgroundColor: attackingEndA
                           ? 'rgba(242,241,236,0.16)'
-                          : colors.brand.primary,
+                          : darkColors.brand.fill,
                       },
                     ]}
                   />
-                  <Text style={[styles.directionArrows, { color: colors.brand.primary }]}>
+                  <Text style={[pitchStyles.directionArrows, { color: darkColors.brand.fill }]}>
                     {attackingEndA ? '◀◀◀' : '▶▶▶'}
                   </Text>
                   <Text
                     style={[
-                      styles.attackingLabel,
-                      attackingEndA ? styles.labelLeft : styles.labelRight,
+                      pitchStyles.attackingLabel,
+                      attackingEndA ? pitchStyles.labelLeft : pitchStyles.labelRight,
                     ]}
                   >
                     ATTACKING · {attackingEndA ? 'HOME END' : 'AWAY END'}
                   </Text>
                   <Text
                     style={[
-                      styles.defendingLabel,
-                      attackingEndA ? styles.labelRight : styles.labelLeft,
+                      pitchStyles.defendingLabel,
+                      attackingEndA ? pitchStyles.labelRight : pitchStyles.labelLeft,
                     ]}
                   >
                     DEFENDING
@@ -458,383 +464,394 @@ export const PitchSetupScreen: React.FC<PitchSetupScreenProps> = ({
   );
 };
 
-const CornerMarker: React.FC<{ number: number; marked: boolean }> = ({ number, marked }) => (
-  <View
-    style={[styles.cornerMarker, marked ? styles.cornerMarkerFilled : styles.cornerMarkerEmpty]}
-  >
-    <Text
-      style={[styles.cornerNumber, marked ? styles.cornerNumberFilled : styles.cornerNumberEmpty]}
+const CornerMarker: React.FC<{ number: number; marked: boolean }> = ({ number, marked }) => {
+  return (
+    <View
+      style={[
+        pitchStyles.cornerMarker,
+        marked ? pitchStyles.cornerMarkerFilled : pitchStyles.cornerMarkerEmpty,
+      ]}
     >
-      {number}
-    </Text>
-  </View>
-);
+      <Text
+        style={[
+          pitchStyles.cornerNumber,
+          marked ? pitchStyles.cornerNumberFilled : pitchStyles.cornerNumberEmpty,
+        ]}
+      >
+        {number}
+      </Text>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  flex: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  backRow: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-  },
-  backText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  header: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    paddingBottom: spacing[5],
-    gap: 10,
-  },
-  stepLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.2 * 11,
-    color: colors.brand.primary,
-  },
-  headerTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 30,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: -0.025 * 30,
-    lineHeight: 30 * 1.05,
-    color: colors.text.primary,
-  },
-  nearbyCard: {
-    marginHorizontal: spacing[6],
-    marginBottom: spacing[5],
-    padding: 18,
-    borderWidth: 1,
-    borderColor: colors.brand.primary,
-    backgroundColor: `${colors.brand.primary}10`,
-    gap: 8,
-  },
-  nearbyLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-  nearbyTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 18,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  nearbyMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.text.secondary,
-  },
-  nearbyActions: { gap: 10, marginTop: 8 },
-  corner: { position: 'absolute', width: 24, height: 24, zIndex: 3 },
-  // Landscape pitch (same as attack view): Home left, Away right
-  cornerHomeTop: { top: 10, left: 10 },
-  cornerHomeBottom: { bottom: 10, left: 10 },
-  cornerAwayTop: { top: 10, right: 10 },
-  cornerAwayBottom: { bottom: 10, right: 10 },
-  endSideLabel: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -6,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-    zIndex: 2,
-  },
-  endSideLabelLeft: { left: 52 },
-  endSideLabelRight: { right: 52 },
-  goalPostDim: {
-    backgroundColor: 'rgba(242,241,236,0.16)',
-  },
-  cornerMarker: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cornerMarkerFilled: { backgroundColor: colors.brand.primary },
-  cornerMarkerEmpty: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: colors.brand.primary,
-  },
-  cornerNumber: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  cornerNumberFilled: { color: colors.background.secondary },
-  cornerNumberEmpty: { color: colors.brand.primary },
-  gpsLabel: {
-    position: 'absolute',
-    bottom: 12,
-    alignSelf: 'center',
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.14 * 9,
-    color: colors.text.secondary,
-    zIndex: 2,
-  },
-  statsRow: {
-    marginHorizontal: spacing[6],
-    marginTop: 1,
-    flexDirection: 'row',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-  },
-  statBlock: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-    padding: spacing[4],
-    gap: 6,
-  },
-  statLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.secondary,
-  },
-  statValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 26,
-    color: colors.text.primary,
-  },
-  statValueSmall: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  spacer: { flex: 1 },
-  section: { paddingHorizontal: spacing[6], gap: 14 },
-  actions: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[9],
-    gap: 12,
-  },
-  hint: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 15 * 1.5,
-  },
-  hintPadded: {
-    paddingHorizontal: spacing[6],
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 15 * 1.5,
-    marginBottom: spacing[5],
-  },
-  startingActivitySection: {
-    paddingHorizontal: spacing[6],
-    gap: 12,
-    marginBottom: spacing[5],
-  },
-  sectionMonoLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-  startingActivityChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  primaryButton: {
-    height: 64,
-    backgroundColor: colors.brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 15,
-    letterSpacing: 0.22 * 15,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.background.secondary,
-  },
-  savedButton: {
-    height: 52,
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-  },
-  savedButtonText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.16 * 12,
-    color: colors.text.primary,
-  },
-  savedButtonMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  skipButton: { paddingVertical: 6, alignItems: 'center' },
-  skipText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-  },
-  similarList: { paddingHorizontal: spacing[6], gap: 10, marginBottom: spacing[6] },
-  similarCard: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 18,
-    gap: 6,
-  },
-  similarTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 18,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  similarMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  directionPitch: {
-    marginHorizontal: spacing[6],
-    height: 180,
-    backgroundColor: colors.background.pitch,
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-    overflow: 'hidden',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centreLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: 1,
-    backgroundColor: 'rgba(242,241,236,0.28)',
-  },
-  centreCircle: {
-    position: 'absolute',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(242,241,236,0.28)',
-  },
-  goalBox: {
-    position: 'absolute',
-    top: '50%',
-    width: 44,
-    height: 90,
-    marginTop: -45,
-    borderWidth: 1,
-    borderColor: 'rgba(242,241,236,0.28)',
-  },
-  goalBoxLeft: { left: 0, borderLeftWidth: 0 },
-  goalBoxRight: { right: 0, borderRightWidth: 0 },
-  goalPost: {
-    position: 'absolute',
-    top: '50%',
-    width: 10,
-    height: 38,
-    marginTop: -19,
-  },
-  goalPostLeft: { left: 0 },
-  goalPostRight: { right: 0 },
-  directionArrows: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 22,
-    letterSpacing: 0.1 * 22,
-    zIndex: 2,
-  },
-  attackingLabel: {
-    position: 'absolute',
-    top: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-  labelRight: { right: 14 },
-  labelLeft: { left: 14 },
-  defendingLabel: {
-    position: 'absolute',
-    top: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-  flipContainer: {
-    paddingHorizontal: spacing[6],
-    marginTop: spacing[4],
-  },
-  flipButton: {
-    height: 56,
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flipButtonText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 13,
-    letterSpacing: 0.2 * 13,
-    color: colors.text.primary,
-  },
-  kickOffActions: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[4],
-    paddingBottom: spacing[6],
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-  },
-  savedPitchMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.disabled,
-  },
-  kickOffButton: {
-    height: 72,
-    backgroundColor: colors.brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  kickOffButtonDisabled: { opacity: 0.6 },
-  kickOffLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 17,
-    letterSpacing: 0.22 * 17,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.background.secondary,
-  },
-  kickOffSub: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: 'rgba(8,9,10,0.65)',
-  },
-  error: {
-    paddingHorizontal: spacing[6],
-    fontSize: 14,
-    color: colors.accent.danger,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    flex: { flex: 1 },
+    scrollContent: { flexGrow: 1 },
+    backRow: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+    },
+    backText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    header: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      paddingBottom: spacing[5],
+      gap: 10,
+    },
+    stepLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.2 * 11,
+      color: colors.brand.ink,
+    },
+    headerTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 30,
+      fontWeight: typography.fontWeight.extrabold,
+      letterSpacing: -0.025 * 30,
+      lineHeight: 30 * 1.05,
+      color: colors.text.primary,
+    },
+    nearbyCard: {
+      marginHorizontal: spacing[6],
+      marginBottom: spacing[5],
+      padding: 18,
+      borderWidth: 1,
+      borderColor: colors.brand.ink,
+      backgroundColor: colors.brand.tint,
+      gap: 8,
+    },
+    nearbyLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+    },
+    nearbyTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 18,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    nearbyMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.text.secondary,
+    },
+    nearbyActions: { gap: 10, marginTop: 8 },
+    corner: { position: 'absolute', width: 24, height: 24, zIndex: 3 },
+    // Landscape pitch (same as attack view): Home left, Away right
+    cornerHomeTop: { top: 10, left: 10 },
+    cornerHomeBottom: { bottom: 10, left: 10 },
+    cornerAwayTop: { top: 10, right: 10 },
+    cornerAwayBottom: { bottom: 10, right: 10 },
+    endSideLabel: {
+      position: 'absolute',
+      top: '50%',
+      marginTop: -6,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+      zIndex: 2,
+    },
+    endSideLabelLeft: { left: 52 },
+    endSideLabelRight: { right: 52 },
+    goalPostDim: {
+      backgroundColor: 'rgba(242,241,236,0.16)',
+    },
+    cornerMarker: {
+      width: 24,
+      height: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cornerMarkerFilled: { backgroundColor: colors.brand.fill },
+    cornerMarkerEmpty: {
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: colors.brand.ink,
+    },
+    cornerNumber: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    cornerNumberFilled: { color: colors.text.onBrand },
+    cornerNumberEmpty: { color: colors.brand.ink },
+    gpsLabel: {
+      position: 'absolute',
+      bottom: 12,
+      alignSelf: 'center',
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.14 * 9,
+      color: colors.text.secondary,
+      zIndex: 2,
+    },
+    statsRow: {
+      marginHorizontal: spacing[6],
+      marginTop: 1,
+      flexDirection: 'row',
+      gap: 1,
+      backgroundColor: colors.border.subtle,
+    },
+    statBlock: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+      padding: spacing[4],
+      gap: 6,
+    },
+    statLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.16 * 9,
+      color: colors.text.secondary,
+    },
+    statValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 26,
+      color: colors.text.primary,
+    },
+    statValueSmall: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 16,
+      color: colors.text.primary,
+    },
+    spacer: { flex: 1 },
+    section: { paddingHorizontal: spacing[6], gap: 14 },
+    actions: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[9],
+      gap: 12,
+    },
+    hint: {
+      fontSize: 15,
+      color: colors.text.secondary,
+      lineHeight: 15 * 1.5,
+    },
+    hintPadded: {
+      paddingHorizontal: spacing[6],
+      fontSize: 15,
+      color: colors.text.secondary,
+      lineHeight: 15 * 1.5,
+      marginBottom: spacing[5],
+    },
+    startingActivitySection: {
+      paddingHorizontal: spacing[6],
+      gap: 12,
+      marginBottom: spacing[5],
+    },
+    sectionMonoLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+    startingActivityChips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    primaryButton: {
+      height: 64,
+      backgroundColor: colors.brand.fill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primaryButtonText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 15,
+      letterSpacing: 0.22 * 15,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.onBrand,
+    },
+    savedButton: {
+      height: 52,
+      borderWidth: 1,
+      borderColor: colors.border.strong,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+    },
+    savedButtonText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.16 * 12,
+      color: colors.text.primary,
+    },
+    savedButtonMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    skipButton: { paddingVertical: 6, alignItems: 'center' },
+    skipText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.disabled,
+    },
+    similarList: { paddingHorizontal: spacing[6], gap: 10, marginBottom: spacing[6] },
+    similarCard: {
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      padding: 18,
+      gap: 6,
+    },
+    similarTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 18,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    similarMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    directionPitch: {
+      marginHorizontal: spacing[6],
+      height: 180,
+      backgroundColor: colors.background.pitch,
+      borderWidth: 1,
+      borderColor: colors.border.strong,
+      overflow: 'hidden',
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    centreLine: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: '50%',
+      width: 1,
+      backgroundColor: 'rgba(242,241,236,0.28)',
+    },
+    centreCircle: {
+      position: 'absolute',
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: 'rgba(242,241,236,0.28)',
+    },
+    goalBox: {
+      position: 'absolute',
+      top: '50%',
+      width: 44,
+      height: 90,
+      marginTop: -45,
+      borderWidth: 1,
+      borderColor: 'rgba(242,241,236,0.28)',
+    },
+    goalBoxLeft: { left: 0, borderLeftWidth: 0 },
+    goalBoxRight: { right: 0, borderRightWidth: 0 },
+    goalPost: {
+      position: 'absolute',
+      top: '50%',
+      width: 10,
+      height: 38,
+      marginTop: -19,
+    },
+    goalPostLeft: { left: 0 },
+    goalPostRight: { right: 0 },
+    directionArrows: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 22,
+      letterSpacing: 0.1 * 22,
+      zIndex: 2,
+    },
+    attackingLabel: {
+      position: 'absolute',
+      top: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+    },
+    labelRight: { right: 14 },
+    labelLeft: { left: 14 },
+    defendingLabel: {
+      position: 'absolute',
+      top: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+    flipContainer: {
+      paddingHorizontal: spacing[6],
+      marginTop: spacing[4],
+    },
+    flipButton: {
+      height: 56,
+      borderWidth: 1,
+      borderColor: colors.border.strong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    flipButtonText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 13,
+      letterSpacing: 0.2 * 13,
+      color: colors.text.primary,
+    },
+    kickOffActions: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[4],
+      paddingBottom: spacing[6],
+      gap: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.subtle,
+    },
+    savedPitchMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.disabled,
+    },
+    kickOffButton: {
+      height: 72,
+      backgroundColor: colors.brand.fill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    kickOffButtonDisabled: { opacity: 0.6 },
+    kickOffLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 17,
+      letterSpacing: 0.22 * 17,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.onBrand,
+    },
+    kickOffSub: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.18 * 10,
+      color: 'rgba(8,9,10,0.65)',
+    },
+    error: {
+      paddingHorizontal: spacing[6],
+      fontSize: 14,
+      color: colors.accent.danger,
+    },
+  });
+
+const pitchStyles = createStyles(darkColors);

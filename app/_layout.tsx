@@ -5,26 +5,31 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Auth0Provider } from 'react-native-auth0';
 import { QueryProvider } from '@/providers/query-provider';
 import { AuthProvider } from '@/providers/auth-provider';
-import { colors } from '@/theme';
+import { useColors, useResolvedColorScheme } from '@/theme';
 import { config } from '@/lib/config';
 import '@/features/sessions/tracking/location-task';
 
-const AppStack = () => (
-  <SafeAreaProvider>
-    <QueryProvider>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background.primary },
-            animation: 'fade',
-          }}
-        />
-      </AuthProvider>
-    </QueryProvider>
-  </SafeAreaProvider>
-);
+const AppStack = () => {
+  const colors = useColors();
+  const scheme = useResolvedColorScheme();
+
+  return (
+    <SafeAreaProvider>
+      <QueryProvider>
+        <AuthProvider>
+          <StatusBar style={scheme === 'light' ? 'dark' : 'light'} />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background.primary },
+              animation: 'fade',
+            }}
+          />
+        </AuthProvider>
+      </QueryProvider>
+    </SafeAreaProvider>
+  );
+};
 
 export default function RootLayout() {
   if (!config.auth0Domain || !config.auth0ClientId) {

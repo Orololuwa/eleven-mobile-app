@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Field, SegmentedControl, Button, Chip } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 import type { PositionIn, PreferredFoot, Sex } from '@/features/profile/types';
 import { PREFERRED_FOOT_OPTIONS, SEX_OPTIONS } from '@/features/profile/types';
 import { displayToKg, sexLabel, weightUnitLabel } from '@/features/profile/weight';
@@ -45,6 +45,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
   onComplete,
   onOpenPositionPicker,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const progress = 2;
   const [displayNameTouched, setDisplayNameTouched] = useState(false);
   const [positionsTouched, setPositionsTouched] = useState(false);
@@ -184,117 +185,118 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  content: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-  },
-  progressBar: {
-    flexDirection: 'row',
-    gap: 5,
-  },
-  progressSegment: {
-    width: 44,
-    height: 3,
-    backgroundColor: colors.border.default,
-  },
-  progressSegmentFilled: {
-    backgroundColor: colors.brand.primary,
-  },
-  titleSection: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[9],
-    gap: 12,
-  },
-  subtitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.34 * 11,
-    color: colors.brand.primary,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 36,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.035 * 36,
-    lineHeight: 36 * 1.02,
-    color: colors.text.primary,
-  },
-  form: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-  },
-  section: {
-    marginTop: 26,
-    gap: 10,
-  },
-  sectionLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.18 * 9,
-    color: colors.text.secondary,
-  },
-  positionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 12,
-  },
-  positionValue: {
-    flex: 1,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  positionChevron: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 14,
-    color: colors.brand.primary,
-  },
-  inlineError: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.accent.danger,
-  },
-  error: {
-    marginTop: 18,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.accent.danger,
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[9],
-    gap: 12,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  hint: {
-    marginTop: 8,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.text.tertiary,
-  },
-  footerText: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 15 * 1.5,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    content: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+    },
+    progressBar: {
+      flexDirection: 'row',
+      gap: 5,
+    },
+    progressSegment: {
+      width: 44,
+      height: 3,
+      backgroundColor: colors.border.default,
+    },
+    progressSegmentFilled: {
+      backgroundColor: colors.brand.ink,
+    },
+    titleSection: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[9],
+      gap: 12,
+    },
+    subtitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.34 * 11,
+      color: colors.brand.ink,
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 36,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.035 * 36,
+      lineHeight: 36 * 1.02,
+      color: colors.text.primary,
+    },
+    form: {
+      flex: 1,
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[8],
+    },
+    section: {
+      marginTop: 26,
+      gap: 10,
+    },
+    sectionLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.18 * 9,
+      color: colors.text.secondary,
+    },
+    positionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 12,
+    },
+    positionValue: {
+      flex: 1,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      color: colors.text.primary,
+    },
+    positionChevron: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 14,
+      color: colors.brand.ink,
+    },
+    inlineError: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.accent.danger,
+    },
+    error: {
+      marginTop: 18,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.accent.danger,
+    },
+    footer: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[9],
+      gap: 12,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    hint: {
+      marginTop: 8,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.text.tertiary,
+    },
+    footerText: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      color: colors.text.secondary,
+      lineHeight: 15 * 1.5,
+    },
+  });

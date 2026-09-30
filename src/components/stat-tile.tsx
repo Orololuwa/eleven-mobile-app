@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles } from '@/theme';
 
 type StatTileProps = {
   label: string;
@@ -19,6 +19,7 @@ export const StatTile: React.FC<StatTileProps> = ({
   isHero = false,
   style,
 }) => {
+  const styles = useThemedStyles(createStyles);
   if (isHero) {
     return (
       <View style={[styles.heroContainer, style]}>
@@ -44,61 +45,62 @@ export const StatTile: React.FC<StatTileProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.background.secondary,
-    padding: 18,
-    gap: 8,
-  },
-  label: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.secondary,
-  },
-  value: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 32,
-    letterSpacing: -0.02 * 32,
-    color: colors.text.primary,
-  },
-  valueRecord: {
-    color: colors.brand.primary,
-  },
-  subtitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.14 * 9,
-    color: colors.text.secondary,
-  },
-  subtitleRecord: {
-    color: colors.brand.primary,
-  },
-  heroContainer: {
-    gap: 10,
-  },
-  heroValueRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 10,
-  },
-  heroValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 78,
-    lineHeight: 78 * 0.85,
-    letterSpacing: -0.05 * 78,
-    color: colors.text.primary,
-  },
-  heroUnit: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 18,
-    color: colors.text.secondary,
-    paddingBottom: 8,
-  },
-  heroLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.background.secondary,
+      padding: 18,
+      gap: 8,
+    },
+    label: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.16 * 9,
+      color: colors.text.secondary,
+    },
+    value: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 32,
+      letterSpacing: -0.02 * 32,
+      color: colors.text.primary,
+    },
+    valueRecord: {
+      color: colors.brand.ink,
+    },
+    subtitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.14 * 9,
+      color: colors.text.secondary,
+    },
+    subtitleRecord: {
+      color: colors.brand.ink,
+    },
+    heroContainer: {
+      gap: 10,
+    },
+    heroValueRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 10,
+    },
+    heroValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 78,
+      lineHeight: 78 * 0.85,
+      letterSpacing: -0.05 * 78,
+      color: colors.text.primary,
+    },
+    heroUnit: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 18,
+      color: colors.text.secondary,
+      paddingBottom: 8,
+    },
+    heroLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+  });

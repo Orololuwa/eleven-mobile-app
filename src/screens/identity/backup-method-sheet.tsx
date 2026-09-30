@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { Button } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 
 type BackupMethodSheetProps = {
   visible: boolean;
@@ -18,6 +18,7 @@ export const BackupMethodSheet: React.FC<BackupMethodSheetProps> = ({
   onAddEmail,
   onDismiss,
 }) => {
+  const styles = useThemedStyles(createStyles);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
       <View style={styles.overlay}>
@@ -45,67 +46,68 @@ export const BackupMethodSheet: React.FC<BackupMethodSheetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.medium,
-  },
-  sheet: {
-    backgroundColor: colors.background.secondary,
-    borderTopWidth: 2,
-    borderTopColor: colors.brand.primary,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[4],
-    paddingBottom: spacing[8],
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 42,
-    height: 3,
-    backgroundColor: colors.border.medium,
-    marginBottom: spacing[5],
-  },
-  eyebrow: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.brand.primary,
-    marginBottom: 14,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.03 * 34,
-    lineHeight: 34 * 1.05,
-    color: colors.text.primary,
-    marginBottom: 14,
-  },
-  body: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    lineHeight: 16 * 1.5,
-    color: colors.text.secondary,
-    marginBottom: spacing[7],
-  },
-  actions: {
-    gap: 12,
-  },
-  notNow: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.14 * 12,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    paddingVertical: 10,
-  },
-  footer: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.disabled,
-    textAlign: 'center',
-    marginTop: spacing[5],
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: colors.overlay.medium,
+    },
+    sheet: {
+      backgroundColor: colors.background.secondary,
+      borderTopWidth: 2,
+      borderTopColor: colors.brand.ink,
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[4],
+      paddingBottom: spacing[8],
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 42,
+      height: 3,
+      backgroundColor: colors.border.medium,
+      marginBottom: spacing[5],
+    },
+    eyebrow: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.brand.ink,
+      marginBottom: 14,
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 34,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.03 * 34,
+      lineHeight: 34 * 1.05,
+      color: colors.text.primary,
+      marginBottom: 14,
+    },
+    body: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      lineHeight: 16 * 1.5,
+      color: colors.text.secondary,
+      marginBottom: spacing[7],
+    },
+    actions: {
+      gap: 12,
+    },
+    notNow: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.14 * 12,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      paddingVertical: 10,
+    },
+    footer: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.disabled,
+      textAlign: 'center',
+      marginTop: spacing[5],
+    },
+  });

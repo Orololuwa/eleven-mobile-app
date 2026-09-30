@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 import type { SignInMethod } from '@/types/profile';
 
 type SignInMethodsScreenProps = {
@@ -26,6 +26,7 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
   busy = false,
   errorMessage = null,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const connectedCount = methods.filter((method) => method.connected).length;
 
   return (
@@ -109,151 +110,152 @@ export const SignInMethodsScreen: React.FC<SignInMethodsScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  backRow: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-    paddingBottom: spacing[2],
-  },
-  backText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[6],
-  },
-  header: {
-    gap: 14,
-    marginBottom: spacing[7],
-    marginTop: spacing[4],
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 36,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.035 * 36,
-    color: colors.text.primary,
-  },
-  description: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    lineHeight: 16 * 1.5,
-    color: colors.text.secondary,
-  },
-  list: {
-    gap: 12,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  cardHighlight: {
-    borderColor: colors.brand.primary,
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    gap: 12,
-    flex: 1,
-  },
-  indicator: {
-    width: 10,
-    height: 10,
-    marginTop: 4,
-  },
-  indicatorOn: {
-    backgroundColor: colors.brand.primary,
-  },
-  indicatorOff: {
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-  },
-  cardCopy: {
-    gap: 6,
-    flex: 1,
-  },
-  cardLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 13,
-    letterSpacing: 0.14 * 13,
-    color: colors.text.primary,
-  },
-  cardMeta: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  cardRight: {
-    alignItems: 'flex-end',
-    gap: 10,
-  },
-  since: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.12 * 10,
-    color: colors.text.disabled,
-  },
-  action: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.text.secondary,
-  },
-  actionDisabled: {
-    color: colors.text.dimmed,
-  },
-  actionAdd: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.brand.primary,
-  },
-  note: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: spacing[6],
-  },
-  noteBar: {
-    width: 2,
-    backgroundColor: colors.border.medium,
-  },
-  noteText: {
-    flex: 1,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 15 * 1.5,
-    color: colors.text.secondary,
-  },
-  errorText: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    lineHeight: 14 * 1.4,
-    color: colors.accent.danger,
-    marginTop: spacing[4],
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[6],
-    gap: 14,
-  },
-  footerNote: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.disabled,
-    textAlign: 'center',
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    backRow: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+      paddingBottom: spacing[2],
+    },
+    backText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    content: {
+      flex: 1,
+    },
+    contentInner: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[6],
+    },
+    header: {
+      gap: 14,
+      marginBottom: spacing[7],
+      marginTop: spacing[4],
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 36,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.035 * 36,
+      color: colors.text.primary,
+    },
+    description: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      lineHeight: 16 * 1.5,
+      color: colors.text.secondary,
+    },
+    list: {
+      gap: 12,
+    },
+    card: {
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      padding: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    cardHighlight: {
+      borderColor: colors.brand.ink,
+    },
+    cardLeft: {
+      flexDirection: 'row',
+      gap: 12,
+      flex: 1,
+    },
+    indicator: {
+      width: 10,
+      height: 10,
+      marginTop: 4,
+    },
+    indicatorOn: {
+      backgroundColor: colors.brand.ink,
+    },
+    indicatorOff: {
+      borderWidth: 1,
+      borderColor: colors.border.strong,
+    },
+    cardCopy: {
+      gap: 6,
+      flex: 1,
+    },
+    cardLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 13,
+      letterSpacing: 0.14 * 13,
+      color: colors.text.primary,
+    },
+    cardMeta: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      color: colors.text.secondary,
+    },
+    cardRight: {
+      alignItems: 'flex-end',
+      gap: 10,
+    },
+    since: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.12 * 10,
+      color: colors.text.disabled,
+    },
+    action: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.text.secondary,
+    },
+    actionDisabled: {
+      color: colors.text.dimmed,
+    },
+    actionAdd: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.brand.ink,
+    },
+    note: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: spacing[6],
+    },
+    noteBar: {
+      width: 2,
+      backgroundColor: colors.border.medium,
+    },
+    noteText: {
+      flex: 1,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 15 * 1.5,
+      color: colors.text.secondary,
+    },
+    errorText: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      lineHeight: 14 * 1.4,
+      color: colors.accent.danger,
+      marginTop: spacing[4],
+    },
+    footer: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[6],
+      gap: 14,
+    },
+    footerNote: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.disabled,
+      textAlign: 'center',
+    },
+  });

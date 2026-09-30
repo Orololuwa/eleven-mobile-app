@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles, useColors } from '@/theme';
 import { avatarUrlWithCacheBust } from '@/features/profile/display';
 
 type AvatarPickerProps = {
@@ -31,6 +31,8 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
   onUpload,
   onRemove,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const [picking, setPicking] = useState(false);
   const resolvedUrl = avatarUrlWithCacheBust({
     avatar_url: avatarUrl,
@@ -82,7 +84,7 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
         )}
         {isBusy ? (
           <View style={styles.overlay}>
-            <ActivityIndicator color={colors.brand.primary} />
+            <ActivityIndicator color={colors.brand.ink} />
           </View>
         ) : null}
       </View>
@@ -107,64 +109,65 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-  },
-  circle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholder: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.disabled,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(6, 7, 6, 0.55)',
-  },
-  copy: {
-    flex: 1,
-    gap: 8,
-  },
-  action: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.14 * 12,
-    color: colors.brand.primary,
-  },
-  secondaryAction: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.text.secondary,
-  },
-  removeAction: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.accent.danger,
-  },
-  hint: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 18,
+    },
+    circle: {
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.border.medium,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+    placeholder: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.disabled,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(6, 7, 6, 0.55)',
+    },
+    copy: {
+      flex: 1,
+      gap: 8,
+    },
+    action: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.14 * 12,
+      color: colors.brand.ink,
+    },
+    secondaryAction: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.text.secondary,
+    },
+    removeAction: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.accent.danger,
+    },
+    hint: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      color: colors.text.secondary,
+    },
+  });

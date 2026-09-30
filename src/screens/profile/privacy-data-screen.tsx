@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 
 type PrivacyDataScreenProps = {
   onBack: () => void;
 };
 
 export const PrivacyDataScreen: React.FC<PrivacyDataScreenProps> = ({ onBack }) => {
+  const styles = useThemedStyles(createStyles);
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.backRow} onPress={onBack}>
@@ -52,61 +53,62 @@ export const PrivacyDataScreen: React.FC<PrivacyDataScreenProps> = ({ onBack }) 
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  backRow: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-  },
-  backText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
-    paddingBottom: spacing[8],
-    gap: 14,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 36,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.035 * 36,
-    color: colors.text.primary,
-    marginBottom: 14,
-  },
-  description: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    lineHeight: 16 * 1.5,
-    color: colors.text.secondary,
-    marginBottom: spacing[4],
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 16,
-    gap: 10,
-  },
-  cardLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.brand.primary,
-  },
-  cardBody: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 15 * 1.5,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    backRow: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+    },
+    backText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    content: {
+      flex: 1,
+    },
+    contentInner: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[6],
+      paddingBottom: spacing[8],
+      gap: 14,
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 36,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.035 * 36,
+      color: colors.text.primary,
+      marginBottom: 14,
+    },
+    description: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      lineHeight: 16 * 1.5,
+      color: colors.text.secondary,
+      marginBottom: spacing[4],
+    },
+    card: {
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      padding: 16,
+      gap: 10,
+    },
+    cardLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.brand.ink,
+    },
+    cardBody: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 15 * 1.5,
+      color: colors.text.secondary,
+    },
+  });

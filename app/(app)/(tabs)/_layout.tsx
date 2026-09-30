@@ -1,7 +1,9 @@
 import { Tabs } from 'expo-router';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 export default function TabsLayout() {
+  const colors = useColors();
+
   return (
     <Tabs
       screenOptions={{

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Button, Chip } from '@/components';
-import { colors, spacing, typography } from '@/theme';
+import { spacing, typography, type Colors, useThemedStyles } from '@/theme';
 import { SEX_OPTIONS, type Sex } from '@/features/profile/types';
 import {
   displayToKg,
@@ -41,6 +41,7 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
   onDismiss,
   onSave,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [weightKg, setWeightKg] = useState<number | null>(mode === 'stale' ? savedWeightKg : null);
   const [sex, setSex] = useState<Sex | null>(null);
   const updated = formatWeightUpdated(weightUpdatedAt);
@@ -145,118 +146,119 @@ export const WeightGateSheet: React.FC<WeightGateSheetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.medium,
-  },
-  sheet: {
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    paddingBottom: spacing[8],
-    gap: 10,
-  },
-  kickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  kicker: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    color: colors.brand.primary,
-  },
-  dismiss: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 16,
-    color: colors.text.secondary,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 28,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-    letterSpacing: -0.6,
-  },
-  body: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.secondary,
-  },
-  label: {
-    marginTop: 8,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    color: colors.text.secondary,
-  },
-  meta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: colors.text.tertiary,
-  },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  step: {
-    width: 52,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border.medium,
-  },
-  stepLabel: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 28,
-    color: colors.text.primary,
-  },
-  valueBlock: {
-    alignItems: 'center',
-  },
-  value: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 40,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-  },
-  unit: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: colors.text.secondary,
-  },
-  sexBlock: {
-    gap: 8,
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  hint: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.text.tertiary,
-  },
-  error: {
-    color: colors.accent.danger,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-  },
-  private: {
-    textAlign: 'center',
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: colors.text.tertiary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      backgroundColor: colors.overlay.medium,
+    },
+    sheet: {
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      paddingBottom: spacing[8],
+      gap: 10,
+    },
+    kickerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    kicker: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.4,
+      color: colors.brand.ink,
+    },
+    dismiss: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 16,
+      color: colors.text.secondary,
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 28,
+      fontWeight: typography.fontWeight.black,
+      color: colors.text.primary,
+      letterSpacing: -0.6,
+    },
+    body: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text.secondary,
+    },
+    label: {
+      marginTop: 8,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.4,
+      color: colors.text.secondary,
+    },
+    meta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      color: colors.text.tertiary,
+    },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    step: {
+      width: 52,
+      height: 52,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border.medium,
+    },
+    stepLabel: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 28,
+      color: colors.text.primary,
+    },
+    valueBlock: {
+      alignItems: 'center',
+    },
+    value: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 40,
+      fontWeight: typography.fontWeight.black,
+      color: colors.text.primary,
+    },
+    unit: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      color: colors.text.secondary,
+    },
+    sexBlock: {
+      gap: 8,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    hint: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.text.tertiary,
+    },
+    error: {
+      color: colors.accent.danger,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+    },
+    private: {
+      textAlign: 'center',
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      color: colors.text.tertiary,
+    },
+  });

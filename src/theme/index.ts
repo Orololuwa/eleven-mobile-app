@@ -1,54 +1,8 @@
 // Eleven Design System - Theme Configuration
 // Based on the Eleven Component Library
 
-export const colors = {
-  // Base Colors
-  background: {
-    primary: '#060706',
-    secondary: '#08090A',
-    tertiary: '#0F1211',
-    elevated: '#141614',
-    pitch: '#0B1F14',
-  },
-
-  // Text Colors
-  text: {
-    primary: '#F2F1EC',
-    secondary: '#8B908A',
-    tertiary: '#6E736D',
-    quaternary: '#5C615B',
-    disabled: '#4E534D',
-    dimmed: '#3E433D',
-  },
-
-  // Brand Colors
-  brand: {
-    primary: '#C8F24E',
-    primaryHover: '#DCFF74',
-    primaryLight: '#E2FB9B',
-  },
-
-  // Accent Colors
-  accent: {
-    warning: '#FFC24A',
-    danger: '#FF6B4A',
-    club: '#1E4D33',
-  },
-
-  // Border Colors
-  border: {
-    subtle: 'rgba(242, 241, 236, 0.10)',
-    default: 'rgba(242, 241, 236, 0.14)',
-    medium: 'rgba(242, 241, 236, 0.22)',
-    strong: 'rgba(242, 241, 236, 0.28)',
-  },
-
-  // Overlay Colors
-  overlay: {
-    light: 'rgba(8, 9, 10, 0.55)',
-    medium: 'rgba(0, 0, 0, 0.60)',
-  },
-};
+export { darkColors, lightColors } from './colors';
+export type { Colors } from './colors';
 
 export const typography = {
   // Font Families
@@ -137,12 +91,5 @@ export const layout = {
   gridBase: 4,
 };
 
-export const theme = {
-  colors,
-  typography,
-  spacing,
-  borderRadius,
-  layout,
-};
-
-export type Theme = typeof theme;
+export { ForceColorScheme, useColors, useResolvedColorScheme, useThemedStyles } from './use-colors';
+export type { ColorSchemeName } from './use-colors';

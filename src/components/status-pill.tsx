@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles, useColors } from '@/theme';
 
 type StatusPillProps = {
   label: string;
@@ -9,6 +9,8 @@ type StatusPillProps = {
 };
 
 export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', style }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const getIndicatorStyle = () => {
     switch (status) {
       case 'live':
@@ -16,7 +18,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', 
           width: 8,
           height: 8,
           borderRadius: 4,
-          backgroundColor: colors.brand.primary,
+          backgroundColor: colors.brand.ink,
         };
       case 'paused':
         return {
@@ -45,7 +47,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', 
   const getTextColor = () => {
     switch (status) {
       case 'live':
-        return colors.brand.primary;
+        return colors.brand.ink;
       case 'paused':
         return colors.text.primary;
       case 'holding':
@@ -53,7 +55,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', 
       case 'gps':
         return colors.text.secondary;
       case 'streak':
-        return colors.brand.primary;
+        return colors.brand.ink;
     }
   };
 
@@ -67,20 +69,21 @@ export const StatusPill: React.FC<StatusPillProps> = ({ label, status = 'live', 
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.background.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  text: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.2 * 11,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.background.secondary,
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+    },
+    text: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.2 * 11,
+    },
+  });

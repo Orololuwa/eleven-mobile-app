@@ -1,26 +1,39 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
-import type { DistanceUnit, MassUnit, UnitsPreference } from '@/types/profile';
+import { typography, spacing, type Colors, type ColorSchemeName, useThemedStyles } from '@/theme';
+import type { AppearancePreference } from '@/stores/appearance-store';
 
-type UnitsScreenProps = {
-  units: UnitsPreference;
+type AppearanceScreenProps = {
+  preference: AppearancePreference;
+  activeScheme: ColorSchemeName;
   onBack: () => void;
-  onChange: (units: UnitsPreference) => void;
+  onChange: (preference: AppearancePreference) => void;
 };
 
-const DISTANCE_OPTIONS: { id: DistanceUnit; label: string; detail: string }[] = [
-  { id: 'km', label: 'Kilometres', detail: 'KM · METRIC' },
-  { id: 'mi', label: 'Miles', detail: 'MI · IMPERIAL' },
+const OPTIONS: { id: AppearancePreference; label: string }[] = [
+  { id: 'system', label: 'Match phone' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
 ];
 
-const MASS_OPTIONS: { id: MassUnit; label: string; detail: string }[] = [
-  { id: 'kg', label: 'Kilograms', detail: 'KG' },
-  { id: 'lb', label: 'Pounds', detail: 'LB' },
-];
+const optionDetail = ({
+  id,
+  activeScheme,
+}: {
+  id: AppearancePreference;
+  activeScheme: ColorSchemeName;
+}) =>
+  id === 'system'
+    ? `FOLLOWS SYSTEM · ${activeScheme.toUpperCase()} NOW`
+    : `ALWAYS ${id.toUpperCase()}`;
 
-export const UnitsScreen: React.FC<UnitsScreenProps> = ({ units, onBack, onChange }) => {
+export const AppearanceScreen: React.FC<AppearanceScreenProps> = ({
+  preference,
+  activeScheme,
+  onBack,
+  onChange,
+}) => {
   const styles = useThemedStyles(createStyles);
   return (
     <SafeAreaView style={styles.container}>
@@ -29,24 +42,26 @@ export const UnitsScreen: React.FC<UnitsScreenProps> = ({ units, onBack, onChang
       </TouchableOpacity>
 
       <View style={styles.content}>
-        <Text style={styles.title}>Units</Text>
+        <Text style={styles.title}>Appearance</Text>
         <Text style={styles.description}>
-          Numbers on the wall, history and match cards follow these.
+          Light is easier to read in daylight. Dark is easier on the eyes under floodlights.
         </Text>
 
-        <Text style={styles.sectionLabel}>DISTANCE</Text>
+        <Text style={styles.sectionLabel}>THEME</Text>
         <View style={styles.list}>
-          {DISTANCE_OPTIONS.map((option) => {
-            const selected = units.distance === option.id;
+          {OPTIONS.map((option) => {
+            const selected = preference === option.id;
             return (
               <TouchableOpacity
                 key={option.id}
                 style={[styles.row, selected && styles.rowSelected]}
-                onPress={() => onChange({ ...units, distance: option.id })}
+                onPress={() => onChange(option.id)}
               >
-                <View>
+                <View style={styles.rowCopy}>
                   <Text style={styles.rowLabel}>{option.label}</Text>
-                  <Text style={styles.rowDetail}>{option.detail}</Text>
+                  <Text style={styles.rowDetail}>
+                    {optionDetail({ id: option.id, activeScheme })}
+                  </Text>
                 </View>
                 {selected ? (
                   <Text style={styles.check}>●</Text>
@@ -58,29 +73,7 @@ export const UnitsScreen: React.FC<UnitsScreenProps> = ({ units, onBack, onChang
           })}
         </View>
 
-        <Text style={styles.sectionLabel}>MASS</Text>
-        <View style={styles.list}>
-          {MASS_OPTIONS.map((option) => {
-            const selected = units.mass === option.id;
-            return (
-              <TouchableOpacity
-                key={option.id}
-                style={[styles.row, selected && styles.rowSelected]}
-                onPress={() => onChange({ ...units, mass: option.id })}
-              >
-                <View>
-                  <Text style={styles.rowLabel}>{option.label}</Text>
-                  <Text style={styles.rowDetail}>{option.detail}</Text>
-                </View>
-                {selected ? (
-                  <Text style={styles.check}>●</Text>
-                ) : (
-                  <Text style={styles.unchecked}>○</Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <Text style={styles.footer}>SIGN-IN AND SHARE CARDS STAY DARK EITHER WAY.</Text>
       </View>
     </SafeAreaView>
   );
@@ -132,7 +125,6 @@ const createStyles = (colors: Colors) =>
     },
     list: {
       gap: 10,
-      marginBottom: spacing[6],
     },
     row: {
       borderWidth: 1,
@@ -145,25 +137,35 @@ const createStyles = (colors: Colors) =>
     rowSelected: {
       borderColor: colors.brand.ink,
     },
+    rowCopy: {
+      gap: 6,
+    },
     rowLabel: {
       fontFamily: typography.fontFamily.primary,
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: typography.fontWeight.semibold,
       color: colors.text.primary,
-      marginBottom: 4,
     },
     rowDetail: {
       fontFamily: typography.fontFamily.mono,
-      fontSize: 11,
-      letterSpacing: 0.12 * 11,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
       color: colors.text.secondary,
     },
     check: {
       color: colors.brand.ink,
-      fontSize: 14,
+      fontSize: 16,
     },
     unchecked: {
+      color: colors.text.tertiary,
+      fontSize: 16,
+    },
+    footer: {
+      marginTop: spacing[6],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      lineHeight: 16,
+      letterSpacing: 0.12 * 10,
       color: colors.text.disabled,
-      fontSize: 14,
     },
   });

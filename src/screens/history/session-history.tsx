@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Wall } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 
 type Session = {
   id: string;
@@ -83,6 +83,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
   onNavigateToHome,
   onNavigateToProfile,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [activeFilter, setActiveFilter] = useState<Filter>('ALL');
 
   const allSessions = sessions.length > 0 ? sessions : MOCK_SESSIONS;
@@ -192,6 +193,7 @@ export const HistoryScreen: React.FC<HistoryScreenProps> = ({
 };
 
 const MonthGrid: React.FC<{ sessionDays: number[] }> = ({ sessionDays }) => {
+  const styles = useThemedStyles(createStyles);
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
   return (
     <View style={styles.monthGrid}>
@@ -207,232 +209,236 @@ const TabBar: React.FC<{
   active: string;
   onHome: () => void;
   onProfile: () => void;
-}> = ({ active, onHome, onProfile }) => (
-  <View style={styles.tabBar}>
-    <TouchableOpacity style={styles.tab} onPress={onHome}>
-      <Text style={active === 'HOME' ? styles.tabTextActive : styles.tabText}>HOME</Text>
-    </TouchableOpacity>
-    <TouchableOpacity style={styles.tab}>
-      <Text style={active === 'HISTORY' ? styles.tabTextActive : styles.tabText}>HISTORY</Text>
-    </TouchableOpacity>
-    <TouchableOpacity style={styles.tab} onPress={onProfile}>
-      <Text style={active === 'PROFILE' ? styles.tabTextActive : styles.tabText}>PROFILE</Text>
-    </TouchableOpacity>
-  </View>
-);
+}> = ({ active, onHome, onProfile }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.tabBar}>
+      <TouchableOpacity style={styles.tab} onPress={onHome}>
+        <Text style={active === 'HOME' ? styles.tabTextActive : styles.tabText}>HOME</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tab}>
+        <Text style={active === 'HISTORY' ? styles.tabTextActive : styles.tabText}>HISTORY</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.tab} onPress={onProfile}>
+        <Text style={active === 'PROFILE' ? styles.tabTextActive : styles.tabText}>PROFILE</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  statusBar: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[6],
-  },
-  time: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
-  statusIcons: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
-  scroll: {
-    flex: 1,
-  },
-  listHeader: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[4],
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  screenTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 28,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.03 * 28,
-    color: colors.text.primary,
-  },
-  sessionCount: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.brand.primary,
-  },
-  filters: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[4],
-    gap: 8,
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border.medium,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipActive: {
-    borderColor: colors.brand.primary,
-    backgroundColor: colors.brand.primary,
-  },
-  chipText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  chipTextActive: {
-    color: colors.background.secondary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  monthSection: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[5],
-    gap: 10,
-  },
-  monthLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-  monthGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  dayCell: {
-    width: 14,
-    height: 14,
-    backgroundColor: 'rgba(242,241,236,0.10)',
-  },
-  dayCellActive: {
-    backgroundColor: colors.brand.primary,
-  },
-  sessionList: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-  },
-  sessionRow: {
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing[6],
-    paddingVertical: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sessionRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-  },
-  sessionInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  sessionTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  sessionMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  sessionStats: {
-    flexDirection: 'row',
-    gap: 22,
-  },
-  sessionStat: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  sessionStatLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    color: colors.text.secondary,
-    letterSpacing: 0.14 * 9,
-  },
-  sessionStatValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 19,
-    color: colors.text.primary,
-    letterSpacing: -0.02 * 19,
-  },
-  sessionStatAccent: {
-    color: colors.brand.primary,
-  },
-  // Empty state
-  emptyHeader: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[4],
-  },
-  emptyBody: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
-    justifyContent: 'center',
-    gap: 26,
-  },
-  emptyWall: {
-    opacity: 0.5,
-  },
-  emptyTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 30,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: -0.025 * 30,
-    lineHeight: 30 * 1.1,
-    color: colors.text.primary,
-  },
-  emptyDesc: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    lineHeight: 16 * 1.55,
-  },
-  startFirstButton: {
-    height: 56,
-    backgroundColor: colors.brand.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startFirstText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 13,
-    letterSpacing: 0.22 * 13,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.background.secondary,
-  },
-  // Tab bar
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    paddingTop: 16,
-    height: 76,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-  },
-  tabTextActive: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    statusBar: {
+      height: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing[6],
+    },
+    time: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 13,
+      color: colors.text.primary,
+    },
+    statusIcons: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.text.secondary,
+    },
+    scroll: {
+      flex: 1,
+    },
+    listHeader: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[4],
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+    },
+    screenTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 28,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.03 * 28,
+      color: colors.text.primary,
+    },
+    sessionCount: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.brand.ink,
+    },
+    filters: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[4],
+      gap: 8,
+    },
+    chip: {
+      borderWidth: 1,
+      borderColor: colors.border.medium,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    chipActive: {
+      borderColor: colors.brand.fill,
+      backgroundColor: colors.brand.fill,
+    },
+    chipText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    chipTextActive: {
+      color: colors.text.onBrand,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    monthSection: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[5],
+      gap: 10,
+    },
+    monthLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+    monthGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+    },
+    dayCell: {
+      width: 14,
+      height: 14,
+      backgroundColor: colors.cell,
+    },
+    dayCellActive: {
+      backgroundColor: colors.brand.ink,
+    },
+    sessionList: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border.subtle,
+    },
+    sessionRow: {
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: spacing[6],
+      paddingVertical: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sessionRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border.subtle,
+    },
+    sessionInfo: {
+      flex: 1,
+      gap: 6,
+    },
+    sessionTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    sessionMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    sessionStats: {
+      flexDirection: 'row',
+      gap: 22,
+    },
+    sessionStat: {
+      alignItems: 'flex-end',
+      gap: 4,
+    },
+    sessionStatLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      color: colors.text.secondary,
+      letterSpacing: 0.14 * 9,
+    },
+    sessionStatValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 19,
+      color: colors.text.primary,
+      letterSpacing: -0.02 * 19,
+    },
+    sessionStatAccent: {
+      color: colors.brand.ink,
+    },
+    // Empty state
+    emptyHeader: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[4],
+    },
+    emptyBody: {
+      flex: 1,
+      paddingHorizontal: spacing[6],
+      justifyContent: 'center',
+      gap: 26,
+    },
+    emptyWall: {
+      opacity: 0.5,
+    },
+    emptyTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 30,
+      fontWeight: typography.fontWeight.extrabold,
+      letterSpacing: -0.025 * 30,
+      lineHeight: 30 * 1.1,
+      color: colors.text.primary,
+    },
+    emptyDesc: {
+      fontSize: 16,
+      color: colors.text.secondary,
+      lineHeight: 16 * 1.55,
+    },
+    startFirstButton: {
+      height: 56,
+      backgroundColor: colors.brand.fill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    startFirstText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 13,
+      letterSpacing: 0.22 * 13,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.onBrand,
+    },
+    // Tab bar
+    tabBar: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: colors.border.subtle,
+      paddingTop: 16,
+      height: 76,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    tabText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.disabled,
+    },
+    tabTextActive: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+    },
+  });

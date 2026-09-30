@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles, useColors } from '@/theme';
 
 type BrandMarkProps = {
   size?: 'small' | 'medium' | 'large';
@@ -21,16 +21,18 @@ export const BrandMark: React.FC<BrandMarkProps> = ({
   withText = false,
   style,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const sizeConfig = sizes[size];
 
   const containerBg =
     variant === 'light'
-      ? colors.brand.primary
+      ? colors.brand.fill
       : variant === 'dark'
         ? colors.background.secondary
         : colors.text.primary;
 
-  const barColor = variant === 'light' ? colors.background.secondary : colors.brand.primary;
+  const barColor = variant === 'light' ? colors.text.onBrand : colors.brand.ink;
 
   const containerStyle =
     variant === 'outline' ? { borderWidth: 1, borderColor: colors.border.strong } : {};
@@ -75,25 +77,26 @@ export const BrandMark: React.FC<BrandMarkProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  wrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bar: {
-    transform: [{ skewX: '-9deg' }],
-  },
-  text: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 20,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.03 * 20,
-    color: colors.text.primary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    wrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    bar: {
+      transform: [{ skewX: '-9deg' }],
+    },
+    text: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 20,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.03 * 20,
+      color: colors.text.primary,
+    },
+  });

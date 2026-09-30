@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Wall, StatTile } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 
 type HomeScreenProps = {
   userName: string;
@@ -44,6 +44,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   lastSession,
   streak,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const isFirstTime = sessionCount === 0;
 
   return (
@@ -176,235 +177,236 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  content: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-    paddingBottom: spacing[5],
-  },
-  headerLeft: {
-    gap: 4,
-  },
-  headerSubtitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.34 * 10,
-    color: colors.brand.primary,
-  },
-  headerTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 26,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.03 * 26,
-    lineHeight: 26,
-    color: colors.text.primary,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderWidth: 1,
-    borderColor: colors.brand.primary,
-    backgroundColor: colors.background.secondary,
-    overflow: 'hidden',
-    borderRadius: 100,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarPlaceholder: {
-    flex: 1,
-    backgroundColor: colors.background.tertiary,
-  },
-  emptyWallBanner: {
-    marginHorizontal: spacing[6],
-    marginBottom: spacing[4],
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyWallCopy: {
-    flex: 1,
-    gap: 6,
-  },
-  emptyWallTitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.brand.primary,
-  },
-  emptyWallBody: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    lineHeight: 14 * 1.4,
-    color: colors.text.secondary,
-  },
-  emptyWallChevron: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 16,
-    color: colors.text.secondary,
-  },
-  main: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[6],
-    gap: 14,
-  },
-  heroSection: {
-    marginBottom: 0,
-  },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 10,
-    flexWrap: 'wrap',
-  },
-  heroTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 30,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: -0.025 * 30,
-    lineHeight: 30 * 1.05,
-    color: colors.text.primary,
-  },
-  heroStreak: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.12 * 12,
-    color: colors.brand.primary,
-  },
-  startButton: {
-    height: 112,
-    backgroundColor: colors.brand.primary,
-  },
-  startButtonSubtitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginTop: -6,
-  },
-  wallSection: {
-    marginTop: 12,
-    gap: 14,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  sectionLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-  sectionValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-  wallDescription: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    color: colors.text.secondary,
-    lineHeight: 15 * 1.5,
-  },
-  section: {
-    marginTop: 10,
-    gap: 12,
-  },
-  sessionCard: {
-    backgroundColor: colors.background.tertiary,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sessionInfo: {
-    gap: 6,
-    flex: 1,
-  },
-  sessionTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  sessionSubtitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  sessionStats: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-  sessionStat: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  sessionStatLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    color: colors.text.secondary,
-    letterSpacing: 0.14 * 9,
-  },
-  sessionStatValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 20,
-    color: colors.text.primary,
-  },
-  sessionStatAccent: {
-    color: colors.brand.primary,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-  },
-  statTile: {
-    flex: 1,
-    padding: 16,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    paddingTop: 16,
-    height: 76,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-  },
-  tabTextActive: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    content: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+      paddingBottom: spacing[5],
+    },
+    headerLeft: {
+      gap: 4,
+    },
+    headerSubtitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.34 * 10,
+      color: colors.brand.ink,
+    },
+    headerTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 26,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.03 * 26,
+      lineHeight: 26,
+      color: colors.text.primary,
+    },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderWidth: 1,
+      borderColor: colors.brand.ink,
+      backgroundColor: colors.background.secondary,
+      overflow: 'hidden',
+      borderRadius: 100,
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
+    },
+    avatarPlaceholder: {
+      flex: 1,
+      backgroundColor: colors.background.tertiary,
+    },
+    emptyWallBanner: {
+      marginHorizontal: spacing[6],
+      marginBottom: spacing[4],
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      padding: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    emptyWallCopy: {
+      flex: 1,
+      gap: 6,
+    },
+    emptyWallTitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.brand.ink,
+    },
+    emptyWallBody: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      lineHeight: 14 * 1.4,
+      color: colors.text.secondary,
+    },
+    emptyWallChevron: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 16,
+      color: colors.text.secondary,
+    },
+    main: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[6],
+      gap: 14,
+    },
+    heroSection: {
+      marginBottom: 0,
+    },
+    heroRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 10,
+      flexWrap: 'wrap',
+    },
+    heroTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 30,
+      fontWeight: typography.fontWeight.extrabold,
+      letterSpacing: -0.025 * 30,
+      lineHeight: 30 * 1.05,
+      color: colors.text.primary,
+    },
+    heroStreak: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.12 * 12,
+      color: colors.brand.ink,
+    },
+    startButton: {
+      height: 112,
+      backgroundColor: colors.brand.fill,
+    },
+    startButtonSubtitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.18 * 10,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      marginTop: -6,
+    },
+    wallSection: {
+      marginTop: 12,
+      gap: 14,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+    },
+    sectionLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+    sectionValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+    },
+    wallDescription: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      color: colors.text.secondary,
+      lineHeight: 15 * 1.5,
+    },
+    section: {
+      marginTop: 10,
+      gap: 12,
+    },
+    sessionCard: {
+      backgroundColor: colors.background.tertiary,
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+      padding: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sessionInfo: {
+      gap: 6,
+      flex: 1,
+    },
+    sessionTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    sessionSubtitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    sessionStats: {
+      flexDirection: 'row',
+      gap: 20,
+    },
+    sessionStat: {
+      alignItems: 'flex-end',
+      gap: 4,
+    },
+    sessionStatLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      color: colors.text.secondary,
+      letterSpacing: 0.14 * 9,
+    },
+    sessionStatValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 20,
+      color: colors.text.primary,
+    },
+    sessionStatAccent: {
+      color: colors.brand.ink,
+    },
+    statsGrid: {
+      flexDirection: 'row',
+      gap: 1,
+      backgroundColor: colors.border.subtle,
+    },
+    statTile: {
+      flex: 1,
+      padding: 16,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: colors.border.subtle,
+      paddingTop: 16,
+      height: 76,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    tabText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.disabled,
+    },
+    tabTextActive: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+    },
+  });

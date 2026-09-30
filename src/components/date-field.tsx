@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles } from '@/theme';
 import {
   defaultBirthDate,
   formatDateOfBirth,
@@ -26,6 +26,7 @@ export const DateField: React.FC<DateFieldProps> = ({
   optional = false,
   error,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [open, setOpen] = useState(false);
   const selected = parseIsoDate(value) ?? defaultBirthDate();
   const hasValue = value.length > 0;
@@ -87,56 +88,57 @@ export const DateField: React.FC<DateFieldProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    gap: 8,
-  },
-  label: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.18 * 9,
-    color: colors.text.secondary,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 10,
-  },
-  inputContainerFocused: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.brand.primary,
-  },
-  inputContainerError: {
-    borderBottomColor: colors.accent.danger,
-  },
-  value: {
-    flex: 1,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 18,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
-  placeholder: {
-    color: colors.text.quaternary,
-    fontWeight: typography.fontWeight.regular,
-  },
-  chevron: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 14,
-    color: colors.brand.primary,
-  },
-  clear: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.secondary,
-  },
-  error: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.accent.danger,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      gap: 8,
+    },
+    label: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.18 * 9,
+      color: colors.text.secondary,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 10,
+    },
+    inputContainerFocused: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.brand.ink,
+    },
+    inputContainerError: {
+      borderBottomColor: colors.accent.danger,
+    },
+    value: {
+      flex: 1,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 18,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+    },
+    placeholder: {
+      color: colors.text.quaternary,
+      fontWeight: typography.fontWeight.regular,
+    },
+    chevron: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 14,
+      color: colors.brand.ink,
+    },
+    clear: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.secondary,
+    },
+    error: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.accent.danger,
+    },
+  });

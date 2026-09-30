@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components';
-import { colors, spacing, typography } from '@/theme';
+import { spacing, typography, type Colors, useColors, useThemedStyles } from '@/theme';
 import type { DistanceUnit } from '@/types/profile';
 import type { SyncStatus } from '@/features/sessions/tracking/types';
 import {
@@ -67,13 +67,13 @@ type SessionSummaryScreenProps = {
   onDone: () => void;
 };
 
-const ZONE_COLORS = {
-  walk: '#3E433D',
-  jog: '#5C615B',
-  run: '#1E4D33',
-  high_run: '#8FA36A',
-  sprint: '#C8F24E',
-} as const;
+const ZONE_KEYS = {
+  walk: 'walk',
+  jog: 'jog',
+  run: 'run',
+  high_run: 'highRun',
+  sprint: 'sprint',
+} as const satisfies Record<keyof ZoneSeconds, keyof Colors['zone']>;
 
 const approx = (marked: boolean, value: string) => (marked ? `≈ ${value}` : value);
 
@@ -127,6 +127,7 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
   onCloseRejectedWhy,
   onDone,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [showSprints, setShowSprints] = React.useState(false);
   const estimated = dataQuality === 'estimated';
   const noSpeed = speedSource === 'none';
@@ -358,24 +359,29 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
   );
 };
 
-const Metric = ({ label, value, unit }: { label: string; value: string; unit: string }) => (
-  <View style={styles.metric}>
-    <Text style={styles.label}>{label}</Text>
-    <Text style={styles.metricValue}>{value}</Text>
-    <Text style={styles.metricUnit}>{unit}</Text>
-  </View>
-);
+const Metric = ({ label, value, unit }: { label: string; value: string; unit: string }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricUnit}>{unit}</Text>
+    </View>
+  );
+};
 
 const ZoneBar = ({ zones, total }: { zones: ZoneSeconds; total: number }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   if (total <= 0) return null;
   return (
     <View style={styles.bar}>
-      {(Object.keys(ZONE_COLORS) as (keyof typeof ZONE_COLORS)[]).map((key) => (
+      {(Object.keys(ZONE_KEYS) as (keyof typeof ZONE_KEYS)[]).map((key) => (
         <View
           key={key}
           style={{
             flex: zones[key] / total,
-            backgroundColor: ZONE_COLORS[key],
+            backgroundColor: colors.zone[ZONE_KEYS[key]],
             minWidth: zones[key] > 0 ? 2 : 0,
           }}
         />
@@ -385,6 +391,7 @@ const ZoneBar = ({ zones, total }: { zones: ZoneSeconds; total: number }) => {
 };
 
 const SyncBanner = ({ status, onWhy }: { status: SyncStatus; onWhy: () => void }) => {
+  const styles = useThemedStyles(createStyles);
   if (status === 'synced') {
     return <Text style={styles.synced}>✓ SAFE IN YOUR ACCOUNT</Text>;
   }
@@ -407,302 +414,303 @@ const SyncBanner = ({ status, onWhy }: { status: SyncStatus; onWhy: () => void }
   return <Text style={styles.pending}>↑ SAVING TO YOUR ACCOUNT</Text>;
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  content: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[6],
-    gap: 8,
-  },
-  brick: {
-    marginTop: spacing[4],
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 2,
-    color: colors.brand.primary,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -1,
-    color: colors.text.primary,
-  },
-  meta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    color: colors.text.secondary,
-  },
-  hero: {
-    marginTop: spacing[6],
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  heroValue: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 64,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-    letterSpacing: -2,
-  },
-  heroUnit: {
-    marginBottom: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 14,
-    letterSpacing: 1.4,
-    color: colors.text.secondary,
-  },
-  heroLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.6,
-    color: colors.text.secondary,
-  },
-  grid: {
-    marginTop: spacing[4],
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-  },
-  metric: {
-    width: '49.6%',
-    backgroundColor: colors.background.secondary,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    gap: 4,
-  },
-  label: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    color: colors.text.secondary,
-  },
-  metricValue: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 28,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-  },
-  metricUnit: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    color: colors.text.tertiary,
-  },
-  caption: {
-    marginTop: spacing[4],
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: colors.brand.primary,
-  },
-  bar: {
-    marginTop: 8,
-    height: 10,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  zoneNames: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1,
-    color: colors.text.tertiary,
-  },
-  longest: {
-    marginTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  longestValue: {
-    marginTop: 4,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 18,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  chevron: {
-    fontSize: 28,
-    color: colors.text.secondary,
-  },
-  body: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.secondary,
-  },
-  section: {
-    marginTop: spacing[6],
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.6,
-    color: colors.text.primary,
-  },
-  tableHead: {
-    flexDirection: 'row',
-    paddingVertical: 6,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  tableCell: {
-    width: 52,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1,
-    color: colors.text.tertiary,
-    textAlign: 'right',
-  },
-  tableValue: {
-    width: 52,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    color: colors.text.primary,
-    textAlign: 'right',
-  },
-  grow: {
-    flex: 1,
-    width: undefined,
-    textAlign: 'left',
-  },
-  zoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  zoneLabel: {
-    width: 90,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.primary,
-  },
-  zoneRange: {
-    flex: 1,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  zoneTime: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  insufficient: {
-    marginTop: spacing[7],
-    gap: 8,
-  },
-  insufficientTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 28,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-    letterSpacing: -0.5,
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
-    gap: 8,
-  },
-  soon: {
-    textAlign: 'center',
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.6,
-    color: colors.text.disabled,
-  },
-  synced: {
-    marginTop: spacing[3],
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: colors.brand.primary,
-  },
-  pending: {
-    marginTop: spacing[3],
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: colors.text.secondary,
-  },
-  retrying: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    color: colors.accent.warning,
-  },
-  rejectedRow: {
-    marginTop: spacing[3],
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  rejected: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: colors.accent.danger,
-  },
-  whyLink: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: colors.text.primary,
-  },
-  whyBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    backgroundColor: colors.overlay.medium,
-  },
-  whySheet: {
-    backgroundColor: colors.background.elevated,
-    padding: spacing[6],
-    gap: 12,
-  },
-  whyTitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 1.4,
-    color: colors.accent.danger,
-  },
-  sprintHeader: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[3],
-    gap: 6,
-  },
-  back: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    color: colors.text.secondary,
-  },
-  sprintTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.black,
-    color: colors.text.primary,
-  },
-  rankCol: {
-    width: 36,
-  },
-  rankNote: {
-    margin: spacing[6],
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.6,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    content: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[6],
+      gap: 8,
+    },
+    brick: {
+      marginTop: spacing[4],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 2,
+      color: colors.brand.ink,
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 34,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -1,
+      color: colors.text.primary,
+    },
+    meta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.2,
+      color: colors.text.secondary,
+    },
+    hero: {
+      marginTop: spacing[6],
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+    },
+    heroValue: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 64,
+      fontWeight: typography.fontWeight.black,
+      color: colors.text.primary,
+      letterSpacing: -2,
+    },
+    heroUnit: {
+      marginBottom: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 14,
+      letterSpacing: 1.4,
+      color: colors.text.secondary,
+    },
+    heroLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.6,
+      color: colors.text.secondary,
+    },
+    grid: {
+      marginTop: spacing[4],
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 1,
+      backgroundColor: colors.border.subtle,
+    },
+    metric: {
+      width: '49.6%',
+      backgroundColor: colors.background.secondary,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      gap: 4,
+    },
+    label: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.4,
+      color: colors.text.secondary,
+    },
+    metricValue: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 28,
+      fontWeight: typography.fontWeight.black,
+      color: colors.text.primary,
+    },
+    metricUnit: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      color: colors.text.tertiary,
+    },
+    caption: {
+      marginTop: spacing[4],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: colors.brand.ink,
+    },
+    bar: {
+      marginTop: 8,
+      height: 10,
+      flexDirection: 'row',
+      overflow: 'hidden',
+    },
+    zoneNames: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1,
+      color: colors.text.tertiary,
+    },
+    longest: {
+      marginTop: 8,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.border.subtle,
+    },
+    longestValue: {
+      marginTop: 4,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 18,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    chevron: {
+      fontSize: 28,
+      color: colors.text.secondary,
+    },
+    body: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text.secondary,
+    },
+    section: {
+      marginTop: spacing[6],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.6,
+      color: colors.text.primary,
+    },
+    tableHead: {
+      flexDirection: 'row',
+      paddingVertical: 6,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderColor: colors.border.subtle,
+    },
+    tableCell: {
+      width: 52,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1,
+      color: colors.text.tertiary,
+      textAlign: 'right',
+    },
+    tableValue: {
+      width: 52,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      color: colors.text.primary,
+      textAlign: 'right',
+    },
+    grow: {
+      flex: 1,
+      width: undefined,
+      textAlign: 'left',
+    },
+    zoneRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      borderTopWidth: 1,
+      borderColor: colors.border.subtle,
+    },
+    zoneLabel: {
+      width: 90,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.primary,
+    },
+    zoneRange: {
+      flex: 1,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.secondary,
+    },
+    zoneTime: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      color: colors.text.primary,
+    },
+    insufficient: {
+      marginTop: spacing[7],
+      gap: 8,
+    },
+    insufficientTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 28,
+      fontWeight: typography.fontWeight.black,
+      color: colors.text.primary,
+      letterSpacing: -0.5,
+    },
+    footer: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[8],
+      gap: 8,
+    },
+    soon: {
+      textAlign: 'center',
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.6,
+      color: colors.text.disabled,
+    },
+    synced: {
+      marginTop: spacing[3],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      color: colors.brand.ink,
+    },
+    pending: {
+      marginTop: spacing[3],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      color: colors.text.secondary,
+    },
+    retrying: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 1.4,
+      color: colors.accent.warning,
+    },
+    rejectedRow: {
+      marginTop: spacing[3],
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    rejected: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      color: colors.accent.danger,
+    },
+    whyLink: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      color: colors.text.primary,
+    },
+    whyBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      backgroundColor: colors.overlay.medium,
+    },
+    whySheet: {
+      backgroundColor: colors.background.elevated,
+      padding: spacing[6],
+      gap: 12,
+    },
+    whyTitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 1.4,
+      color: colors.accent.danger,
+    },
+    sprintHeader: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[3],
+      gap: 6,
+    },
+    back: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 1.2,
+      color: colors.text.secondary,
+    },
+    sprintTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 34,
+      fontWeight: typography.fontWeight.black,
+      color: colors.text.primary,
+    },
+    rankCol: {
+      width: 36,
+    },
+    rankNote: {
+      margin: spacing[6],
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.6,
+      color: colors.text.secondary,
+    },
+  });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles, useColors } from '@/theme';
 
 type FieldProps = TextInputProps & {
   label: string;
@@ -18,6 +18,8 @@ export const Field: React.FC<FieldProps> = ({
   placeholder,
   ...props
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const hasValue = value && value.length > 0;
 
   return (
@@ -46,44 +48,45 @@ export const Field: React.FC<FieldProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    gap: 8,
-  },
-  label: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.18 * 9,
-    color: colors.text.secondary,
-  },
-  inputContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 10,
-  },
-  inputContainerFocused: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.brand.primary,
-  },
-  inputContainerError: {
-    borderBottomColor: colors.accent.danger,
-  },
-  input: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 18,
-    color: colors.text.primary,
-    padding: 0,
-  },
-  inputFilled: {
-    fontWeight: typography.fontWeight.semibold,
-  },
-  inputEmpty: {
-    color: colors.text.quaternary,
-  },
-  error: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.accent.danger,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      gap: 8,
+    },
+    label: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.18 * 9,
+      color: colors.text.secondary,
+    },
+    inputContainer: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 10,
+    },
+    inputContainerFocused: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.brand.ink,
+    },
+    inputContainerError: {
+      borderBottomColor: colors.accent.danger,
+    },
+    input: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 18,
+      color: colors.text.primary,
+      padding: 0,
+    },
+    inputFilled: {
+      fontWeight: typography.fontWeight.semibold,
+    },
+    inputEmpty: {
+      color: colors.text.quaternary,
+    },
+    error: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.accent.danger,
+    },
+  });

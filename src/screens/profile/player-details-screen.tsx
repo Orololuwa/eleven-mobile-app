@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, Controller } from 'react-hook-form';
 import * as Location from 'expo-location';
 import { AvatarPicker, Button, Chip, DateField, Field, SegmentedControl } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles, useColors } from '@/theme';
 import type { UnitsPreference } from '@/types/profile';
 import { preferredFootIndex, preferredPosition } from '@/features/profile/display';
 import type {
@@ -104,6 +104,8 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
   onUploadAvatar,
   onRemoveAvatar,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const [locationBusy, setLocationBusy] = useState(false);
   const [location, setLocation] = useState(profile.location);
 
@@ -461,7 +463,7 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
             onPress={() => void captureCurrentLocation()}
           >
             {locationBusy ? (
-              <ActivityIndicator color={colors.brand.primary} />
+              <ActivityIndicator color={colors.brand.ink} />
             ) : (
               <Text style={styles.locationButtonText}>
                 {location
@@ -491,159 +493,160 @@ export const PlayerDetailsScreen: React.FC<PlayerDetailsScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-    paddingBottom: spacing[4],
-  },
-  headerAction: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  headerTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  headerSave: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.brand.primary,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
-    gap: 26,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.18 * 9,
-    color: colors.text.secondary,
-  },
-  bioInput: {
-    minHeight: 96,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 10,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    color: colors.text.primary,
-    textAlignVertical: 'top',
-  },
-  counter: {
-    alignSelf: 'flex-end',
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.disabled,
-  },
-  positionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 12,
-  },
-  positionValue: {
-    flex: 1,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    color: colors.text.primary,
-  },
-  positionChevron: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 14,
-    color: colors.brand.primary,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  metricField: {
-    gap: 10,
-  },
-  metricUnderline: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 10,
-    gap: 8,
-  },
-  metricUnderlineFocused: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.brand.primary,
-  },
-  metricValue: {
-    flex: 1,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 18,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    padding: 0,
-  },
-  metricUnit: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.secondary,
-    paddingBottom: 2,
-  },
-  locationButton: {
-    minHeight: 42,
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.medium,
-    paddingBottom: 10,
-  },
-  locationButtonText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.brand.primary,
-  },
-  clearLocation: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.secondary,
-  },
-  weightNote: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.text.tertiary,
-  },
-  inlineError: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.accent.danger,
-  },
-  error: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.accent.danger,
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[6],
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+      paddingBottom: spacing[4],
+    },
+    headerAction: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    headerTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    headerSave: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.brand.ink,
+    },
+    content: {
+      flex: 1,
+    },
+    contentInner: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[8],
+      gap: 26,
+    },
+    section: {
+      gap: 10,
+    },
+    sectionLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.18 * 9,
+      color: colors.text.secondary,
+    },
+    bioInput: {
+      minHeight: 96,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 10,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      color: colors.text.primary,
+      textAlignVertical: 'top',
+    },
+    counter: {
+      alignSelf: 'flex-end',
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.disabled,
+    },
+    positionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 12,
+    },
+    positionValue: {
+      flex: 1,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      color: colors.text.primary,
+    },
+    positionChevron: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 14,
+      color: colors.brand.ink,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    metricField: {
+      gap: 10,
+    },
+    metricUnderline: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 10,
+      gap: 8,
+    },
+    metricUnderlineFocused: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.brand.ink,
+    },
+    metricValue: {
+      flex: 1,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 18,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+      padding: 0,
+    },
+    metricUnit: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.secondary,
+      paddingBottom: 2,
+    },
+    locationButton: {
+      minHeight: 42,
+      justifyContent: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.medium,
+      paddingBottom: 10,
+    },
+    locationButtonText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.brand.ink,
+    },
+    clearLocation: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.secondary,
+    },
+    weightNote: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.text.tertiary,
+    },
+    inlineError: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.accent.danger,
+    },
+    error: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.accent.danger,
+    },
+    footer: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[6],
+    },
+  });

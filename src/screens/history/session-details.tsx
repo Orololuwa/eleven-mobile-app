@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles, useColors, darkColors } from '@/theme';
 
 type SessionDetailTab = 'HEATMAP' | 'SPRINTS' | 'SPEED' | 'STATS';
 
@@ -50,6 +50,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
   onShare,
   onNavigateToHome,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [activeTab, setActiveTab] = useState<SessionDetailTab>('HEATMAP');
 
   return (
@@ -113,6 +114,8 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
 // ── Heatmap Tab ─────────────────────────────────────────────────────────────
 
 const HeatmapTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const [half, setHalf] = useState<'1ST' | '2ND' | 'FULL'>('1ST');
 
   return (
@@ -120,20 +123,20 @@ const HeatmapTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
       {/* Pitch with heatmap */}
       <View style={styles.pitchContainer}>
         {/* Pitch markings */}
-        <View style={styles.pitchCentreLine} />
-        <View style={styles.pitchCentreCircle} />
-        <View style={[styles.pitchBox, styles.pitchBoxLeft]} />
-        <View style={[styles.pitchBox, styles.pitchBoxRight]} />
-        <View style={[styles.pitchPost, styles.pitchPostLeft]} />
-        <View style={[styles.pitchPost, styles.pitchPostRight]} />
+        <View style={pitchStyles.pitchCentreLine} />
+        <View style={pitchStyles.pitchCentreCircle} />
+        <View style={[pitchStyles.pitchBox, pitchStyles.pitchBoxLeft]} />
+        <View style={[pitchStyles.pitchBox, pitchStyles.pitchBoxRight]} />
+        <View style={[pitchStyles.pitchPost, pitchStyles.pitchPostLeft]} />
+        <View style={[pitchStyles.pitchPost, pitchStyles.pitchPostRight]} />
 
         {/* Heat blobs */}
         <HeatBlobs half={half} />
 
-        <Text style={styles.pitchHalfLabel}>
+        <Text style={pitchStyles.pitchHalfLabel}>
           {half === '1ST' ? '1ST HALF ▶' : half === '2ND' ? '2ND HALF ▶' : 'FULL MATCH'}
         </Text>
-        <Text style={styles.pitchSize}>64 × 42 M</Text>
+        <Text style={pitchStyles.pitchSize}>64 × 42 M</Text>
       </View>
 
       {/* Legend + flip */}
@@ -170,7 +173,7 @@ const HeatmapTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
       {/* Analysis */}
       <View style={styles.analysis}>
         <Text style={styles.analysisText}>
-          You held the <Text style={{ color: colors.brand.primary }}>left half-space</Text> — 41% of
+          You held the <Text style={{ color: colors.brand.ink }}>left half-space</Text> — 41% of
           your minutes in the middle third, drifting wide when the ball turned over.
         </Text>
       </View>
@@ -223,47 +226,52 @@ const HeatBlobs: React.FC<{ half: string }> = ({ half }) => {
 
 // ── Sprints Tab ──────────────────────────────────────────────────────────────
 
-const SprintsTab: React.FC<{ data: SessionDetailData }> = ({ data }) => (
-  <View style={styles.tabContent}>
-    {/* Sprint pitch */}
-    <View style={styles.pitchContainer}>
-      <View style={styles.pitchCentreLine} />
-      <View style={styles.pitchCentreCircle} />
-      <View style={[styles.pitchBox, styles.pitchBoxLeft]} />
-      <View style={[styles.pitchBox, styles.pitchBoxRight]} />
-      <SprintLines />
-      <Text style={styles.pitchHalfLabel}>{data.sprints} SPRINTS ▶ 20+ KM/H</Text>
-    </View>
+const SprintsTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.tabContent}>
+      {/* Sprint pitch */}
+      <View style={styles.pitchContainer}>
+        <View style={pitchStyles.pitchCentreLine} />
+        <View style={pitchStyles.pitchCentreCircle} />
+        <View style={[pitchStyles.pitchBox, pitchStyles.pitchBoxLeft]} />
+        <View style={[pitchStyles.pitchBox, pitchStyles.pitchBoxRight]} />
+        <SprintLines />
+        <Text style={pitchStyles.pitchHalfLabel}>{data.sprints} SPRINTS ▶ 20+ KM/H</Text>
+      </View>
 
-    {/* Time by third */}
-    <View style={styles.section}>
-      <Text style={styles.sectionLabel}>TIME BY THIRD</Text>
-      <ZoneBar label="DEFENSIVE" percent={27} />
-      <ZoneBar label="MIDDLE" percent={41} isHighlight />
-      <ZoneBar label="ATTACKING" percent={32} />
-    </View>
+      {/* Time by third */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>TIME BY THIRD</Text>
+        <ZoneBar label="DEFENSIVE" percent={27} />
+        <ZoneBar label="MIDDLE" percent={41} isHighlight />
+        <ZoneBar label="ATTACKING" percent={32} />
+      </View>
 
-    {/* Sprint stats */}
-    <View style={styles.statsGrid}>
-      <View style={styles.statsRow}>
-        <StatBox label="LONGEST SPRINT" value={`${data.longestSprint}`} unit="M" />
-        <StatBox label="SPRINT DIST." value={`${data.sprintDistance}`} unit="KM" />
-        <StatBox label="RECOVERY" value={`${data.recoveryTime}`} unit="S" />
+      {/* Sprint stats */}
+      <View style={styles.statsGrid}>
+        <View style={styles.statsRow}>
+          <StatBox label="LONGEST SPRINT" value={`${data.longestSprint}`} unit="M" />
+          <StatBox label="SPRINT DIST." value={`${data.sprintDistance}`} unit="KM" />
+          <StatBox label="RECOVERY" value={`${data.recoveryTime}`} unit="S" />
+        </View>
+      </View>
+
+      {/* Analysis */}
+      <View style={styles.analysis}>
+        <Text style={styles.analysisText}>
+          Most of your sprints came in the{' '}
+          <Text style={{ color: colors.brand.ink }}>second half</Text> — 17 of {data.sprints}. You
+          finished stronger than you started.
+        </Text>
       </View>
     </View>
-
-    {/* Analysis */}
-    <View style={styles.analysis}>
-      <Text style={styles.analysisText}>
-        Most of your sprints came in the{' '}
-        <Text style={{ color: colors.brand.primary }}>second half</Text> — 17 of {data.sprints}. You
-        finished stronger than you started.
-      </Text>
-    </View>
-  </View>
-);
+  );
+};
 
 const SprintLines: React.FC = () => {
+  const colors = useColors();
   const lines = [
     { x1: 10, y1: 30, x2: 65, y2: 28 },
     { x1: 20, y1: 60, x2: 80, y2: 55 },
@@ -282,7 +290,7 @@ const SprintLines: React.FC = () => {
             top: `${l.y1}%` as any,
             width: `${l.x2 - l.x1}%` as any,
             height: 2,
-            backgroundColor: colors.brand.primary,
+            backgroundColor: colors.brand.fill,
             opacity: 0.7,
           }}
         />
@@ -295,29 +303,35 @@ const ZoneBar: React.FC<{ label: string; percent: number; isHighlight?: boolean 
   label,
   percent,
   isHighlight,
-}) => (
-  <View style={styles.zoneRow}>
-    <Text style={styles.zoneLabel}>{label}</Text>
-    <View style={styles.zoneTrack}>
-      <View
-        style={[
-          styles.zoneFill,
-          { width: `${percent}%` },
-          isHighlight
-            ? { backgroundColor: colors.brand.primary }
-            : { backgroundColor: 'rgba(200,242,78,0.45)' },
-        ]}
-      />
+}) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.zoneRow}>
+      <Text style={styles.zoneLabel}>{label}</Text>
+      <View style={styles.zoneTrack}>
+        <View
+          style={[
+            styles.zoneFill,
+            { width: `${percent}%` },
+            isHighlight
+              ? { backgroundColor: colors.brand.ink }
+              : { backgroundColor: colors.brand.ink, opacity: 0.45 },
+          ]}
+        />
+      </View>
+      <Text style={[styles.zonePercent, isHighlight && { color: colors.brand.ink }]}>
+        {percent}%
+      </Text>
     </View>
-    <Text style={[styles.zonePercent, isHighlight && { color: colors.brand.primary }]}>
-      {percent}%
-    </Text>
-  </View>
-);
+  );
+};
 
 // ── Speed Tab ────────────────────────────────────────────────────────────────
 
 const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   // Generate speed trace bars
   const bars = Array.from({ length: 46 }, (_, i) => {
     const v =
@@ -345,7 +359,7 @@ const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
                 styles.speedBar,
                 {
                   height: bar.height,
-                  backgroundColor: bar.hot ? colors.brand.primary : 'rgba(242,241,236,0.22)',
+                  backgroundColor: bar.hot ? colors.brand.ink : colors.border.medium,
                 },
               ]}
             />
@@ -372,9 +386,8 @@ const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
 
       <View style={styles.analysis}>
         <Text style={styles.analysisText}>
-          Your peak speed of{' '}
-          <Text style={{ color: colors.brand.primary }}>{data.topSpeed} km/h</Text> was hit in the
-          second half — consistent with your sprint data.
+          Your peak speed of <Text style={{ color: colors.brand.ink }}>{data.topSpeed} km/h</Text>{' '}
+          was hit in the second half — consistent with your sprint data.
         </Text>
       </View>
     </View>
@@ -383,26 +396,29 @@ const SpeedTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
 
 // ── Stats Tab ────────────────────────────────────────────────────────────────
 
-const StatsTab: React.FC<{ data: SessionDetailData }> = ({ data }) => (
-  <View style={styles.tabContent}>
-    <View style={styles.statsGrid}>
-      <View style={styles.statsRow}>
-        <StatBox label="DISTANCE" value={`${data.distance}`} unit="KM" isLarge />
-        <StatBox label="TOP SPEED" value={`${data.topSpeed}`} unit="KM/H" isLarge />
-      </View>
-      <View style={styles.statsRow}>
-        <StatBox label="DURATION" value={`${data.duration}`} unit="MIN" />
-        <StatBox label="SPRINTS" value={`${data.sprints}`} unit="" />
-        <StatBox label="CALORIES" value={`${data.calories}`} unit="KCAL" />
-      </View>
-      <View style={styles.statsRow}>
-        <StatBox label="LONGEST SPRINT" value={`${data.longestSprint}`} unit="M" />
-        <StatBox label="SPRINT DIST." value={`${data.sprintDistance}`} unit="KM" />
-        <StatBox label="RECOVERY" value={`${data.recoveryTime}`} unit="S" />
+const StatsTab: React.FC<{ data: SessionDetailData }> = ({ data }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.tabContent}>
+      <View style={styles.statsGrid}>
+        <View style={styles.statsRow}>
+          <StatBox label="DISTANCE" value={`${data.distance}`} unit="KM" isLarge />
+          <StatBox label="TOP SPEED" value={`${data.topSpeed}`} unit="KM/H" isLarge />
+        </View>
+        <View style={styles.statsRow}>
+          <StatBox label="DURATION" value={`${data.duration}`} unit="MIN" />
+          <StatBox label="SPRINTS" value={`${data.sprints}`} unit="" />
+          <StatBox label="CALORIES" value={`${data.calories}`} unit="KCAL" />
+        </View>
+        <View style={styles.statsRow}>
+          <StatBox label="LONGEST SPRINT" value={`${data.longestSprint}`} unit="M" />
+          <StatBox label="SPRINT DIST." value={`${data.sprintDistance}`} unit="KM" />
+          <StatBox label="RECOVERY" value={`${data.recoveryTime}`} unit="S" />
+        </View>
       </View>
     </View>
-  </View>
-);
+  );
+};
 
 // ── Shared Components ────────────────────────────────────────────────────────
 
@@ -411,374 +427,380 @@ const StatBox: React.FC<{
   value: string;
   unit: string;
   isLarge?: boolean;
-}> = ({ label, value, unit, isLarge }) => (
-  <View style={[styles.statBox, isLarge && styles.statBoxLarge]}>
-    <Text style={styles.statBoxLabel}>{label}</Text>
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
-      <Text style={[styles.statBoxValue, isLarge && styles.statBoxValueLarge]}>{value}</Text>
-      {!!unit && <Text style={styles.statBoxUnit}>{unit}</Text>}
+}> = ({ label, value, unit, isLarge }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={[styles.statBox, isLarge && styles.statBoxLarge]}>
+      <Text style={styles.statBoxLabel}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+        <Text style={[styles.statBoxValue, isLarge && styles.statBoxValueLarge]}>{value}</Text>
+        {!!unit && <Text style={styles.statBoxUnit}>{unit}</Text>}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  statusBar: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[6],
-  },
-  time: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 13,
-    color: colors.text.primary,
-  },
-  statusIcons: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.text.secondary,
-  },
-  scroll: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[4],
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    gap: 6,
-  },
-  sessionTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 24,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.03 * 24,
-    color: colors.text.primary,
-  },
-  sessionMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  shareButton: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.brand.primary,
-  },
-  tabs: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[4],
-    gap: 8,
-  },
-  tabPill: {
-    borderWidth: 1,
-    borderColor: colors.border.medium,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabPillActive: {
-    borderColor: colors.brand.primary,
-    backgroundColor: colors.brand.primary,
-  },
-  tabPillText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  tabPillTextActive: {
-    color: colors.background.secondary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  tabContent: {
-    gap: 0,
-  },
-  // Pitch
-  pitchContainer: {
-    marginHorizontal: spacing[6],
-    height: 200,
-    backgroundColor: colors.background.pitch,
-    borderWidth: 1,
-    borderColor: colors.border.strong,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  pitchCentreLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: 1,
-    backgroundColor: 'rgba(242,241,236,0.30)',
-  },
-  pitchCentreCircle: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    width: 56,
-    height: 56,
-    marginLeft: -28,
-    marginTop: -28,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(242,241,236,0.30)',
-  },
-  pitchBox: {
-    position: 'absolute',
-    top: '50%',
-    width: 44,
-    height: 90,
-    marginTop: -45,
-    borderWidth: 1,
-    borderColor: 'rgba(242,241,236,0.30)',
-  },
-  pitchBoxLeft: {
-    left: 0,
-    borderLeftWidth: 0,
-  },
-  pitchBoxRight: {
-    right: 0,
-    borderRightWidth: 0,
-  },
-  pitchPost: {
-    position: 'absolute',
-    top: '50%',
-    width: 8,
-    height: 34,
-    marginTop: -17,
-    backgroundColor: 'rgba(242,241,236,0.2)',
-  },
-  pitchPostLeft: {
-    left: 0,
-  },
-  pitchPostRight: {
-    right: 0,
-  },
-  pitchHalfLabel: {
-    position: 'absolute',
-    bottom: 10,
-    left: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.primary,
-  },
-  pitchSize: {
-    position: 'absolute',
-    bottom: 10,
-    right: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.primary,
-  },
-  // Heatmap
-  legendRow: {
-    paddingHorizontal: spacing[6],
-    paddingTop: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.14 * 9,
-    color: colors.text.secondary,
-  },
-  legendBar: {
-    flexDirection: 'row',
-  },
-  legendSegment: {
-    width: 20,
-    height: 8,
-  },
-  flipPitchButton: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.brand.primary,
-  },
-  halfSelector: {
-    flexDirection: 'row',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-    marginTop: spacing[5],
-  },
-  halfOption: {
-    flex: 1,
-    backgroundColor: colors.background.tertiary,
-    padding: 14,
-    gap: 5,
-  },
-  halfOptionLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.secondary,
-  },
-  halfOptionAction: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.14 * 11,
-    color: colors.text.secondary,
-  },
-  halfOptionShowing: {
-    color: colors.brand.primary,
-  },
-  analysis: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
-    paddingBottom: spacing[4],
-  },
-  analysisText: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 19,
-    lineHeight: 19 * 1.4,
-    color: colors.text.primary,
-  },
-  // Sprints
-  section: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    gap: 14,
-  },
-  sectionLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.secondary,
-  },
-  zoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  zoneLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-    width: 74,
-  },
-  zoneTrack: {
-    flex: 1,
-    height: 16,
-    backgroundColor: 'rgba(242,241,236,0.08)',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  zoneFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-  },
-  zonePercent: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 13,
-    width: 38,
-    textAlign: 'right',
-    color: colors.text.primary,
-  },
-  // Stats grid
-  statsGrid: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    gap: 1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: colors.background.tertiary,
-    padding: 14,
-    gap: 6,
-  },
-  statBoxLarge: {
-    padding: 16,
-  },
-  statBoxLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    letterSpacing: 0.16 * 9,
-    color: colors.text.secondary,
-  },
-  statBoxValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 22,
-    color: colors.text.primary,
-  },
-  statBoxValueLarge: {
-    fontSize: 26,
-  },
-  statBoxUnit: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  // Speed tab
-  speedHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  topSpeedLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: colors.brand.primary,
-  },
-  speedTrace: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
-    height: 120,
-  },
-  speedBar: {
-    flex: 1,
-  },
-  // Tab bar
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    paddingTop: 16,
-    height: 76,
-  },
-  navTab: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  navTabText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-  },
-  navTabTextActive: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.brand.primary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    statusBar: {
+      height: 54,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing[6],
+    },
+    time: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 13,
+      color: colors.text.primary,
+    },
+    statusIcons: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.text.secondary,
+    },
+    scroll: {
+      flex: 1,
+    },
+    header: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[4],
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+    },
+    headerLeft: {
+      gap: 6,
+    },
+    sessionTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 24,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.03 * 24,
+      color: colors.text.primary,
+    },
+    sessionMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    shareButton: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.brand.ink,
+    },
+    tabs: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[4],
+      gap: 8,
+    },
+    tabPill: {
+      borderWidth: 1,
+      borderColor: colors.border.medium,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    tabPillActive: {
+      borderColor: colors.brand.fill,
+      backgroundColor: colors.brand.fill,
+    },
+    tabPillText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    tabPillTextActive: {
+      color: colors.text.onBrand,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    tabContent: {
+      gap: 0,
+    },
+    // Pitch
+    pitchContainer: {
+      marginHorizontal: spacing[6],
+      height: 200,
+      backgroundColor: colors.background.pitch,
+      borderWidth: 1,
+      borderColor: colors.border.strong,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    pitchCentreLine: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: '50%',
+      width: 1,
+      backgroundColor: 'rgba(242,241,236,0.30)',
+    },
+    pitchCentreCircle: {
+      position: 'absolute',
+      left: '50%',
+      top: '50%',
+      width: 56,
+      height: 56,
+      marginLeft: -28,
+      marginTop: -28,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: 'rgba(242,241,236,0.30)',
+    },
+    pitchBox: {
+      position: 'absolute',
+      top: '50%',
+      width: 44,
+      height: 90,
+      marginTop: -45,
+      borderWidth: 1,
+      borderColor: 'rgba(242,241,236,0.30)',
+    },
+    pitchBoxLeft: {
+      left: 0,
+      borderLeftWidth: 0,
+    },
+    pitchBoxRight: {
+      right: 0,
+      borderRightWidth: 0,
+    },
+    pitchPost: {
+      position: 'absolute',
+      top: '50%',
+      width: 8,
+      height: 34,
+      marginTop: -17,
+      backgroundColor: 'rgba(242,241,236,0.2)',
+    },
+    pitchPostLeft: {
+      left: 0,
+    },
+    pitchPostRight: {
+      right: 0,
+    },
+    pitchHalfLabel: {
+      position: 'absolute',
+      bottom: 10,
+      left: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.16 * 9,
+      color: colors.text.primary,
+    },
+    pitchSize: {
+      position: 'absolute',
+      bottom: 10,
+      right: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.16 * 9,
+      color: colors.text.primary,
+    },
+    // Heatmap
+    legendRow: {
+      paddingHorizontal: spacing[6],
+      paddingTop: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    legend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    legendLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.14 * 9,
+      color: colors.text.secondary,
+    },
+    legendBar: {
+      flexDirection: 'row',
+    },
+    legendSegment: {
+      width: 20,
+      height: 8,
+    },
+    flipPitchButton: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.brand.ink,
+    },
+    halfSelector: {
+      flexDirection: 'row',
+      gap: 1,
+      backgroundColor: colors.border.subtle,
+      marginTop: spacing[5],
+    },
+    halfOption: {
+      flex: 1,
+      backgroundColor: colors.background.tertiary,
+      padding: 14,
+      gap: 5,
+    },
+    halfOptionLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.16 * 9,
+      color: colors.text.secondary,
+    },
+    halfOptionAction: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.14 * 11,
+      color: colors.text.secondary,
+    },
+    halfOptionShowing: {
+      color: colors.brand.ink,
+    },
+    analysis: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[6],
+      paddingBottom: spacing[4],
+    },
+    analysisText: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 19,
+      lineHeight: 19 * 1.4,
+      color: colors.text.primary,
+    },
+    // Sprints
+    section: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      gap: 14,
+    },
+    sectionLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.secondary,
+    },
+    zoneRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    zoneLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+      width: 74,
+    },
+    zoneTrack: {
+      flex: 1,
+      height: 16,
+      backgroundColor: colors.cell,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    zoneFill: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+    },
+    zonePercent: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 13,
+      width: 38,
+      textAlign: 'right',
+      color: colors.text.primary,
+    },
+    // Stats grid
+    statsGrid: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      gap: 1,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      gap: 1,
+      backgroundColor: colors.border.subtle,
+    },
+    statBox: {
+      flex: 1,
+      backgroundColor: colors.background.tertiary,
+      padding: 14,
+      gap: 6,
+    },
+    statBoxLarge: {
+      padding: 16,
+    },
+    statBoxLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.16 * 9,
+      color: colors.text.secondary,
+    },
+    statBoxValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 22,
+      color: colors.text.primary,
+    },
+    statBoxValueLarge: {
+      fontSize: 26,
+    },
+    statBoxUnit: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.secondary,
+    },
+    // Speed tab
+    speedHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+    },
+    topSpeedLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.18 * 10,
+      color: colors.brand.ink,
+    },
+    speedTrace: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 2,
+      height: 120,
+    },
+    speedBar: {
+      flex: 1,
+    },
+    // Tab bar
+    tabBar: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: colors.border.subtle,
+      paddingTop: 16,
+      height: 76,
+    },
+    navTab: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    navTabText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.disabled,
+    },
+    navTabTextActive: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.brand.ink,
+    },
+  });
+
+const pitchStyles = createStyles(darkColors);

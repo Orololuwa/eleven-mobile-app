@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles } from '@/theme';
 
 type SegmentedControlProps = {
   options: string[];
@@ -13,6 +13,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   selectedIndex,
   onSelect,
 }) => {
+  const styles = useThemedStyles(createStyles);
   return (
     <View style={styles.container}>
       {options.map((option, index) => (
@@ -31,30 +32,31 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    backgroundColor: colors.border.subtle,
-    gap: 1,
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: 13,
-    backgroundColor: colors.background.tertiary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentSelected: {
-    backgroundColor: colors.brand.primary,
-  },
-  text: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.14 * 12,
-    color: colors.text.secondary,
-  },
-  textSelected: {
-    color: colors.background.secondary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      backgroundColor: colors.border.subtle,
+      gap: 1,
+    },
+    segment: {
+      flex: 1,
+      paddingVertical: 13,
+      backgroundColor: colors.background.tertiary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    segmentSelected: {
+      backgroundColor: colors.brand.fill,
+    },
+    text: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.14 * 12,
+      color: colors.text.secondary,
+    },
+    textSelected: {
+      color: colors.text.onBrand,
+      fontWeight: typography.fontWeight.semibold,
+    },
+  });

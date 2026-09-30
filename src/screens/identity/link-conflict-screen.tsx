@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 
 type LinkConflictScreenProps = {
   currentMethodsLabel?: string;
@@ -20,6 +20,7 @@ export const LinkConflictScreen: React.FC<LinkConflictScreenProps> = ({
   onKeepCurrent,
   onSwitchAccount,
 }) => {
+  const styles = useThemedStyles(createStyles);
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity style={styles.backRow} onPress={onBack}>
@@ -69,118 +70,119 @@ export const LinkConflictScreen: React.FC<LinkConflictScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  backRow: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-  },
-  backText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
-  },
-  badge: {
-    width: 8,
-    height: 8,
-    backgroundColor: colors.accent.danger,
-  },
-  badgeText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.accent.danger,
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 34,
-    fontWeight: typography.fontWeight.black,
-    letterSpacing: -0.03 * 34,
-    lineHeight: 34 * 1.05,
-    color: colors.text.primary,
-    marginBottom: 14,
-  },
-  body: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    lineHeight: 16 * 1.5,
-    color: colors.text.secondary,
-    marginBottom: spacing[7],
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 16,
-    gap: 12,
-    marginBottom: 12,
-  },
-  cardActive: {
-    borderColor: colors.brand.primary,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  cardEyebrow: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  cardMeta: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.disabled,
-  },
-  cardValue: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 28,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  cardActionActive: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.12 * 11,
-    color: colors.brand.primary,
-  },
-  cardAction: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.12 * 11,
-    color: colors.text.primary,
-  },
-  note: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: spacing[4],
-  },
-  noteBar: {
-    width: 2,
-    backgroundColor: colors.accent.danger,
-  },
-  noteText: {
-    flex: 1,
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 15 * 1.5,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    backRow: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+    },
+    backText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[6],
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 14,
+    },
+    badge: {
+      width: 8,
+      height: 8,
+      backgroundColor: colors.accent.danger,
+    },
+    badgeText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.accent.danger,
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 34,
+      fontWeight: typography.fontWeight.black,
+      letterSpacing: -0.03 * 34,
+      lineHeight: 34 * 1.05,
+      color: colors.text.primary,
+      marginBottom: 14,
+    },
+    body: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      lineHeight: 16 * 1.5,
+      color: colors.text.secondary,
+      marginBottom: spacing[7],
+    },
+    card: {
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      padding: 16,
+      gap: 12,
+      marginBottom: 12,
+    },
+    cardActive: {
+      borderColor: colors.brand.ink,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    cardEyebrow: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    cardMeta: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.disabled,
+    },
+    cardValue: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 28,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    cardActionActive: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.12 * 11,
+      color: colors.brand.ink,
+    },
+    cardAction: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.12 * 11,
+      color: colors.text.primary,
+    },
+    note: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: spacing[4],
+    },
+    noteBar: {
+      width: 2,
+      backgroundColor: colors.accent.danger,
+    },
+    noteText: {
+      flex: 1,
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 15 * 1.5,
+      color: colors.text.secondary,
+    },
+  });

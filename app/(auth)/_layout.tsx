@@ -1,6 +1,6 @@
 import { Redirect, Stack, useSegments } from 'expo-router';
 import { AuthLoadingScreen } from '@/screens';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 import {
   selectHasCompletedOnboarding,
   selectIsAuthenticated,
@@ -12,6 +12,7 @@ export default function AuthLayout() {
   const isAuthenticated = useAppStore(selectIsAuthenticated);
   const hasCompletedOnboarding = useAppStore(selectHasCompletedOnboarding);
   const segments = useSegments();
+  const colors = useColors();
   const onOnboardingFlow =
     segments.includes('profile-setup') || segments.includes('position-picker');
 

@@ -1,7 +1,7 @@
 import { AppState, Platform } from 'react-native';
 import * as LiveActivity from 'expo-live-activity';
 import * as Location from 'expo-location';
-import { colors } from '@/theme';
+import { darkColors as colors } from '@/theme';
 import { useAppStore } from '@/stores/app-store';
 import { updateAndroidTrackingNotification } from './android-notification';
 import { ANDROID_FGS_TITLE, INDICATOR_UPDATE_INTERVAL_MS, LOCATION_TASK_NAME } from './constants';
@@ -39,8 +39,8 @@ type IndicatorSnapshot = {
 const liveActivityConfig: LiveActivity.LiveActivityConfig = {
   backgroundColor: colors.background.secondary,
   titleColor: colors.text.primary,
-  subtitleColor: colors.brand.primary,
-  progressViewTint: colors.brand.primary,
+  subtitleColor: colors.brand.fill,
+  progressViewTint: colors.brand.fill,
   progressViewLabelColor: colors.text.primary,
   deepLinkUrl: '/active-session',
   timerType: 'digital',
@@ -115,7 +115,7 @@ const androidLocationOptions = (notificationBody: string): Location.LocationTask
   foregroundService: {
     notificationTitle: ANDROID_FGS_TITLE,
     notificationBody,
-    notificationColor: colors.brand.primary,
+    notificationColor: colors.brand.fill,
   },
 });
 
@@ -126,7 +126,7 @@ const updateAndroidIndicator = async (notificationBody: string) => {
   const updatedInPlace = await updateAndroidTrackingNotification({
     title: ANDROID_FGS_TITLE,
     body: notificationBody,
-    color: colors.brand.primary,
+    color: colors.brand.fill,
   });
   if (updatedInPlace) return;
 

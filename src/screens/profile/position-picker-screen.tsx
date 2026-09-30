@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Chip } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
 import { POSITION_CODES, type PositionCode, type PositionIn } from '@/features/profile/types';
 import { ensureOnePreferred, validatePositionSet } from '@/features/profile/validation';
 
@@ -17,6 +17,7 @@ export const PositionPickerScreen: React.FC<PositionPickerScreenProps> = ({
   onCancel,
   onSave,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const [selected, setSelected] = useState<PositionIn[]>(initialPositions);
 
   const selectedCodes = useMemo(() => new Set(selected.map((entry) => entry.position)), [selected]);
@@ -110,88 +111,89 @@ export const PositionPickerScreen: React.FC<PositionPickerScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[2],
-    paddingBottom: spacing[4],
-  },
-  headerAction: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.text.secondary,
-  },
-  headerTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 16,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  headerSave: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.16 * 11,
-    color: colors.brand.primary,
-  },
-  headerSaveDisabled: {
-    color: colors.text.disabled,
-  },
-  content: {
-    flex: 1,
-  },
-  contentInner: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[8],
-    gap: 18,
-  },
-  subtitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.secondary,
-  },
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  chipWrap: {
-    position: 'relative',
-  },
-  starButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.background.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  star: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  starActive: {
-    color: colors.brand.primary,
-  },
-  error: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.accent.danger,
-  },
-  footer: {
-    paddingHorizontal: spacing[6],
-    paddingBottom: spacing[6],
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[2],
+      paddingBottom: spacing[4],
+    },
+    headerAction: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.text.secondary,
+    },
+    headerTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 16,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    headerSave: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.16 * 11,
+      color: colors.brand.ink,
+    },
+    headerSaveDisabled: {
+      color: colors.text.disabled,
+    },
+    content: {
+      flex: 1,
+    },
+    contentInner: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[8],
+      gap: 18,
+    },
+    subtitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text.secondary,
+    },
+    chipGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    chipWrap: {
+      position: 'relative',
+    },
+    starButton: {
+      position: 'absolute',
+      top: -8,
+      right: -8,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: colors.background.secondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    star: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.secondary,
+    },
+    starActive: {
+      color: colors.brand.ink,
+    },
+    error: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.accent.danger,
+    },
+    footer: {
+      paddingHorizontal: spacing[6],
+      paddingBottom: spacing[6],
+    },
+  });

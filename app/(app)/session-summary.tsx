@@ -19,7 +19,7 @@ import {
 import type { SyncStatus } from '@/features/sessions/tracking/types';
 import type { SpeedBandBucket } from '@/features/sessions/summary/speed-bands';
 import { useAppStore } from '@/stores/app-store';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 const laidBricks = new Set<string>();
 
@@ -34,6 +34,7 @@ const TITLE: Record<string, string> = {
 
 export default function SessionSummaryRoute() {
   const navigation = useNavigation();
+  const colors = useColors();
   const { sessionId = '' } = useLocalSearchParams<{ sessionId?: string }>();
   const units = useAppStore((state) => state.units);
   const sessionCount = useAppStore((state) => state.sessionCount);
@@ -79,7 +80,7 @@ export default function SessionSummaryRoute() {
       <View
         style={{ flex: 1, backgroundColor: colors.background.secondary, justifyContent: 'center' }}
       >
-        <ActivityIndicator color={colors.brand.primary} />
+        <ActivityIndicator color={colors.brand.ink} />
       </View>
     );
   }

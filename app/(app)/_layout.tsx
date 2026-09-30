@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Redirect, Stack, router } from 'expo-router';
 import { AuthLoadingScreen } from '@/screens';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 import { selectIsAuthenticated, useAppStore } from '@/stores/app-store';
 import { getActiveTrackingSession, initTrackingDb } from '@/features/sessions/tracking/db';
 import { startSyncListeners } from '@/features/sessions/tracking/sync';
@@ -9,6 +9,7 @@ import { startSyncListeners } from '@/features/sessions/tracking/sync';
 export default function AppLayout() {
   const authStatus = useAppStore((state) => state.authStatus);
   const isAuthenticated = useAppStore(selectIsAuthenticated);
+  const colors = useColors();
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -58,6 +59,7 @@ export default function AppLayout() {
       <Stack.Screen name="sign-in-methods" />
       <Stack.Screen name="link-email" />
       <Stack.Screen name="units" />
+      <Stack.Screen name="appearance" />
       <Stack.Screen name="saved-pitches" />
       <Stack.Screen name="privacy-data" />
       <Stack.Screen name="link-conflict" />

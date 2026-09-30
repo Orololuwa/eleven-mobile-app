@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   View,
 } from 'react-native';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, useColors } from '@/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -37,6 +37,7 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const colors = useColors();
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       height: size === 'large' ? 64 : 56,
@@ -55,7 +56,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'primary':
         return {
           ...baseStyle,
-          backgroundColor: colors.brand.primary,
+          backgroundColor: colors.brand.fill,
         };
       case 'secondary':
         return {
@@ -95,7 +96,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'primary':
         return {
           ...baseStyle,
-          color: colors.background.secondary,
+          color: colors.text.onBrand,
         };
       case 'secondary':
       case 'ghost':
@@ -122,7 +123,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? colors.background.secondary : colors.text.primary}
+          color={variant === 'primary' ? colors.text.onBrand : colors.text.primary}
         />
       ) : (
         <View style={styles.content}>

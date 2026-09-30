@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions } from 'react-native';
 import { Button } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles, useColors } from '@/theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -44,6 +44,8 @@ export const SessionTypeSheet: React.FC<SessionTypeSheetProps> = ({
   onClose,
   onSelectType,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const [selectedType, setSelectedType] = useState<string>('match');
 
   const handleStartSession = () => {
@@ -52,7 +54,7 @@ export const SessionTypeSheet: React.FC<SessionTypeSheetProps> = ({
   };
 
   const renderIcon = (icon: string, isSelected: boolean) => {
-    const iconColor = isSelected ? colors.brand.primary : colors.text.primary;
+    const iconColor = isSelected ? colors.brand.ink : colors.text.primary;
 
     switch (icon) {
       case 'match':
@@ -119,116 +121,117 @@ export const SessionTypeSheet: React.FC<SessionTypeSheetProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.overlay.light,
-  },
-  sheet: {
-    backgroundColor: colors.background.tertiary,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.default,
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[7],
-    paddingBottom: spacing[9],
-    gap: 16,
-  },
-  handle: {
-    width: 44,
-    height: 4,
-    backgroundColor: colors.border.strong,
-    alignSelf: 'center',
-  },
-  title: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 26,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: -0.025 * 26,
-    color: colors.text.primary,
-  },
-  options: {
-    gap: 10,
-  },
-  option: {
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-  },
-  optionSelected: {
-    borderColor: colors.brand.primary,
-    backgroundColor: `${colors.brand.primary}10`,
-  },
-  iconContainer: {
-    width: 34,
-    height: 34,
-  },
-  iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.text.primary,
-  },
-  iconCircleSelected: {
-    backgroundColor: colors.brand.primary,
-  },
-  iconTraining: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 5,
-  },
-  iconBar: {
-    width: 9,
-    transform: [{ skewX: '-9deg' }],
-  },
-  iconFutsal: {
-    width: 34,
-    height: 34,
-    borderWidth: 3,
-  },
-  optionText: {
-    flex: 1,
-    gap: 5,
-  },
-  optionTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 20,
-    fontWeight: typography.fontWeight.extrabold,
-    letterSpacing: -0.01 * 20,
-    color: colors.text.primary,
-  },
-  optionSubtitle: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  optionArrow: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 16,
-    color: colors.text.disabled,
-  },
-  optionArrowSelected: {
-    color: colors.brand.primary,
-  },
-  cancelButton: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  cancelText: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.18 * 11,
-    color: colors.text.secondary,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.overlay.light,
+    },
+    sheet: {
+      backgroundColor: colors.background.tertiary,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.default,
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[7],
+      paddingBottom: spacing[9],
+      gap: 16,
+    },
+    handle: {
+      width: 44,
+      height: 4,
+      backgroundColor: colors.border.strong,
+      alignSelf: 'center',
+    },
+    title: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 26,
+      fontWeight: typography.fontWeight.extrabold,
+      letterSpacing: -0.025 * 26,
+      color: colors.text.primary,
+    },
+    options: {
+      gap: 10,
+    },
+    option: {
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      padding: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 18,
+    },
+    optionSelected: {
+      borderColor: colors.brand.ink,
+      backgroundColor: colors.brand.tint,
+    },
+    iconContainer: {
+      width: 34,
+      height: 34,
+    },
+    iconCircle: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: colors.text.primary,
+    },
+    iconCircleSelected: {
+      backgroundColor: colors.brand.ink,
+    },
+    iconTraining: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 5,
+    },
+    iconBar: {
+      width: 9,
+      transform: [{ skewX: '-9deg' }],
+    },
+    iconFutsal: {
+      width: 34,
+      height: 34,
+      borderWidth: 3,
+    },
+    optionText: {
+      flex: 1,
+      gap: 5,
+    },
+    optionTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 20,
+      fontWeight: typography.fontWeight.extrabold,
+      letterSpacing: -0.01 * 20,
+      color: colors.text.primary,
+    },
+    optionSubtitle: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    optionArrow: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 16,
+      color: colors.text.disabled,
+    },
+    optionArrowSelected: {
+      color: colors.brand.ink,
+    },
+    cancelButton: {
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    cancelText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.18 * 11,
+      color: colors.text.secondary,
+    },
+  });

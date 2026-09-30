@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, HoldToConfirmButton, StatusPill } from '@/components';
-import { colors, typography, spacing } from '@/theme';
+import { typography, spacing, type Colors, useThemedStyles, useColors } from '@/theme';
 import type { ActivityKind, AttackDirection, PlayStructure } from '@/features/sessions/types';
 import {
   activityKindLabel,
@@ -70,46 +70,57 @@ const PermissionScreen: React.FC<{
   onAlways: () => void;
   onWhenInUse: () => void;
   busy?: boolean;
-}> = ({ onAlways, onWhenInUse, busy }) => (
-  <ScrollView style={styles.content} contentContainerStyle={styles.permissionContent}>
-    <Text style={styles.eyebrow}>BEFORE KICKOFF</Text>
-    <Text style={styles.permissionTitle}>
-      Your phone goes in your pocket.{'\n'}We keep counting.
-    </Text>
-    <Text style={styles.permissionBody}>
-      iOS asks twice for location — corner marking first, then tracking while locked. This is the
-      second ask.
-    </Text>
-    <View style={styles.systemDialog}>
-      <Text style={styles.systemDialogText}>
-        Allow &quot;Eleven&quot; to use your location even when you&apos;re not using the app?
+}> = ({ onAlways, onWhenInUse, busy }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <ScrollView style={styles.content} contentContainerStyle={styles.permissionContent}>
+      <Text style={styles.eyebrow}>BEFORE KICKOFF</Text>
+      <Text style={styles.permissionTitle}>
+        Your phone goes in your pocket.{'\n'}We keep counting.
       </Text>
-      <Text style={styles.systemDialogSub}>
-        Eleven needs to track your session even while your phone is locked in your pocket.
+      <Text style={styles.permissionBody}>
+        iOS asks twice for location — corner marking first, then tracking while locked. This is the
+        second ask.
       </Text>
-      <Button title="CHANGE TO ALWAYS ALLOW" onPress={onAlways} loading={busy} />
-      <Button title="KEEP WHILE USING" onPress={onWhenInUse} variant="secondary" disabled={busy} />
-    </View>
-    <Text style={styles.permissionFoot}>
-      Keeping While Using still works — tracking pauses when the screen locks and resumes when you
-      open the app again.
-    </Text>
-  </ScrollView>
-);
+      <View style={styles.systemDialog}>
+        <Text style={styles.systemDialogText}>
+          Allow &quot;Eleven&quot; to use your location even when you&apos;re not using the app?
+        </Text>
+        <Text style={styles.systemDialogSub}>
+          Eleven needs to track your session even while your phone is locked in your pocket.
+        </Text>
+        <Button title="CHANGE TO ALWAYS ALLOW" onPress={onAlways} loading={busy} />
+        <Button
+          title="KEEP WHILE USING"
+          onPress={onWhenInUse}
+          variant="secondary"
+          disabled={busy}
+        />
+      </View>
+      <Text style={styles.permissionFoot}>
+        Keeping While Using still works — tracking pauses when the screen locks and resumes when you
+        open the app again.
+      </Text>
+    </ScrollView>
+  );
+};
 
 const AndroidPermissionScreen: React.FC<{
   onAllow: () => void;
   busy?: boolean;
-}> = ({ onAllow, busy }) => (
-  <ScrollView style={styles.content} contentContainerStyle={styles.permissionContent}>
-    <Text style={styles.eyebrow}>BEFORE KICKOFF</Text>
-    <Text style={styles.permissionTitle}>Allow location to start tracking.</Text>
-    <Text style={styles.permissionBody}>
-      Android uses a persistent notification — no &quot;All the time&quot; permission needed.
-    </Text>
-    <Button title="ALLOW LOCATION" onPress={onAllow} loading={busy} />
-  </ScrollView>
-);
+}> = ({ onAllow, busy }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <ScrollView style={styles.content} contentContainerStyle={styles.permissionContent}>
+      <Text style={styles.eyebrow}>BEFORE KICKOFF</Text>
+      <Text style={styles.permissionTitle}>Allow location to start tracking.</Text>
+      <Text style={styles.permissionBody}>
+        Android uses a persistent notification — no &quot;All the time&quot; permission needed.
+      </Text>
+      <Button title="ALLOW LOCATION" onPress={onAllow} loading={busy} />
+    </ScrollView>
+  );
+};
 
 const SegmentSwitchScreen: React.FC<{
   playStructure: PlayStructure;
@@ -134,6 +145,8 @@ const SegmentSwitchScreen: React.FC<{
   onConfirm,
   busy,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const attackingEndA = attackDirection === 'end_a';
   const closedLabel =
     playStructure === 'halves'
@@ -180,7 +193,7 @@ const SegmentSwitchScreen: React.FC<{
         <View style={styles.centreCircle} />
         <View style={[styles.goalBox, styles.goalBoxLeft]} />
         <View style={[styles.goalBox, styles.goalBoxRight]} />
-        <Text style={[styles.directionArrows, { color: colors.brand.primary }]}>
+        <Text style={[styles.directionArrows, { color: colors.brand.ink }]}>
           {attackingEndA ? '◀◀◀' : '▶▶▶'}
         </Text>
         <Text style={styles.compassSays}>COMPASS SAYS</Text>
@@ -213,6 +226,8 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   massKg = null,
   onEnd,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const {
     ready,
     session,
@@ -252,7 +267,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   if (!ready) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator color={colors.brand.primary} style={styles.loader} />
+        <ActivityIndicator color={colors.brand.ink} style={styles.loader} />
       </SafeAreaView>
     );
   }
@@ -575,364 +590,365 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  content: {
-    flex: 1,
-  },
-  loader: {
-    flex: 1,
-    alignSelf: 'center',
-  },
-  header: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[3],
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  gpsStatus: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.14 * 10,
-    color: colors.text.secondary,
-  },
-  dimmed: {
-    opacity: 0.45,
-  },
-  activityHero: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    gap: 10,
-  },
-  activityEyebrow: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    letterSpacing: 0.2 * 11,
-    color: colors.brand.primary,
-  },
-  activityTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 30,
-    lineHeight: 32,
-    letterSpacing: -0.025 * 30,
-    fontWeight: typography.fontWeight.extrabold,
-    color: colors.text.primary,
-  },
-  activityHint: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.secondary,
-  },
-  timeSection: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[11],
-    gap: 6,
-  },
-  timeLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: colors.text.secondary,
-  },
-  timeValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 82,
-    lineHeight: 82,
-    letterSpacing: -0.03 * 82,
-    color: colors.text.primary,
-  },
-  timeValueMuted: {
-    color: colors.text.secondary,
-  },
-  extraTimeCard: {
-    marginHorizontal: spacing[6],
-    marginTop: spacing[6],
-    borderWidth: 1,
-    borderColor: colors.brand.primary,
-    padding: spacing[5],
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  extraTimeLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: colors.brand.primary,
-  },
-  extraTimeHint: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 4,
-  },
-  extraTimeValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 46,
-    color: colors.brand.primary,
-  },
-  primaryStats: {
-    marginTop: spacing[9],
-    flexDirection: 'row',
-    gap: 1,
-    backgroundColor: colors.border.subtle,
-  },
-  primaryStat: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: 8,
-    paddingVertical: spacing[4],
-    gap: 8,
-  },
-  primaryStatBorder: {
-    paddingLeft: 20,
-  },
-  primaryStatLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.18 * 10,
-    color: colors.text.secondary,
-  },
-  primaryStatValue: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 38,
-    lineHeight: 38,
-    letterSpacing: -0.03 * 38,
-    color: colors.text.primary,
-  },
-  speedHighlight: {
-    color: colors.brand.primary,
-  },
-  primaryStatUnit: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  helperCopy: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 20,
-  },
-  actions: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[5],
-    paddingBottom: spacing[9],
-    gap: 12,
-  },
-  holdRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  holdFullWidth: {
-    flex: 0,
-    alignSelf: 'stretch',
-  },
-  endHint: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-    textAlign: 'center',
-  },
-  autoPauseBlock: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
-    gap: 8,
-  },
-  autoPauseTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 24,
-    color: colors.text.primary,
-  },
-  autoPauseSub: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.accent.danger,
-    letterSpacing: 0.16 * 11,
-  },
-  autoPauseFoot: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.disabled,
-    letterSpacing: 0.14 * 10,
-    marginTop: spacing[4],
-  },
-  manualPauseBlock: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[6],
-    gap: 8,
-  },
-  pauseListLabel: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.secondary,
-    letterSpacing: 0.18 * 10,
-    marginTop: spacing[4],
-  },
-  pauseListItem: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.primary,
-  },
-  permissionContent: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    paddingBottom: spacing[12],
-    gap: spacing[5],
-  },
-  eyebrow: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.2 * 10,
-    color: colors.text.secondary,
-  },
-  permissionTitle: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 30,
-    lineHeight: 34,
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.bold,
-  },
-  permissionBody: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.secondary,
-  },
-  systemDialog: {
-    backgroundColor: colors.background.tertiary,
-    padding: spacing[5],
-    gap: spacing[4],
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  systemDialogText: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 15,
-    color: colors.text.primary,
-  },
-  systemDialogSub: {
-    fontFamily: typography.fontFamily.primary,
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  permissionFoot: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.disabled,
-    lineHeight: 16,
-    letterSpacing: 0.12 * 10,
-  },
-  segmentSwitchContent: {
-    paddingHorizontal: spacing[6],
-    paddingTop: spacing[8],
-    paddingBottom: spacing[12],
-    gap: spacing[5],
-  },
-  directionPitch: {
-    height: 180,
-    backgroundColor: colors.background.tertiary,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  endLabelLeft: {
-    position: 'absolute',
-    left: 12,
-    top: 8,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    color: colors.text.secondary,
-  },
-  endLabelRight: {
-    position: 'absolute',
-    right: 12,
-    top: 8,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    color: colors.text.secondary,
-  },
-  centreLine: {
-    position: 'absolute',
-    left: '50%',
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: colors.border.default,
-  },
-  centreCircle: {
-    position: 'absolute',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    top: '50%',
-    left: '50%',
-    marginLeft: -24,
-    marginTop: -24,
-  },
-  goalBox: {
-    position: 'absolute',
-    top: '30%',
-    height: '40%',
-    width: 16,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  goalBoxLeft: { left: 0, borderLeftWidth: 0 },
-  goalBoxRight: { right: 0, borderRightWidth: 0 },
-  directionArrows: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -24,
-    marginTop: -10,
-    fontSize: 16,
-  },
-  compassSays: {
-    position: 'absolute',
-    bottom: 28,
-    left: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 9,
-    color: colors.text.secondary,
-  },
-  compassResult: {
-    position: 'absolute',
-    bottom: 10,
-    left: 12,
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 11,
-    color: colors.brand.primary,
-  },
-  segmentMetaRow: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  segmentMetaChip: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.subtle,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  flipLink: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    letterSpacing: 0.16 * 12,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    content: {
+      flex: 1,
+    },
+    loader: {
+      flex: 1,
+      alignSelf: 'center',
+    },
+    header: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[3],
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    gpsStatus: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.14 * 10,
+      color: colors.text.secondary,
+    },
+    dimmed: {
+      opacity: 0.45,
+    },
+    activityHero: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[8],
+      gap: 10,
+    },
+    activityEyebrow: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 0.2 * 11,
+      color: colors.brand.ink,
+    },
+    activityTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 30,
+      lineHeight: 32,
+      letterSpacing: -0.025 * 30,
+      fontWeight: typography.fontWeight.extrabold,
+      color: colors.text.primary,
+    },
+    activityHint: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text.secondary,
+    },
+    timeSection: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[11],
+      gap: 6,
+    },
+    timeLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.18 * 10,
+      color: colors.text.secondary,
+    },
+    timeValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 82,
+      lineHeight: 82,
+      letterSpacing: -0.03 * 82,
+      color: colors.text.primary,
+    },
+    timeValueMuted: {
+      color: colors.text.secondary,
+    },
+    extraTimeCard: {
+      marginHorizontal: spacing[6],
+      marginTop: spacing[6],
+      borderWidth: 1,
+      borderColor: colors.brand.ink,
+      padding: spacing[5],
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    extraTimeLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.18 * 10,
+      color: colors.brand.ink,
+    },
+    extraTimeHint: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      color: colors.text.secondary,
+      marginTop: 4,
+    },
+    extraTimeValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 46,
+      color: colors.brand.ink,
+    },
+    primaryStats: {
+      marginTop: spacing[9],
+      flexDirection: 'row',
+      gap: 1,
+      backgroundColor: colors.border.subtle,
+    },
+    primaryStat: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+      paddingHorizontal: 8,
+      paddingVertical: spacing[4],
+      gap: 8,
+    },
+    primaryStatBorder: {
+      paddingLeft: 20,
+    },
+    primaryStatLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.18 * 10,
+      color: colors.text.secondary,
+    },
+    primaryStatValue: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 38,
+      lineHeight: 38,
+      letterSpacing: -0.03 * 38,
+      color: colors.text.primary,
+    },
+    speedHighlight: {
+      color: colors.brand.ink,
+    },
+    primaryStatUnit: {
+      fontSize: 14,
+      color: colors.text.secondary,
+    },
+    helperCopy: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      color: colors.text.secondary,
+      lineHeight: 20,
+    },
+    actions: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[5],
+      paddingBottom: spacing[9],
+      gap: 12,
+    },
+    holdRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    holdFullWidth: {
+      flex: 0,
+      alignSelf: 'stretch',
+    },
+    endHint: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.disabled,
+      textAlign: 'center',
+    },
+    autoPauseBlock: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[6],
+      gap: 8,
+    },
+    autoPauseTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 24,
+      color: colors.text.primary,
+    },
+    autoPauseSub: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.accent.danger,
+      letterSpacing: 0.16 * 11,
+    },
+    autoPauseFoot: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.disabled,
+      letterSpacing: 0.14 * 10,
+      marginTop: spacing[4],
+    },
+    manualPauseBlock: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[6],
+      gap: 8,
+    },
+    pauseListLabel: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.secondary,
+      letterSpacing: 0.18 * 10,
+      marginTop: spacing[4],
+    },
+    pauseListItem: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.primary,
+    },
+    permissionContent: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[8],
+      paddingBottom: spacing[12],
+      gap: spacing[5],
+    },
+    eyebrow: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.2 * 10,
+      color: colors.text.secondary,
+    },
+    permissionTitle: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 30,
+      lineHeight: 34,
+      color: colors.text.primary,
+      fontWeight: typography.fontWeight.bold,
+    },
+    permissionBody: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      lineHeight: 22,
+      color: colors.text.secondary,
+    },
+    systemDialog: {
+      backgroundColor: colors.background.tertiary,
+      padding: spacing[5],
+      gap: spacing[4],
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+    },
+    systemDialogText: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 15,
+      color: colors.text.primary,
+    },
+    systemDialogSub: {
+      fontFamily: typography.fontFamily.primary,
+      fontSize: 14,
+      color: colors.text.secondary,
+    },
+    permissionFoot: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.disabled,
+      lineHeight: 16,
+      letterSpacing: 0.12 * 10,
+    },
+    segmentSwitchContent: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[8],
+      paddingBottom: spacing[12],
+      gap: spacing[5],
+    },
+    directionPitch: {
+      height: 180,
+      backgroundColor: colors.background.tertiary,
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    endLabelLeft: {
+      position: 'absolute',
+      left: 12,
+      top: 8,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      color: colors.text.secondary,
+    },
+    endLabelRight: {
+      position: 'absolute',
+      right: 12,
+      top: 8,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      color: colors.text.secondary,
+    },
+    centreLine: {
+      position: 'absolute',
+      left: '50%',
+      top: 0,
+      bottom: 0,
+      width: 1,
+      backgroundColor: colors.border.default,
+    },
+    centreCircle: {
+      position: 'absolute',
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: colors.border.default,
+      top: '50%',
+      left: '50%',
+      marginLeft: -24,
+      marginTop: -24,
+    },
+    goalBox: {
+      position: 'absolute',
+      top: '30%',
+      height: '40%',
+      width: 16,
+      borderWidth: 1,
+      borderColor: colors.border.default,
+    },
+    goalBoxLeft: { left: 0, borderLeftWidth: 0 },
+    goalBoxRight: { right: 0, borderRightWidth: 0 },
+    directionArrows: {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      marginLeft: -24,
+      marginTop: -10,
+      fontSize: 16,
+    },
+    compassSays: {
+      position: 'absolute',
+      bottom: 28,
+      left: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      color: colors.text.secondary,
+    },
+    compassResult: {
+      position: 'absolute',
+      bottom: 10,
+      left: 12,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      color: colors.brand.ink,
+    },
+    segmentMetaRow: {
+      flexDirection: 'row',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    segmentMetaChip: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.text.secondary,
+      borderWidth: 1,
+      borderColor: colors.border.subtle,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    flipLink: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      letterSpacing: 0.16 * 12,
+    },
+  });

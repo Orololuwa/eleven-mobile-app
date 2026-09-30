@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, useColors } from '@/theme';
 
 type ChipVariant = 'filter' | 'milestone' | 'position';
 
@@ -21,6 +21,7 @@ export const Chip: React.FC<ChipProps> = ({
   completed = false,
   style,
 }) => {
+  const colors = useColors();
   const getContainerStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       borderWidth: 1,
@@ -32,7 +33,7 @@ export const Chip: React.FC<ChipProps> = ({
       if (completed) {
         return {
           ...baseStyle,
-          borderColor: selected ? colors.brand.primary : colors.border.strong,
+          borderColor: selected ? colors.brand.ink : colors.border.strong,
         };
       } else {
         return {
@@ -45,8 +46,8 @@ export const Chip: React.FC<ChipProps> = ({
     if (selected) {
       return {
         ...baseStyle,
-        borderColor: colors.brand.primary,
-        backgroundColor: colors.brand.primary,
+        borderColor: colors.brand.fill,
+        backgroundColor: colors.brand.fill,
       };
     }
 
@@ -67,7 +68,7 @@ export const Chip: React.FC<ChipProps> = ({
       if (completed) {
         return {
           ...baseStyle,
-          color: selected ? colors.brand.primary : colors.text.primary,
+          color: selected ? colors.brand.ink : colors.text.primary,
         };
       } else {
         return {
@@ -80,7 +81,7 @@ export const Chip: React.FC<ChipProps> = ({
     if (selected) {
       return {
         ...baseStyle,
-        color: colors.background.secondary,
+        color: colors.text.onBrand,
         fontWeight: typography.fontWeight.semibold,
       };
     }

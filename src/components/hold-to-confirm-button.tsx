@@ -8,7 +8,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
-import { colors, typography } from '@/theme';
+import { typography, type Colors, useThemedStyles, useColors } from '@/theme';
 import { HOLD_CONFIRM_MS, HOLD_CONFIRM_SECONDS } from '@/features/sessions/tracking/constants';
 
 type HoldToConfirmButtonProps = {
@@ -30,6 +30,8 @@ export const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const colors = useColors();
+  const styles = useThemedStyles(createStyles);
   const [holdProgress, setHoldProgress] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -82,35 +84,36 @@ export const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  button: {
-    flex: 1,
-    height: 56,
-    borderWidth: 2,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  progress: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-  },
-  text: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 12,
-    letterSpacing: 0.22 * 12,
-    fontWeight: typography.fontWeight.semibold,
-    position: 'relative',
-  },
-  hint: {
-    fontFamily: typography.fontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 0.16 * 10,
-    color: colors.text.disabled,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-});
+const createStyles = (colors: Colors) =>
+  StyleSheet.create({
+    button: {
+      flex: 1,
+      height: 56,
+      borderWidth: 2,
+      position: 'relative',
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    progress: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+    },
+    text: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 0.22 * 12,
+      fontWeight: typography.fontWeight.semibold,
+      position: 'relative',
+    },
+    hint: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      letterSpacing: 0.16 * 10,
+      color: colors.text.disabled,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+  });
