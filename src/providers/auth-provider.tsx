@@ -6,6 +6,7 @@ import {
   hydrateSession,
 } from '@/features/auth/use-auth-actions';
 import { getAccessToken } from '@/features/auth/token-storage';
+import { bindHistoryQueryClient } from '@/features/sessions/history/history-cache';
 import { useQueryClient } from '@tanstack/react-query';
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -13,6 +14,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     bindAuthQueryClient(queryClient);
+    bindHistoryQueryClient(queryClient);
     configureApiClient({
       getAccessToken,
       onUnauthorized: () => {

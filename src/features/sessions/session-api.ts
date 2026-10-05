@@ -1,5 +1,14 @@
 import { apiRequest } from '@/lib/api-client';
-import type { SessionCreate, SessionRead, SessionStartIn, SessionStartOut } from './types';
+import type {
+  SessionCalendar,
+  SessionCreate,
+  SessionDetail,
+  SessionListPage,
+  SessionRead,
+  SessionStartIn,
+  SessionStartOut,
+  SessionType,
+} from './types';
 import type { SessionFinalizeBody, TrackPointsBody } from './tracking/types';
 
 export const createSession = (body: SessionCreate) =>
@@ -53,6 +62,60 @@ export const finalizeSession = ({
     method: 'POST',
     body,
   });
+
+const toQuery = (params: Record<string, string | number | null | undefined>) => {
+  const pairs = Object.entries(params).flatMap(([key, value]) =>
+    value == null ? [] : [`${key}=${encodeURIComponent(String(value))}`],
+  );
+  return pairs.length > 0 ? `?${pairs.join('&')}` : '';
+};
+
+export const HISTORY_PAGE_SIZE = 20;
+
+export const fetchSessionHistoryPage = ({
+  sessionType = null,
+  cursor = null,
+  limit = HISTORY_PAGE_SIZE,
+}: {
+  sessionType?: SessionType | null;
+  cursor?: string | null;
+  limit?: number;
+} = {}) =>
+  apiRequest<SessionListPage>({
+    path: `/sessions${toQuery({ session_type: sessionType, cursor, limit })}`,
+  });
+
+export const fetchSessionCalendar = ({
+  month,
+  tz,
+  sessionType = null,
+}: {
+  month: string;
+  tz: string;
+  sessionType?: SessionType | null;
+}) =>
+  apiRequest<SessionCalendar>({
+    path: `/sessions/calendar${toQuery({ month, tz, session_type: sessionType })}`,
+  });
+
+export const fetchSessionDetail = (sessionId: string) =>
+  apiRequest<SessionDetail>({ path: `/sessions/${sessionId}` });
+
+export const renameSessionRemote = ({
+  sessionId,
+  title,
+}: {
+  sessionId: string;
+  title: string | null;
+}) =>
+  apiRequest<{ id: string; title: string | null }>({
+    path: `/sessions/${sessionId}`,
+    method: 'PATCH',
+    body: { title },
+  });
+
+export const deleteSessionRemote = (sessionId: string) =>
+  apiRequest<void>({ path: `/sessions/${sessionId}`, method: 'DELETE' });
 
 export const uploadTrackPoints = ({
   sessionId,

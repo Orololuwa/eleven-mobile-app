@@ -1,10 +1,13 @@
 import * as SQLite from 'expo-sqlite';
 import type { PitchRead } from '@/features/pitches/types';
-import type { ActivityKind, SessionRead, SessionStartOut } from '../types';
+import type { ActivityKind, SessionRead, SessionStartOut, SessionType } from '../types';
 import { normalizePlayStructure } from '../segment-display';
 import { createTrackingId } from './id';
 import type {
   BackgroundPermission,
+  LocalHistoryRow,
+  PendingDeletionRow,
+  PendingRenameRow,
   StoredPitchCorners,
   SyncStatus,
   TrackingPauseRow,
@@ -85,6 +88,28 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await addColumnIfMissing(db, 'tracking_sessions', 'training_activity_options', 'TEXT');
   await addColumnIfMissing(db, 'tracking_segments', 'activity_kind', 'TEXT');
   await addColumnIfMissing(db, 'tracking_points', 'speed_accuracy_mps', 'REAL');
+  await addColumnIfMissing(db, 'tracking_sessions', 'user_id', 'TEXT');
+  await addColumnIfMissing(db, 'tracking_sessions', 'title', 'TEXT');
+  await addColumnIfMissing(db, 'tracking_sessions', 'finalized_at', 'TEXT');
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS pending_deletions (
+      session_id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      counted_by_server INTEGER NOT NULL,
+      requested_at TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT,
+      session_type TEXT
+    );
+    CREATE TABLE IF NOT EXISTS pending_renames (
+      session_id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      title TEXT,
+      requested_at TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT
+    );
+  `);
   await ensureUniqueTrackPointSequence(db);
   await ensureSegmentIdNotNull(db, 'tracking_pauses');
   await ensureSegmentIdNotNull(db, 'tracking_points');
@@ -373,8 +398,8 @@ export const seedTrackingSession = async ({
       started_at, ended_at, sync_status, sync_attempts, last_sync_attempt_at,
       tracking_status, last_accepted_fix_at, auto_resume_cooldown_until,
       background_permission, live_activity_id, next_sequence_index,
-      segment_clock_origin_ms, current_segment_id, gps_search_started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', 0, NULL, 'live', NULL, NULL, 'when_in_use', NULL, 0, ?, ?, NULL)`,
+      segment_clock_origin_ms, current_segment_id, gps_search_started_at, user_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', 0, NULL, 'live', NULL, NULL, 'when_in_use', NULL, 0, ?, ?, NULL, ?)`,
       [
         session.id,
         session.session_type,
@@ -396,6 +421,7 @@ export const seedTrackingSession = async ({
         startedAt,
         segmentClockOriginMs,
         currentSegment?.id ?? null,
+        session.user_id ?? null,
       ],
     );
 
@@ -513,6 +539,7 @@ export const updateSessionFields = async (
     sync_status: SyncStatus;
     sync_attempts: number;
     last_sync_attempt_at: string | null;
+    finalized_at: string | null;
   }>,
 ) => {
   const entries = Object.entries(fields).filter(([, value]) => value !== undefined);
@@ -648,12 +675,160 @@ export const deletePointsForSession = async (sessionId: string) => {
   );
 };
 
-export const getSessionsPendingSync = async (): Promise<TrackingSessionRow[]> =>
+export const getSessionsPendingSync = async (userId: string): Promise<TrackingSessionRow[]> =>
   withDb((db) =>
     db.getAllAsync<TrackingSessionRow>(
-      `SELECT * FROM tracking_sessions WHERE ended_at IS NOT NULL AND sync_status IN ('pending', 'failed', 'syncing') ORDER BY ended_at ASC`,
+      `SELECT * FROM tracking_sessions WHERE user_id = ? AND ended_at IS NOT NULL AND sync_status IN ('pending', 'failed', 'syncing') ORDER BY ended_at ASC`,
+      [userId],
     ),
   );
+
+/** Rows written before `user_id` existed belong to whoever is signed in when the column lands. */
+export const claimUnownedSessions = async (userId: string) => {
+  await withDb((db) =>
+    db.runAsync(`UPDATE tracking_sessions SET user_id = ? WHERE user_id IS NULL`, [userId]),
+  );
+};
+
+export const getLocalHistorySessions = async ({
+  userId,
+  sessionType = null,
+}: {
+  userId: string;
+  sessionType?: SessionType | null;
+}): Promise<LocalHistoryRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<LocalHistoryRow>(
+      `SELECT s.id, s.session_type, s.started_at, s.ended_at, s.pitch_id, s.pitch_name, s.title,
+        s.sync_status, s.finalized_at,
+        m.session_id AS metrics_session_id, m.active_duration_seconds, m.distance_m, m.top_speed_kmh,
+        m.speed_source, m.data_quality
+      FROM tracking_sessions s
+      LEFT JOIN session_metrics m ON m.session_id = s.id
+      WHERE s.user_id = ? AND s.ended_at IS NOT NULL AND s.sync_status != 'synced'
+        AND (? IS NULL OR s.session_type = ?)
+      ORDER BY s.started_at DESC, s.id DESC`,
+      [userId, sessionType, sessionType],
+    ),
+  );
+
+export const getPendingDeletions = async (userId: string): Promise<PendingDeletionRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<PendingDeletionRow>(
+      `SELECT * FROM pending_deletions WHERE user_id = ? ORDER BY requested_at ASC`,
+      [userId],
+    ),
+  );
+
+export const getPendingRenames = async (userId: string): Promise<PendingRenameRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<PendingRenameRow>(
+      `SELECT * FROM pending_renames WHERE user_id = ? ORDER BY requested_at ASC`,
+      [userId],
+    ),
+  );
+
+const SESSION_CHILD_TABLES = [
+  'sprint_efforts',
+  'segment_metrics',
+  'session_metrics',
+  'tracking_points',
+  'tracking_pauses',
+  'tracking_segments',
+  'pending_renames',
+] as const;
+
+/**
+ * Removes every local trace of a session and queues the server delete, atomically.
+ * A session with no local row came from the server, so the server is counting it.
+ */
+export const deleteSessionLocally = async ({
+  sessionId,
+  userId,
+  sessionType,
+}: {
+  sessionId: string;
+  userId: string;
+  sessionType: SessionType;
+}) => {
+  await withDb(async (db) => {
+    await db.withTransactionAsync(async () => {
+      const row = await db.getFirstAsync<Pick<TrackingSessionRow, 'finalized_at' | 'sync_status'>>(
+        `SELECT finalized_at, sync_status FROM tracking_sessions WHERE id = ?`,
+        [sessionId],
+      );
+      const countedByServer = row ? row.finalized_at != null || row.sync_status === 'synced' : true;
+      for (const table of SESSION_CHILD_TABLES) {
+        await db.runAsync(`DELETE FROM ${table} WHERE session_id = ?`, [sessionId]);
+      }
+      await db.runAsync(`DELETE FROM tracking_sessions WHERE id = ?`, [sessionId]);
+      await db.runAsync(
+        `INSERT OR REPLACE INTO pending_deletions (session_id, user_id, counted_by_server, requested_at, attempts, last_attempt_at, session_type)
+         VALUES (?, ?, ?, ?, 0, NULL, ?)`,
+        [sessionId, userId, countedByServer ? 1 : 0, new Date().toISOString(), sessionType],
+      );
+    });
+  });
+};
+
+/** Writes the local title (if the row exists) and the rename outbox together. Latest rename wins. */
+export const renameSessionLocally = async ({
+  sessionId,
+  userId,
+  title,
+}: {
+  sessionId: string;
+  userId: string;
+  title: string | null;
+}) => {
+  await withDb(async (db) => {
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(`UPDATE tracking_sessions SET title = ? WHERE id = ?`, [title, sessionId]);
+      await db.runAsync(
+        `INSERT OR REPLACE INTO pending_renames (session_id, user_id, title, requested_at, attempts, last_attempt_at)
+         VALUES (?, ?, ?, ?, 0, NULL)`,
+        [sessionId, userId, title, new Date().toISOString()],
+      );
+    });
+  });
+};
+
+export const removePendingDeletion = async (sessionId: string) => {
+  await withDb((db) =>
+    db.runAsync(`DELETE FROM pending_deletions WHERE session_id = ?`, [sessionId]),
+  );
+};
+
+/** Only clears the rename that was sent; a newer rename queued meanwhile stays. */
+export const removePendingRename = async ({
+  sessionId,
+  requestedAt,
+}: {
+  sessionId: string;
+  requestedAt: string;
+}) => {
+  await withDb((db) =>
+    db.runAsync(`DELETE FROM pending_renames WHERE session_id = ? AND requested_at = ?`, [
+      sessionId,
+      requestedAt,
+    ]),
+  );
+};
+
+export const recordOutboxAttempt = async ({
+  table,
+  sessionId,
+}: {
+  table: 'pending_deletions' | 'pending_renames';
+  sessionId: string;
+}) => {
+  await withDb((db) =>
+    db.runAsync(
+      `UPDATE ${table} SET attempts = attempts + 1, last_attempt_at = ? WHERE session_id = ?`,
+      [new Date().toISOString(), sessionId],
+    ),
+  );
+};
 
 export const initTrackingDb = () => getDb();
 

@@ -1,5 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileCache, prefetchMyProfile } from '@/features/profile/profile-cache';
+import { clearHistoryCache } from '@/features/sessions/history/history-cache';
+import { stopSyncListeners } from '@/features/sessions/tracking/sync';
 import { useAppStore } from '@/stores/app-store';
 import type { SignInMethodId } from '@/types/profile';
 import { fetchMe, linkIdentity } from './auth-api';
@@ -140,10 +142,17 @@ export const verifyEmailCode = ({ email, code }: { email: string; code: string }
     applyAuthenticated({ credentials, showEmptyWallBanner: false }),
   );
 
+/** Another account may sign in next; its token must never carry this account's queue. */
+const releaseUserData = () => {
+  stopSyncListeners();
+  clearHistoryCache();
+};
+
 export const signOut = async () => {
   if (signingOut) return;
   signingOut = true;
   try {
+    releaseUserData();
     await clearAuth0Session();
     await clearStoredCredentials();
     useAppStore.getState().resetAuth();
@@ -155,6 +164,7 @@ export const signOut = async () => {
 };
 
 export const clearLocalSession = async () => {
+  releaseUserData();
   await clearStoredCredentials();
   useAppStore.getState().resetAuth();
   syncMeCache(null);

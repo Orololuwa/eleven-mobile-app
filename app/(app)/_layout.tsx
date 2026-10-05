@@ -3,18 +3,24 @@ import { Redirect, Stack, router } from 'expo-router';
 import { AuthLoadingScreen } from '@/screens';
 import { useColors } from '@/theme';
 import { selectIsAuthenticated, useAppStore } from '@/stores/app-store';
-import { getActiveTrackingSession, initTrackingDb } from '@/features/sessions/tracking/db';
+import {
+  claimUnownedSessions,
+  getActiveTrackingSession,
+  initTrackingDb,
+} from '@/features/sessions/tracking/db';
 import { startSyncListeners } from '@/features/sessions/tracking/sync';
 
 export default function AppLayout() {
   const authStatus = useAppStore((state) => state.authStatus);
   const isAuthenticated = useAppStore(selectIsAuthenticated);
+  const userId = useAppStore((state) => state.authUser?.id ?? null);
   const colors = useColors();
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !userId) return;
     void (async () => {
       await initTrackingDb();
+      await claimUnownedSessions(userId);
       startSyncListeners();
       const active = await getActiveTrackingSession();
       if (active) {
@@ -24,7 +30,7 @@ export default function AppLayout() {
         });
       }
     })();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, userId]);
 
   if (authStatus === 'loading') {
     return <AuthLoadingScreen />;
@@ -53,7 +59,6 @@ export default function AppLayout() {
         }}
       />
       <Stack.Screen name="session-summary" />
-      <Stack.Screen name="session/[id]" />
       <Stack.Screen name="player-details" />
       <Stack.Screen name="position-picker" />
       <Stack.Screen name="sign-in-methods" />

@@ -3,17 +3,13 @@ import { router } from 'expo-router';
 import { HomeScreen, SessionTypeSheet } from '@/screens';
 import { avatarUrlWithCacheBust, displayName } from '@/features/profile/display';
 import { useMyProfileQuery } from '@/features/profile/use-profile-query';
-import { useStartSessionDraftStore } from '@/features/sessions/start-session-draft-store';
-import type { SessionType } from '@/features/sessions/types';
+import { beginSessionSetup } from '@/features/sessions/begin-session-setup';
 import { useAppStore } from '@/stores/app-store';
 
 export default function HomeRoute() {
   const { data: profile } = useMyProfileQuery();
   const sessionCount = useAppStore((state) => state.sessionCount);
   const showEmptyWallBanner = useAppStore((state) => state.showEmptyWallBanner);
-  const resetDraft = useStartSessionDraftStore((state) => state.reset);
-  const setSessionType = useStartSessionDraftStore((state) => state.setSessionType);
-
   const [showSessionSheet, setShowSessionSheet] = useState(false);
 
   const lastSession =
@@ -58,15 +54,7 @@ export default function HomeRoute() {
         onClose={() => setShowSessionSheet(false)}
         onSelectType={(type) => {
           setShowSessionSheet(false);
-          resetDraft();
-          const sessionType = (
-            type === 'training' || type === 'futsal' || type === 'match' ? type : 'match'
-          ) as SessionType;
-          setSessionType(sessionType);
-          router.push({
-            pathname: '/(app)/play-structure',
-            params: { sessionType },
-          });
+          beginSessionSetup(type);
         }}
       />
     </>

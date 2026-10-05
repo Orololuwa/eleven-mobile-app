@@ -100,6 +100,19 @@ export const validateTrainingActivityOptions = ({
   return undefined;
 };
 
+export const SESSION_TITLE_MAX = 40;
+
+/** Trimmed title, or `null` (clear the override) for blank input. Mirrors the API's 1–40 rule. */
+export const normalizeSessionTitle = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+export const validateSessionTitle = (value: string) =>
+  value.trim().length > SESSION_TITLE_MAX
+    ? `Title must be ${SESSION_TITLE_MAX} characters or fewer`
+    : undefined;
+
 export const parseSegmentMinutesInput = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return null;

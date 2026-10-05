@@ -18,52 +18,43 @@ import {
   sprintCaption,
   zoneRows,
 } from '@/features/sessions/summary/display';
-import type { DataQuality, SpeedSource, ZoneSeconds } from '@/features/sessions/summary/types';
-import type { SpeedBandBoundaries, SpeedBandBucket } from '@/features/sessions/summary/speed-bands';
+import type { ZoneSeconds } from '@/features/sessions/summary/types';
+import {
+  NO_STATS_COPY,
+  presentSessionMetrics,
+  type MetricView,
+} from '@/features/sessions/summary/session-presentation';
+import type {
+  SummaryMetricsView,
+  SummarySegmentView,
+  SummarySprintView,
+} from '@/features/sessions/summary/session-detail-model';
 
-export type SummarySegmentView = {
-  label: string;
-  distanceM: number;
-  activeDurationSeconds: number;
-  sprintCount: number;
-  topSpeedKmh: number | null;
-  zones: ZoneSeconds;
-};
-
-export type SummarySprintView = {
-  rank: number;
-  distanceM: number;
-  durationS: number;
-  peakSpeedKmh: number;
-};
+export type { SummarySegmentView, SummarySprintView };
 
 type SessionSummaryScreenProps = {
   title: string;
   dateLabel: string;
   placeLabel: string;
   contextLabel: string;
-  brickNumber: number;
+  /** Null hides the "brick laid" line (re-opened from history). */
+  brickNumber: number | null;
   syncStatus: SyncStatus;
   distanceUnit: DistanceUnit;
-  dataQuality: DataQuality;
-  speedSource: SpeedSource;
-  activeDurationSeconds: number;
-  distanceM: number;
-  topSpeedKmh: number | null;
-  sprintCount: number;
-  caloriesKcal: number | null;
-  gapSeconds: number;
-  acceptedFixCount: number;
-  boundaries: SpeedBandBoundaries;
-  bucket: SpeedBandBucket;
-  pitchLongAxisM: number | null;
-  zones: ZoneSeconds;
+  /** Null for a session finalized without metrics. */
+  metrics: SummaryMetricsView | null;
   segmentHeading: string;
   segments: SummarySegmentView[];
   sprints: SummarySprintView[];
+  backLabel: string | null;
   showRejectedWhy: boolean;
+  onBack: () => void;
   onOpenRejectedWhy: () => void;
   onCloseRejectedWhy: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+  /** Null hides View History (already came from it). */
+  onOpenHistory: (() => void) | null;
   onDone: () => void;
 };
 
@@ -76,6 +67,9 @@ const ZONE_KEYS = {
 } as const satisfies Record<keyof ZoneSeconds, keyof Colors['zone']>;
 
 const approx = (marked: boolean, value: string) => (marked ? `≈ ${value}` : value);
+
+const showMetric = (view: MetricView, format: (value: number) => string) =>
+  view.kind === 'suppressed' ? '—' : approx(view.estimated, format(view.value));
 
 const walkShare = (zones: ZoneSeconds) => {
   const total = zones.walk + zones.jog + zones.run + zones.high_run + zones.sprint;
@@ -106,96 +100,93 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
   brickNumber,
   syncStatus,
   distanceUnit,
-  dataQuality,
-  speedSource,
-  activeDurationSeconds,
-  distanceM,
-  topSpeedKmh,
-  sprintCount,
-  caloriesKcal,
-  gapSeconds,
-  acceptedFixCount,
-  boundaries,
-  bucket,
-  pitchLongAxisM,
-  zones,
+  metrics,
   segmentHeading,
   segments,
   sprints,
+  backLabel,
   showRejectedWhy,
+  onBack,
   onOpenRejectedWhy,
   onCloseRejectedWhy,
+  onRename,
+  onDelete,
+  onOpenHistory,
   onDone,
 }) => {
   const styles = useThemedStyles(createStyles);
   const [showSprints, setShowSprints] = React.useState(false);
-  const estimated = dataQuality === 'estimated';
-  const noSpeed = speedSource === 'none';
-  const insufficient = dataQuality === 'insufficient';
-  const longest = sprints[0];
-  const zoneTotal = zones.walk + zones.jog + zones.run + zones.high_run + zones.sprint;
-  const caption = sprintCaption({ count: sprintCount, boundaries, bucket, unit: distanceUnit });
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const presentation = presentSessionMetrics(
+    metrics && {
+      distance_m: metrics.distanceM,
+      top_speed_kmh: metrics.topSpeedKmh,
+      sprint_count: metrics.sprintCount,
+      calories_kcal: metrics.caloriesKcal,
+      speed_source: metrics.speedSource,
+      data_quality: metrics.dataQuality,
+    },
+  );
 
-  if (showSprints) {
+  if (showSprints && metrics) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.sprintHeader}>
-          <TouchableOpacity onPress={() => setShowSprints(false)}>
-            <Text style={styles.back}>← SUMMARY</Text>
-          </TouchableOpacity>
-          <Text style={styles.sprintTitle}>Sprints</Text>
-          <Text style={styles.caption}>{approx(estimated, caption)}</Text>
-          <Text style={styles.meta}>
-            {title} · {Math.round(sprints.reduce((sum, sprint) => sum + sprint.distanceM, 0))} M AT
-            SPRINT PACE
-          </Text>
-        </View>
-        <View style={styles.tableHead}>
-          <Text style={[styles.tableCell, styles.rankCol]}>#</Text>
-          <Text style={[styles.tableCell, styles.grow]}>DISTANCE ▼</Text>
-          <Text style={styles.tableCell}>DURATION</Text>
-          <Text style={styles.tableCell}>PEAK {speedUnitLabel(distanceUnit)}</Text>
-        </View>
-        <ScrollView>
-          {sprints.map((sprint) => (
-            <View key={sprint.rank} style={styles.tableRow}>
-              <Text style={[styles.tableValue, styles.rankCol]}>
-                {String(sprint.rank).padStart(2, '0')}
-              </Text>
-              <Text style={[styles.tableValue, styles.grow]}>{Math.round(sprint.distanceM)} M</Text>
-              <Text style={styles.tableValue}>{formatSprintSeconds(sprint.durationS)} S</Text>
-              <Text style={styles.tableValue}>
-                {formatSummarySpeed({ kmh: sprint.peakSpeedKmh, unit: distanceUnit })}
-              </Text>
-            </View>
-          ))}
-          <Text style={styles.rankNote}>
-            RANKED BY DISTANCE
-            {topSpeedKmh != null && longest
-              ? ` · FASTEST (${formatSummarySpeed({ kmh: topSpeedKmh, unit: distanceUnit })}) ISN'T THE LONGEST (${Math.round(longest.distanceM)} M)`
-              : ''}
-          </Text>
-        </ScrollView>
-      </SafeAreaView>
+      <SprintsView
+        title={title}
+        metrics={metrics}
+        sprints={sprints}
+        distanceUnit={distanceUnit}
+        onBack={() => setShowSprints(false)}
+      />
     );
   }
 
+  const pickFromMenu = (action: () => void) => {
+    setMenuOpen(false);
+    action();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.topBar}>
+        {backLabel ? (
+          <TouchableOpacity onPress={onBack} hitSlop={12}>
+            <Text style={styles.back}>{backLabel}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View />
+        )}
+        <TouchableOpacity
+          onPress={() => setMenuOpen((open) => !open)}
+          hitSlop={12}
+          accessibilityLabel="Session actions"
+        >
+          <Text style={styles.menuButton}>···</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
         <SyncBanner status={syncStatus} onWhy={onOpenRejectedWhy} />
-        <Text style={styles.brick}>BRICK {brickNumber} LAID</Text>
+        {brickNumber != null ? <Text style={styles.brick}>BRICK {brickNumber} LAID</Text> : null}
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.meta}>
           {dateLabel} · {placeLabel} · {contextLabel}
         </Text>
 
-        {insufficient ? (
+        {presentation.kind === 'no_metrics' ? (
+          <View style={styles.insufficient}>
+            <Text style={styles.insufficientTitle}>{NO_STATS_COPY}</Text>
+            <Text style={styles.body}>
+              The date, place and type are saved. Numbers were never worked out for this one.
+            </Text>
+          </View>
+        ) : null}
+
+        {presentation.kind === 'insufficient' && metrics ? (
           <View style={styles.insufficient}>
             <Text style={styles.insufficientTitle}>We couldn't track this one properly.</Text>
             <Text style={styles.body}>
-              We only had a clear signal for about {acceptedFixCount} seconds. Rather than show
-              numbers we can't stand behind, we're showing none.
+              We only had a clear signal for about {metrics.acceptedFixCount} seconds. Rather than
+              show numbers we can't stand behind, we're showing none.
             </Text>
             <Text style={styles.label}>STILL SAVED</Text>
             <Text style={styles.body}>
@@ -206,139 +197,44 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
               Start before you walk on. The phone needs a few seconds in open sky to lock on.
             </Text>
           </View>
-        ) : (
-          <>
-            <View style={styles.hero}>
-              <Text style={styles.heroValue}>
-                {approx(
-                  estimated,
-                  formatSummaryDistance({ metres: distanceM, unit: distanceUnit }),
-                )}
-              </Text>
-              <Text style={styles.heroUnit}>{distanceUnitLabel(distanceUnit)}</Text>
-            </View>
-            <Text style={styles.heroLabel}>DISTANCE COVERED</Text>
+        ) : null}
 
-            <View style={styles.grid}>
-              <Metric
-                label="ACTIVE"
-                value={formatActiveMinutes(activeDurationSeconds)}
-                unit="MIN"
-              />
-              <Metric
-                label="TOP SPEED"
-                value={
-                  noSpeed || topSpeedKmh == null
-                    ? '—'
-                    : formatSummarySpeed({ kmh: topSpeedKmh, unit: distanceUnit })
-                }
-                unit={speedUnitLabel(distanceUnit)}
-              />
-              <Metric
-                label="SPRINTS"
-                value={noSpeed ? '—' : approx(estimated, String(sprintCount))}
-                unit="COUNT"
-              />
-              <Metric
-                label="CALORIES"
-                value={
-                  caloriesKcal == null ? '—' : approx(estimated || noSpeed, String(caloriesKcal))
-                }
-                unit="KCAL"
-              />
-            </View>
-
-            {noSpeed ? (
-              <Text style={styles.body}>
-                Your phone didn't record speed during this session, so we couldn't work out your top
-                speed or sprints. Your distance and time are still accurate.
-              </Text>
-            ) : (
-              <>
-                <Text style={styles.caption}>{approx(estimated, caption)}</Text>
-                <ZoneBar zones={zones} total={zoneTotal} />
-                <Text style={styles.zoneNames}>WALK · JOG · RUN · HIGH RUN · SPRINT</Text>
-                {longest ? (
-                  <TouchableOpacity style={styles.longest} onPress={() => setShowSprints(true)}>
-                    <View>
-                      <Text style={styles.label}>LONGEST SPRINT</Text>
-                      <Text style={styles.longestValue}>
-                        {approx(
-                          estimated,
-                          `${Math.round(longest.distanceM)} M OVER ${formatSprintSeconds(longest.durationS)} S`,
-                        )}
-                      </Text>
-                    </View>
-                    <Text style={styles.chevron}>›</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={styles.body}>No sprint cleared the line.</Text>
-                )}
-                {estimated ? (
-                  <Text style={styles.body}>
-                    {estimatedSignalCopy({ gapSeconds, activeSeconds: activeDurationSeconds })}
-                  </Text>
-                ) : null}
-              </>
-            )}
-
-            <Text style={styles.section}>{segmentHeading}</Text>
-            <View style={styles.tableHead}>
-              <Text style={[styles.tableCell, styles.grow]} />
-              <Text style={styles.tableCell}>{distanceUnitLabel(distanceUnit)}</Text>
-              <Text style={styles.tableCell}>MIN</Text>
-              <Text style={styles.tableCell}>SPR</Text>
-              <Text style={styles.tableCell}>TOP</Text>
-            </View>
-            {segments.map((segment, index) => (
-              <View key={`${segment.label}-${index}`} style={styles.tableRow}>
-                <Text style={[styles.tableValue, styles.grow]}>{segment.label}</Text>
-                <Text style={styles.tableValue}>
-                  {formatSummaryDistance({ metres: segment.distanceM, unit: distanceUnit })}
-                </Text>
-                <Text style={styles.tableValue}>
-                  {formatActiveMinutes(segment.activeDurationSeconds)}
-                </Text>
-                <Text style={styles.tableValue}>{noSpeed ? '—' : segment.sprintCount}</Text>
-                <Text style={styles.tableValue}>
-                  {noSpeed || segment.topSpeedKmh == null
-                    ? '—'
-                    : formatSummarySpeed({ kmh: segment.topSpeedKmh, unit: distanceUnit })}
-                </Text>
-              </View>
-            ))}
-            {fadeLine(segments, distanceUnit) ? (
-              <Text style={styles.body}>{fadeLine(segments, distanceUnit)}</Text>
-            ) : null}
-
-            <Text style={styles.section}>SPEED ZONES</Text>
-            <Text style={styles.meta}>
-              {sizeLabel(bucket)}
-              {pitchLongAxisM != null ? ` · ${Math.round(pitchLongAxisM)} M PITCH` : ''}
-            </Text>
-            {noSpeed ? (
-              <>
-                <Text style={styles.body}>SPEED ZONES —</Text>
-                <Text style={styles.body}>LONGEST SPRINT —</Text>
-              </>
-            ) : (
-              zoneRows(boundaries).map((zone) => (
-                <View key={zone.key} style={styles.zoneRow}>
-                  <Text style={styles.zoneLabel}>{zone.label}</Text>
-                  <Text style={styles.zoneRange}>{zone.range}</Text>
-                  <Text style={styles.zoneTime}>{formatZoneClock(zones[zone.key])}</Text>
-                </View>
-              ))
-            )}
-          </>
-        )}
+        {presentation.kind === 'metrics' && metrics ? (
+          <MetricsBody
+            metrics={metrics}
+            presentation={presentation}
+            segmentHeading={segmentHeading}
+            segments={segments}
+            sprints={sprints}
+            distanceUnit={distanceUnit}
+            onOpenSprints={() => setShowSprints(true)}
+          />
+        ) : null}
       </ScrollView>
 
       <View style={styles.footer}>
         <Text style={styles.soon}>SHARE CARD SOON</Text>
-        <Text style={styles.soon}>HISTORY SOON</Text>
+        {onOpenHistory ? (
+          <TouchableOpacity onPress={onOpenHistory}>
+            <Text style={styles.historyLink}>VIEW HISTORY</Text>
+          </TouchableOpacity>
+        ) : null}
         <Button title="Done" onPress={onDone} />
       </View>
+
+      {menuOpen ? (
+        <View style={styles.menuLayer}>
+          <TouchableOpacity style={styles.menuDismiss} onPress={() => setMenuOpen(false)} />
+          <View style={styles.menu}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => pickFromMenu(onRename)}>
+              <Text style={styles.menuItemText}>RENAME</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => pickFromMenu(onDelete)}>
+              <Text style={[styles.menuItemText, styles.menuItemDanger]}>DELETE</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       {showRejectedWhy ? (
         <View style={styles.whyBackdrop}>
@@ -355,6 +251,220 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
           </View>
         </View>
       ) : null}
+    </SafeAreaView>
+  );
+};
+
+const MetricsBody = ({
+  metrics,
+  presentation,
+  segmentHeading,
+  segments,
+  sprints,
+  distanceUnit,
+  onOpenSprints,
+}: {
+  metrics: SummaryMetricsView;
+  presentation: Extract<ReturnType<typeof presentSessionMetrics>, { kind: 'metrics' }>;
+  segmentHeading: string;
+  segments: SummarySegmentView[];
+  sprints: SummarySprintView[];
+  distanceUnit: DistanceUnit;
+  onOpenSprints: () => void;
+}) => {
+  const styles = useThemedStyles(createStyles);
+  const { zones, boundaries, bucket } = metrics;
+  const estimated = metrics.dataQuality === 'estimated';
+  const noSpeed = metrics.speedSource === 'none';
+  const longest = sprints[0];
+  const zoneTotal = zones.walk + zones.jog + zones.run + zones.high_run + zones.sprint;
+  const caption = sprintCaption({
+    count: metrics.sprintCount,
+    boundaries,
+    bucket,
+    unit: distanceUnit,
+  });
+
+  return (
+    <>
+      <View style={styles.hero}>
+        <Text style={styles.heroValue}>
+          {showMetric(presentation.distance, (metres) =>
+            formatSummaryDistance({ metres, unit: distanceUnit }),
+          )}
+        </Text>
+        <Text style={styles.heroUnit}>{distanceUnitLabel(distanceUnit)}</Text>
+      </View>
+      <Text style={styles.heroLabel}>DISTANCE COVERED</Text>
+
+      <View style={styles.grid}>
+        <Metric
+          label="ACTIVE"
+          value={formatActiveMinutes(metrics.activeDurationSeconds)}
+          unit="MIN"
+        />
+        <Metric
+          label="TOP SPEED"
+          value={showMetric(presentation.topSpeed, (kmh) =>
+            formatSummarySpeed({ kmh, unit: distanceUnit }),
+          )}
+          unit={speedUnitLabel(distanceUnit)}
+        />
+        <Metric label="SPRINTS" value={showMetric(presentation.sprintCount, String)} unit="COUNT" />
+        <Metric label="CALORIES" value={showMetric(presentation.calories, String)} unit="KCAL" />
+      </View>
+
+      {noSpeed ? (
+        <Text style={styles.body}>
+          Your phone didn't record speed during this session, so we couldn't work out your top speed
+          or sprints. Your distance and time are still accurate.
+        </Text>
+      ) : (
+        <>
+          <Text style={styles.caption}>{approx(estimated, caption)}</Text>
+          <ZoneBar zones={zones} total={zoneTotal} />
+          <Text style={styles.zoneNames}>WALK · JOG · RUN · HIGH RUN · SPRINT</Text>
+          {longest ? (
+            <TouchableOpacity style={styles.longest} onPress={onOpenSprints}>
+              <View>
+                <Text style={styles.label}>LONGEST SPRINT</Text>
+                <Text style={styles.longestValue}>
+                  {approx(
+                    estimated,
+                    `${Math.round(longest.distanceM)} M OVER ${formatSprintSeconds(longest.durationS)} S`,
+                  )}
+                </Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.body}>No sprint cleared the line.</Text>
+          )}
+          {estimated ? (
+            <Text style={styles.body}>
+              {estimatedSignalCopy({
+                gapSeconds: metrics.gapSeconds,
+                activeSeconds: metrics.activeDurationSeconds,
+              })}
+            </Text>
+          ) : null}
+        </>
+      )}
+
+      <Text style={styles.section}>{segmentHeading}</Text>
+      <View style={styles.tableHead}>
+        <Text style={[styles.tableCell, styles.grow]} />
+        <Text style={styles.tableCell}>{distanceUnitLabel(distanceUnit)}</Text>
+        <Text style={styles.tableCell}>MIN</Text>
+        <Text style={styles.tableCell}>SPR</Text>
+        <Text style={styles.tableCell}>TOP</Text>
+      </View>
+      {segments.map((segment, index) => (
+        <View key={`${segment.label}-${index}`} style={styles.tableRow}>
+          <Text style={[styles.tableValue, styles.grow]}>{segment.label}</Text>
+          <Text style={styles.tableValue}>
+            {formatSummaryDistance({ metres: segment.distanceM, unit: distanceUnit })}
+          </Text>
+          <Text style={styles.tableValue}>
+            {formatActiveMinutes(segment.activeDurationSeconds)}
+          </Text>
+          <Text style={styles.tableValue}>{noSpeed ? '—' : segment.sprintCount}</Text>
+          <Text style={styles.tableValue}>
+            {noSpeed || segment.topSpeedKmh == null
+              ? '—'
+              : formatSummarySpeed({ kmh: segment.topSpeedKmh, unit: distanceUnit })}
+          </Text>
+        </View>
+      ))}
+      {fadeLine(segments, distanceUnit) ? (
+        <Text style={styles.body}>{fadeLine(segments, distanceUnit)}</Text>
+      ) : null}
+
+      <Text style={styles.section}>SPEED ZONES</Text>
+      <Text style={styles.meta}>
+        {sizeLabel(bucket)}
+        {metrics.pitchLongAxisM != null ? ` · ${Math.round(metrics.pitchLongAxisM)} M PITCH` : ''}
+      </Text>
+      {noSpeed ? (
+        <>
+          <Text style={styles.body}>SPEED ZONES —</Text>
+          <Text style={styles.body}>LONGEST SPRINT —</Text>
+        </>
+      ) : (
+        zoneRows(boundaries).map((zone) => (
+          <View key={zone.key} style={styles.zoneRow}>
+            <Text style={styles.zoneLabel}>{zone.label}</Text>
+            <Text style={styles.zoneRange}>{zone.range}</Text>
+            <Text style={styles.zoneTime}>{formatZoneClock(zones[zone.key])}</Text>
+          </View>
+        ))
+      )}
+    </>
+  );
+};
+
+const SprintsView = ({
+  title,
+  metrics,
+  sprints,
+  distanceUnit,
+  onBack,
+}: {
+  title: string;
+  metrics: SummaryMetricsView;
+  sprints: SummarySprintView[];
+  distanceUnit: DistanceUnit;
+  onBack: () => void;
+}) => {
+  const styles = useThemedStyles(createStyles);
+  const estimated = metrics.dataQuality === 'estimated';
+  const longest = sprints[0];
+  const caption = sprintCaption({
+    count: metrics.sprintCount,
+    boundaries: metrics.boundaries,
+    bucket: metrics.bucket,
+    unit: distanceUnit,
+  });
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.sprintHeader}>
+        <TouchableOpacity onPress={onBack}>
+          <Text style={styles.back}>← SUMMARY</Text>
+        </TouchableOpacity>
+        <Text style={styles.sprintTitle}>Sprints</Text>
+        <Text style={styles.caption}>{approx(estimated, caption)}</Text>
+        <Text style={styles.meta}>
+          {title} · {Math.round(sprints.reduce((sum, sprint) => sum + sprint.distanceM, 0))} M AT
+          SPRINT PACE
+        </Text>
+      </View>
+      <View style={styles.tableHead}>
+        <Text style={[styles.tableCell, styles.rankCol]}>#</Text>
+        <Text style={[styles.tableCell, styles.grow]}>DISTANCE ▼</Text>
+        <Text style={styles.tableCell}>DURATION</Text>
+        <Text style={styles.tableCell}>PEAK {speedUnitLabel(distanceUnit)}</Text>
+      </View>
+      <ScrollView>
+        {sprints.map((sprint) => (
+          <View key={sprint.rank} style={styles.tableRow}>
+            <Text style={[styles.tableValue, styles.rankCol]}>
+              {String(sprint.rank).padStart(2, '0')}
+            </Text>
+            <Text style={[styles.tableValue, styles.grow]}>{Math.round(sprint.distanceM)} M</Text>
+            <Text style={styles.tableValue}>{formatSprintSeconds(sprint.durationS)} S</Text>
+            <Text style={styles.tableValue}>
+              {formatSummarySpeed({ kmh: sprint.peakSpeedKmh, unit: distanceUnit })}
+            </Text>
+          </View>
+        ))}
+        <Text style={styles.rankNote}>
+          RANKED BY DISTANCE
+          {metrics.topSpeedKmh != null && longest
+            ? ` · FASTEST (${formatSummarySpeed({ kmh: metrics.topSpeedKmh, unit: distanceUnit })}) ISN'T THE LONGEST (${Math.round(longest.distanceM)} M)`
+            : ''}
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -632,6 +742,55 @@ const createStyles = (colors: Colors) =>
       fontSize: 11,
       letterSpacing: 1.6,
       color: colors.text.disabled,
+    },
+    historyLink: {
+      textAlign: 'center',
+      paddingVertical: 6,
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 11,
+      letterSpacing: 1.6,
+      color: colors.brand.ink,
+    },
+    topBar: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[3],
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    menuButton: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 18,
+      letterSpacing: 2,
+      color: colors.text.primary,
+    },
+    menuLayer: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    menuDismiss: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    menu: {
+      position: 'absolute',
+      top: 96,
+      right: spacing[6],
+      minWidth: 160,
+      backgroundColor: colors.background.elevated,
+      borderWidth: 1,
+      borderColor: colors.border.medium,
+    },
+    menuItem: {
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    menuItemText: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      letterSpacing: 2.4,
+      color: colors.text.primary,
+    },
+    menuItemDanger: {
+      color: colors.accent.danger,
     },
     synced: {
       marginTop: spacing[3],

@@ -50,6 +50,48 @@ export type TrackingSessionRow = {
   segment_clock_origin_ms: number;
   current_segment_id: string | null;
   gps_search_started_at: string | null;
+  user_id: string | null;
+  title: string | null;
+  /** Set when `finalize` is acknowledged; never cleared. */
+  finalized_at: string | null;
+};
+
+/** An ended, unsynced local session with its metrics left-joined (all metric fields null when absent). */
+export type LocalHistoryRow = {
+  id: string;
+  session_type: SessionType;
+  started_at: string;
+  ended_at: string;
+  pitch_id: string | null;
+  pitch_name: string | null;
+  title: string | null;
+  sync_status: SyncStatus;
+  finalized_at: string | null;
+  metrics_session_id: string | null;
+  active_duration_seconds: number | null;
+  distance_m: number | null;
+  top_speed_kmh: number | null;
+  speed_source: 'os' | 'position_delta' | 'none' | null;
+  data_quality: 'good' | 'estimated' | 'insufficient' | null;
+};
+
+export type PendingDeletionRow = {
+  session_id: string;
+  user_id: string;
+  counted_by_server: number;
+  requested_at: string;
+  attempts: number;
+  last_attempt_at: string | null;
+  session_type: SessionType | null;
+};
+
+export type PendingRenameRow = {
+  session_id: string;
+  user_id: string;
+  title: string | null;
+  requested_at: string;
+  attempts: number;
+  last_attempt_at: string | null;
 };
 
 export type TrackingSegmentRow = {
