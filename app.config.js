@@ -47,6 +47,7 @@ module.exports = ({ config }) => ({
     ],
     'expo-router',
     'expo-secure-store',
+    'expo-system-ui',
     'expo-dev-client',
     'expo-sqlite',
     'expo-task-manager',
