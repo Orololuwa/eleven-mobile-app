@@ -8,6 +8,7 @@ import type {
   SessionStartIn,
   SessionStartOut,
   SessionType,
+  WeeklySessionWindow,
 } from './types';
 import type { SessionFinalizeBody, TrackPointsBody } from './tracking/types';
 
@@ -96,6 +97,12 @@ export const fetchSessionCalendar = ({
 }) =>
   apiRequest<SessionCalendar>({
     path: `/sessions/calendar${toQuery({ month, tz, session_type: sessionType })}`,
+  });
+
+/** Ended sessions with `started_at` in `[start, end)`; the span must be at most 15 days. */
+export const fetchWeeklySessions = ({ start, end }: { start: Date; end: Date }) =>
+  apiRequest<WeeklySessionWindow>({
+    path: `/sessions/weekly${toQuery({ start: start.toISOString(), end: end.toISOString() })}`,
   });
 
 export const fetchSessionDetail = (sessionId: string) =>

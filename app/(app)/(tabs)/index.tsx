@@ -4,12 +4,16 @@ import { HomeScreen, SessionTypeSheet } from '@/screens';
 import { avatarUrlWithCacheBust, displayName } from '@/features/profile/display';
 import { useMyProfileQuery } from '@/features/profile/use-profile-query';
 import { beginSessionSetup } from '@/features/sessions/begin-session-setup';
+import { useWeeklyStatsQuery } from '@/features/sessions/history/use-weekly-stats-query';
+import { presentWeeklySection } from '@/features/sessions/history/weekly-tiles';
 import { useAppStore } from '@/stores/app-store';
 
 export default function HomeRoute() {
   const { data: profile } = useMyProfileQuery();
   const sessionCount = useAppStore((state) => state.sessionCount);
   const showEmptyWallBanner = useAppStore((state) => state.showEmptyWallBanner);
+  const distanceUnit = useAppStore((state) => state.units.distance);
+  const weeklyState = useWeeklyStatsQuery();
   const [showSessionSheet, setShowSessionSheet] = useState(false);
 
   const lastSession =
@@ -23,12 +27,6 @@ export default function HomeRoute() {
           topSpeed: 31,
         }
       : undefined;
-
-  const weeklyStats = {
-    sessions: sessionCount > 0 ? 4 : 0,
-    distance: sessionCount > 0 ? 27.1 : 0,
-    minutes: sessionCount > 0 ? 312 : 0,
-  };
 
   return (
     <>
@@ -45,9 +43,8 @@ export default function HomeRoute() {
         onNavigateToPlayerDetails={() => router.push('/(app)/player-details')}
         showEmptyWallBanner={showEmptyWallBanner && sessionCount === 0}
         onFindWall={() => router.push('/(app)/find-wall')}
-        weeklyStats={weeklyStats}
+        weekly={presentWeeklySection({ state: weeklyState, distanceUnit })}
         lastSession={lastSession}
-        streak={sessionCount > 0 ? 18 : undefined}
       />
       <SessionTypeSheet
         visible={showSessionSheet}

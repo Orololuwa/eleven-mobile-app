@@ -17,4 +17,8 @@ export const historyQueryKey = {
     ['session-history', 'local', userId, sessionType ?? 'all'] as const,
   detail: ({ userId, sessionId }: { userId: string; sessionId: string }) =>
     ['session-history', 'detail', userId, sessionId] as const,
+  weekly: ({ userId, weekStartKey }: { userId: string; weekStartKey: string }) =>
+    ['session-history', 'weekly', userId, weekStartKey] as const,
+  weeklyLocal: ({ userId, weekStartKey }: { userId: string; weekStartKey: string }) =>
+    ['session-history', 'weekly-local', userId, weekStartKey] as const,
 };

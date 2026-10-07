@@ -3,6 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Wall, StatTile } from '@/components';
 import { typography, spacing, type Colors, useThemedStyles } from '@/theme';
+import {
+  WEEKLY_CAPTION,
+  WEEKLY_TILE_KEYS,
+  weeklyTileLabel,
+  type WeeklySectionView,
+  type WeeklyTile,
+} from '@/features/sessions/history/weekly-tiles';
 
 type HomeScreenProps = {
   userName: string;
@@ -14,11 +21,7 @@ type HomeScreenProps = {
   onNavigateToPlayerDetails: () => void;
   showEmptyWallBanner?: boolean;
   onFindWall?: () => void;
-  weeklyStats?: {
-    sessions: number;
-    distance: number;
-    minutes: number;
-  };
+  weekly: WeeklySectionView;
   lastSession?: {
     title: string;
     date: string;
@@ -27,7 +30,6 @@ type HomeScreenProps = {
     distance: number;
     topSpeed: number;
   };
-  streak?: number;
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -40,9 +42,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigateToPlayerDetails,
   showEmptyWallBanner = false,
   onFindWall,
-  weeklyStats,
+  weekly,
   lastSession,
-  streak,
 }) => {
   const styles = useThemedStyles(createStyles);
   const isFirstTime = sessionCount === 0;
@@ -84,10 +85,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {isFirstTime ? (
               <Text style={styles.heroTitle}>Day one.{'\n'}Lay the first brick.</Text>
             ) : (
-              <View style={styles.heroRow}>
-                <Text style={styles.heroTitle}>Sunday again.</Text>
-                {streak && <Text style={styles.heroStreak}>{streak}-WEEK STREAK</Text>}
-              </View>
+              <Text style={styles.heroTitle}>Sunday again.</Text>
             )}
           </View>
 
@@ -142,22 +140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
 
           {/* Weekly Stats */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>THIS WEEK</Text>
-            <View style={styles.statsGrid}>
-              <StatTile
-                label="Sessions"
-                value={weeklyStats?.sessions ?? 0}
-                style={styles.statTile}
-              />
-              <StatTile
-                label="Distance"
-                value={weeklyStats?.distance ?? 0.0}
-                style={styles.statTile}
-              />
-              <StatTile label="Minutes" value={weeklyStats?.minutes ?? 0} style={styles.statTile} />
-            </View>
-          </View>
+          <WeeklySection weekly={weekly} />
         </View>
       </ScrollView>
 
@@ -174,6 +157,52 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+  );
+};
+
+const placeholderTiles = (value: string): WeeklyTile[] =>
+  WEEKLY_TILE_KEYS.map((key) => ({
+    key,
+    label: weeklyTileLabel(key),
+    value,
+    unit: ' ',
+    trend: null,
+    accessibilityLabel: `${weeklyTileLabel(key)}, ${value === '—' ? 'unavailable' : 'loading'}.`,
+  }));
+
+const WeeklySection: React.FC<{ weekly: WeeklySectionView }> = ({ weekly }) => {
+  const styles = useThemedStyles(createStyles);
+  const tiles =
+    weekly.status === 'ready'
+      ? weekly.tiles
+      : placeholderTiles(weekly.status === 'offline' ? '—' : ' ');
+  const rows = [tiles.slice(0, 2), tiles.slice(2, 4)];
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionLabel}>THIS WEEK</Text>
+      <View style={styles.statsGrid}>
+        {rows.map((row) => (
+          <View key={row[0].key} style={styles.statsRow}>
+            {row.map((tile) => (
+              <StatTile
+                key={tile.key}
+                label={tile.label}
+                value={tile.value}
+                subtitle={tile.unit}
+                trend={tile.trend}
+                accessibilityLabel={tile.accessibilityLabel}
+                style={styles.statTile}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
+      {weekly.status === 'ready' && weekly.showCaption && (
+        <Text style={styles.weeklyCaption}>{WEEKLY_CAPTION.toUpperCase()}</Text>
+      )}
+      {weekly.status === 'offline' && <Text style={styles.weeklyCaption}>OFFLINE</Text>}
+    </View>
   );
 };
 
@@ -267,12 +296,6 @@ const createStyles = (colors: Colors) =>
     heroSection: {
       marginBottom: 0,
     },
-    heroRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: 10,
-      flexWrap: 'wrap',
-    },
     heroTitle: {
       fontFamily: typography.fontFamily.primary,
       fontSize: 30,
@@ -280,12 +303,6 @@ const createStyles = (colors: Colors) =>
       letterSpacing: -0.025 * 30,
       lineHeight: 30 * 1.05,
       color: colors.text.primary,
-    },
-    heroStreak: {
-      fontFamily: typography.fontFamily.mono,
-      fontSize: 12,
-      letterSpacing: 0.12 * 12,
-      color: colors.brand.ink,
     },
     startButton: {
       height: 112,
@@ -378,13 +395,22 @@ const createStyles = (colors: Colors) =>
       color: colors.brand.ink,
     },
     statsGrid: {
-      flexDirection: 'row',
       gap: 1,
       backgroundColor: colors.border.subtle,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      gap: 1,
     },
     statTile: {
       flex: 1,
       padding: 16,
+    },
+    weeklyCaption: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 9,
+      letterSpacing: 0.14 * 9,
+      color: colors.text.secondary,
     },
     tabBar: {
       flexDirection: 'row',

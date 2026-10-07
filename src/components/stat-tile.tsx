@@ -2,14 +2,22 @@ import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { typography, type Colors, useThemedStyles } from '@/theme';
 
+export type StatTileTrend = 'up' | 'down' | 'level' | null;
+
 type StatTileProps = {
   label: string;
   value: string | number;
   subtitle?: string;
   isRecord?: boolean;
   isHero?: boolean;
+  /** Direction against a baseline; shape carries the meaning, not just colour. */
+  trend?: StatTileTrend;
+  /** Spoken as one element when set. */
+  accessibilityLabel?: string;
   style?: ViewStyle;
 };
+
+const TREND_GLYPH = { up: '▲', down: '▼', level: '=' } as const;
 
 export const StatTile: React.FC<StatTileProps> = ({
   label,
@@ -17,6 +25,8 @@ export const StatTile: React.FC<StatTileProps> = ({
   subtitle,
   isRecord = false,
   isHero = false,
+  trend = null,
+  accessibilityLabel,
   style,
 }) => {
   const styles = useThemedStyles(createStyles);
@@ -33,9 +43,18 @@ export const StatTile: React.FC<StatTileProps> = ({
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[styles.container, style]}
+      accessible={accessibilityLabel != null}
+      accessibilityLabel={accessibilityLabel}
+    >
       <Text style={styles.label}>{label.toUpperCase()}</Text>
-      <Text style={[styles.value, isRecord && styles.valueRecord]}>{value}</Text>
+      <View style={styles.valueRow}>
+        <Text style={[styles.value, isRecord && styles.valueRecord]}>{value}</Text>
+        {trend && (
+          <Text style={[styles.trend, trend === 'up' && styles.trendUp]}>{TREND_GLYPH[trend]}</Text>
+        )}
+      </View>
       {subtitle && (
         <Text style={[styles.subtitle, isRecord && styles.subtitleRecord]}>
           {subtitle.toUpperCase()}
@@ -58,6 +77,11 @@ const createStyles = (colors: Colors) =>
       letterSpacing: 0.16 * 9,
       color: colors.text.secondary,
     },
+    valueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 8,
+    },
     value: {
       fontFamily: typography.fontFamily.mono,
       fontSize: 32,
@@ -65,6 +89,14 @@ const createStyles = (colors: Colors) =>
       color: colors.text.primary,
     },
     valueRecord: {
+      color: colors.brand.ink,
+    },
+    trend: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 12,
+      color: colors.text.secondary,
+    },
+    trendUp: {
       color: colors.brand.ink,
     },
     subtitle: {

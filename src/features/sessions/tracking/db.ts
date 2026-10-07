@@ -6,6 +6,7 @@ import { createTrackingId } from './id';
 import type {
   BackgroundPermission,
   LocalHistoryRow,
+  LocalWeeklyRow,
   PendingDeletionRow,
   PendingRenameRow,
   StoredPitchCorners,
@@ -711,6 +712,35 @@ export const getLocalHistorySessions = async ({
       [userId, sessionType, sessionType],
     ),
   );
+
+/**
+ * This user's ended sessions in `[start, end)`, any sync state, metrics left-joined.
+ * `started_at` text may carry any offset, so the range is checked on parsed instants.
+ */
+export const getLocalSessionsInRange = async ({
+  userId,
+  start,
+  end,
+}: {
+  userId: string;
+  start: Date;
+  end: Date;
+}): Promise<LocalWeeklyRow[]> => {
+  const rows = await withDb((db) =>
+    db.getAllAsync<LocalWeeklyRow>(
+      `SELECT s.id, s.started_at,
+        m.session_id AS metrics_session_id, m.active_duration_seconds, m.distance_m, m.data_quality
+      FROM tracking_sessions s
+      LEFT JOIN session_metrics m ON m.session_id = s.id
+      WHERE s.user_id = ? AND s.ended_at IS NOT NULL`,
+      [userId],
+    ),
+  );
+  return rows.filter(({ started_at }) => {
+    const time = Date.parse(started_at);
+    return time >= start.getTime() && time < end.getTime();
+  });
+};
 
 export const getPendingDeletions = async (userId: string): Promise<PendingDeletionRow[]> =>
   withDb((db) =>

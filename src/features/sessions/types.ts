@@ -83,6 +83,25 @@ export type SessionCalendar = {
   days: { date: string; session_ids: string[] }[];
 };
 
+export type WeeklySessionMetrics = {
+  active_duration_seconds: number;
+  distance_m: number;
+  data_quality: 'good' | 'estimated' | 'insufficient';
+};
+
+export type WeeklySessionItem = {
+  id: string;
+  started_at: string;
+  /** Null when the session was finalized without metrics. */
+  metrics: WeeklySessionMetrics | null;
+};
+
+export type WeeklySessionWindow = {
+  start: string;
+  end: string;
+  items: WeeklySessionItem[];
+};
+
 export type SessionDetailSegment = {
   segment_index: number;
   activity_kind: ActivityKind | null;

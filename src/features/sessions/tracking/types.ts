@@ -75,6 +75,16 @@ export type LocalHistoryRow = {
   data_quality: 'good' | 'estimated' | 'insufficient' | null;
 };
 
+export type LocalWeeklyRow = Pick<
+  LocalHistoryRow,
+  | 'id'
+  | 'started_at'
+  | 'metrics_session_id'
+  | 'active_duration_seconds'
+  | 'distance_m'
+  | 'data_quality'
+>;
+
 export type PendingDeletionRow = {
   session_id: string;
   user_id: string;
