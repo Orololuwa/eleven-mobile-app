@@ -15,7 +15,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.eleven.app",
-      "userInterfaceStyle": "automatic"
+      "userInterfaceStyle": "automatic",
+      "infoPlist": {
+        "NSSupportsLiveActivities": true,
+        "NSSupportsLiveActivitiesFrequentUpdates": false,
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {}
     },
     "android": {
       "userInterfaceStyle": "automatic",
@@ -25,6 +31,9 @@
       },
       "package": "com.eleven.app"
     },
-    "plugins": ["expo-location", "expo-router"]
+    "plugins": [
+      "expo-location",
+      "expo-router"
+    ]
   }
 }
