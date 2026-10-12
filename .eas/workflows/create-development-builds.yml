@@ -1,11 +1,17 @@
 name: Create Development Builds
 
+on:
+  push:
+    branches: ['dev']
+
 jobs:
   build_android:
-    type: build # This job type creates a development build for Android
+    type: build
     params:
       platform: android
+      profile: development
   # build_ios:
-  #   type: build # This job type creates a development build for iOS
+  #   type: build
   #   params:
   #     platform: ios
+  #     profile: development
