@@ -92,6 +92,7 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await addColumnIfMissing(db, 'tracking_sessions', 'user_id', 'TEXT');
   await addColumnIfMissing(db, 'tracking_sessions', 'title', 'TEXT');
   await addColumnIfMissing(db, 'tracking_sessions', 'finalized_at', 'TEXT');
+  await addColumnIfMissing(db, 'session_metrics', 'continuity_fix_count', 'INTEGER');
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS pending_deletions (
       session_id TEXT PRIMARY KEY NOT NULL,
@@ -266,6 +267,7 @@ const getDb = () => {
           speed_band_boundaries_json TEXT NOT NULL,
           pitch_long_axis_m REAL,
           accepted_fix_count INTEGER NOT NULL,
+          continuity_fix_count INTEGER,
           gap_seconds INTEGER NOT NULL,
           algorithm_version TEXT NOT NULL,
           computed_at TEXT NOT NULL

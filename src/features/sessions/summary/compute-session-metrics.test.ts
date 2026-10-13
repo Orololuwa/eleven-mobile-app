@@ -68,15 +68,23 @@ const trail = ({
   startT,
   speeds,
   stepSec = 1,
+  horizontalAccuracyM = 5,
 }: {
   segmentId: string;
   startT: number;
   speeds: number[];
   stepSec?: number;
+  horizontalAccuracyM?: number | null;
 }) => {
   let metres = 0;
   return speeds.map((speedKmh, index) => {
-    const point = fix({ segmentId, t: startT + index * stepSec, metresNorth: metres, speedKmh });
+    const point = fix({
+      segmentId,
+      t: startT + index * stepSec,
+      metresNorth: metres,
+      speedKmh,
+      horizontalAccuracyM,
+    });
     const next = speeds[index + 1];
     if (next != null) metres += (speedKmh / 3.6) * stepSec;
     return point;
@@ -126,7 +134,8 @@ describe('computeSessionMetrics', () => {
     );
 
     expect(result.distanceM).toBeCloseTo(10, 1);
-    expect(result.gapSeconds).toBe(11);
+    // Only the first 3 s pair is bridged; the rest of the 30 s segment is unmeasured.
+    expect(result.gapSeconds).toBe(27);
     expect(result.segments[0]?.distanceM).toBeCloseTo(result.distanceM, 5);
   });
 
@@ -313,7 +322,76 @@ describe('computeSessionMetrics', () => {
     expect(result.sprintCount).toBe(sum((row) => row.sprintCount));
     expect(result.zones.walk).toBe(sum((row) => row.zones.walk));
     expect(result.caloriesKcal).toBe(sum((row) => row.caloriesKcal ?? 0));
-    expect(result.algorithmVersion).toBe('v1');
+    expect(result.algorithmVersion).toBe('v2');
+  });
+
+  const steady = (
+    count: number,
+    overrides: { stepSec?: number; horizontalAccuracyM?: number } = {},
+  ) =>
+    trail({
+      segmentId: 's1',
+      startT: 0,
+      speeds: Array.from({ length: count }, () => 8),
+      ...overrides,
+    });
+
+  it('stores nothing measurable from steady 30 m fixes and classifies them insufficient', () => {
+    const result = computeSessionMetrics(
+      baseInput({
+        segments: [segment({ id: 's1', index: 1, start: 0, end: 180 })],
+        points: steady(181, { horizontalAccuracyM: 30 }),
+      }),
+    );
+    expect(result.distanceM).toBe(0);
+    expect(result.acceptedFixCount).toBe(0);
+    expect(result.continuityFixCount).toBe(181);
+    expect(result.gapSeconds).toBe(180);
+    expect(result.dataQuality).toBe('insufficient');
+  });
+
+  it('measures a fix at the 10 m quality gate and ignores one at 15 m', () => {
+    const pair = (horizontalAccuracyM: number) =>
+      computeSessionMetrics(
+        baseInput({
+          points: [
+            fix({ segmentId: 's1', t: 0, metresNorth: 0, horizontalAccuracyM }),
+            fix({ segmentId: 's1', t: 1, metresNorth: 5, horizontalAccuracyM }),
+          ],
+        }),
+      );
+    expect(pair(10).distanceM).toBeCloseTo(5, 1);
+    expect(pair(15).distanceM).toBe(0);
+  });
+
+  it('classifies on gap alone: a clean 0.5 Hz session is good', () => {
+    const result = computeSessionMetrics(
+      baseInput({
+        segments: [segment({ id: 's1', index: 1, start: 0, end: 300 })],
+        points: steady(151, { stepSec: 2 }),
+      }),
+    );
+    expect(result.gapSeconds).toBe(0);
+    expect(result.dataQuality).toBe('good');
+  });
+
+  it('marks a session estimated when sub-quality fixes leave a 5–25% gap', () => {
+    const result = computeSessionMetrics(
+      baseInput({
+        segments: [segment({ id: 's1', index: 1, start: 0, end: 200 })],
+        points: [
+          ...steady(181),
+          ...trail({
+            segmentId: 's1',
+            startT: 181,
+            speeds: Array.from({ length: 20 }, () => 8),
+            horizontalAccuracyM: 30,
+          }),
+        ],
+      }),
+    );
+    expect(result.gapSeconds).toBe(20);
+    expect(result.dataQuality).toBe('estimated');
   });
 });
 

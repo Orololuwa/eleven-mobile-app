@@ -75,7 +75,7 @@ export const beginTrackingAfterPermission = async ({
   const activityId = await startTrackingIndicator({
     session,
     segment,
-    snapshot: { elapsedSeconds: 0, distanceKm: 0, topSpeedKmh: 0 },
+    snapshot: { elapsedSeconds: 0, distanceKm: null, topSpeedKmh: null, signal: 'settling' },
     distanceUnit,
   });
 
@@ -222,7 +222,7 @@ export const completeSegmentSwitch = async ({
       session: updatedSession,
       segment,
       allSegments: await getSegmentsForSession(sessionId),
-      snapshot: { elapsedSeconds: 0, distanceKm: 0, topSpeedKmh: 0 },
+      snapshot: { elapsedSeconds: 0, distanceKm: null, topSpeedKmh: null, signal: 'settling' },
       distanceUnit,
     });
   }

@@ -14,7 +14,8 @@ type TrackingHudStore = {
   attackDirection: AttackDirection | null;
   pendingAttackDirection: AttackDirection | null;
   closedSegmentElapsed: number;
-  closedSegmentDistanceKm: number;
+  /** Null when the summary would suppress distance. */
+  closedSegmentDistanceKm: number | null;
   closedSegmentIndex: number;
   closedSegmentLabel: string;
   gpsSearchSeconds: number;
@@ -27,7 +28,7 @@ const initialHud = {
   phase: 'permission' as TrackingPhase,
   elapsedSeconds: 0,
   extraSeconds: 0,
-  metrics: { distanceKm: 0, topSpeedKmh: 0 },
+  metrics: { distanceKm: null, topSpeedKmh: null, signal: 'settling' } as LiveMetrics,
   gpsAccuracyM: null as number | null,
   segmentIndex: 1,
   segmentLabel: 'SESSION',
@@ -35,7 +36,7 @@ const initialHud = {
   attackDirection: null as AttackDirection | null,
   pendingAttackDirection: null as AttackDirection | null,
   closedSegmentElapsed: 0,
-  closedSegmentDistanceKm: 0,
+  closedSegmentDistanceKm: null as number | null,
   closedSegmentIndex: 1,
   closedSegmentLabel: '',
   gpsSearchSeconds: 0,

@@ -2,7 +2,7 @@ name: Create Development Builds
 
 on:
   push:
-    branches: ['dev']
+    branches: ['preview']
 
 jobs:
   build_android:

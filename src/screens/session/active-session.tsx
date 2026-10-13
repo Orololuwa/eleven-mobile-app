@@ -28,7 +28,9 @@ import {
 import {
   isExtraTimeEnabled,
   parseTrainingActivityOptions,
+  type LiveSignal,
 } from '@/features/sessions/tracking/types';
+import { QUALITY_MIN_ACTIVE_SECONDS } from '@/features/sessions/summary/constants';
 import { useTrackingHudStore } from '@/features/sessions/tracking/tracking-store';
 import { useTrackingSession } from '@/features/sessions/tracking/use-tracking-session';
 import { HOLD_CONFIRM_SECONDS } from '@/features/sessions/tracking/constants';
@@ -56,6 +58,30 @@ const halvesCtaLabel = ({
     return 'ADD EXTRA TIME';
   }
   return '';
+};
+
+const SIGNAL_NOTICE: Record<Exclude<LiveSignal, 'good'>, { title: string | null; sub: string }> = {
+  estimated: { title: null, sub: 'SIGNAL WEAK · NUMBERS ARE ESTIMATES' },
+  settling: {
+    title: null,
+    sub: `LOCKING ON · DISTANCE AND TOP SPEED SHOW AFTER ${QUALITY_MIN_ACTIVE_SECONDS / 60} MIN OF CLEAR SIGNAL`,
+  },
+  poor: {
+    title: 'Poor signal — not tracking accurately.',
+    sub: 'MOVE INTO OPEN SKY · DISTANCE AND TOP SPEED RETURN WHEN IT CLEARS',
+  },
+};
+
+const SignalNoticeComponent: React.FC<{ signal: LiveSignal }> = ({ signal }) => {
+  const styles = useThemedStyles(createStyles);
+  if (signal === 'good') return null;
+  const { title, sub } = SIGNAL_NOTICE[signal];
+  return (
+    <View style={styles.signalBlock}>
+      {title ? <Text style={styles.autoPauseTitle}>{title}</Text> : null}
+      <Text style={[styles.signalSub, signal === 'poor' && styles.signalSubPoor]}>{sub}</Text>
+    </View>
+  );
 };
 
 const nextHalvesConfirmTitle = (closedSegmentIndex: number): string => {
@@ -126,7 +152,7 @@ const SegmentSwitchScreen: React.FC<{
   playStructure: PlayStructure;
   segmentIndex: number;
   closedElapsed: number;
-  closedDistanceKm: number;
+  closedDistanceKm: number | null;
   attackDirection: AttackDirection | null;
   distanceUnit: 'km' | 'mi';
   pendingActivityKind: ActivityKind | null;
@@ -204,8 +230,10 @@ const SegmentSwitchScreen: React.FC<{
       <View style={styles.segmentMetaRow}>
         <Text style={styles.segmentMetaChip}>{segmentMeta}</Text>
         <Text style={styles.segmentMetaChip}>
-          {closedLabel} {formatDistance({ km: closedDistanceKm, unit: distanceUnit })}{' '}
-          {distanceUnit === 'mi' ? 'MI' : 'KM'}
+          {closedLabel}{' '}
+          {closedDistanceKm == null
+            ? '—'
+            : `${formatDistance({ km: closedDistanceKm, unit: distanceUnit })} ${distanceUnit === 'mi' ? 'MI' : 'KM'}`}
         </Text>
       </View>
       <TouchableOpacity onPress={onFlip}>
@@ -392,6 +420,7 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   const isPaused = trackingStatus !== 'live';
   const metricsDimmed = trackingStatus === 'auto_pause';
   const displayTime = trainingIdle ? closedSegmentElapsed : displayElapsed;
+  const shownDistanceKm = trainingIdle ? closedSegmentDistanceKm : metrics.distanceKm;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -466,6 +495,10 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
           </View>
         ) : null}
 
+        {trackingStatus === 'live' && !trainingIdle ? (
+          <SignalNoticeComponent signal={metrics.signal} />
+        ) : null}
+
         {trackingStatus === 'manual_pause' ? (
           <View style={styles.manualPauseBlock}>
             <Text style={styles.autoPauseTitle}>Take your time.</Text>
@@ -486,24 +519,29 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
             <Text style={styles.primaryStatLabel}>
               {trainingIdle ? 'LAST DISTANCE' : 'DISTANCE'}
             </Text>
-            <Text style={styles.primaryStatValue}>
-              {formatDistance({
-                km: trainingIdle ? closedSegmentDistanceKm : metrics.distanceKm,
-                unit: distanceUnit,
-              })}
-              <Text style={styles.primaryStatUnit}> {distanceUnit === 'mi' ? 'MI' : 'KM'}</Text>
-            </Text>
+            {shownDistanceKm == null ? (
+              <Text style={[styles.primaryStatValue, styles.suppressedValue]}>—</Text>
+            ) : (
+              <Text style={styles.primaryStatValue}>
+                {formatDistance({ km: shownDistanceKm, unit: distanceUnit })}
+                <Text style={styles.primaryStatUnit}> {distanceUnit === 'mi' ? 'MI' : 'KM'}</Text>
+              </Text>
+            )}
           </View>
           {trainingIdle ? null : (
             <View style={[styles.primaryStat, styles.primaryStatBorder]}>
               <Text style={styles.primaryStatLabel}>TOP SPEED</Text>
-              <Text style={[styles.primaryStatValue, styles.speedHighlight]}>
-                {formatSpeed({ kmh: metrics.topSpeedKmh, unit: distanceUnit })}
-                <Text style={styles.primaryStatUnit}>
-                  {' '}
-                  {distanceUnit === 'mi' ? 'MPH' : 'KM/H'}
+              {metrics.topSpeedKmh == null ? (
+                <Text style={[styles.primaryStatValue, styles.suppressedValue]}>—</Text>
+              ) : (
+                <Text style={[styles.primaryStatValue, styles.speedHighlight]}>
+                  {formatSpeed({ kmh: metrics.topSpeedKmh, unit: distanceUnit })}
+                  <Text style={styles.primaryStatUnit}>
+                    {' '}
+                    {distanceUnit === 'mi' ? 'MPH' : 'KM/H'}
+                  </Text>
                 </Text>
-              </Text>
+              )}
             </View>
           )}
         </View>
@@ -772,6 +810,23 @@ const createStyles = (colors: Colors) =>
       fontSize: 11,
       color: colors.accent.danger,
       letterSpacing: 0.16 * 11,
+    },
+    signalBlock: {
+      paddingHorizontal: spacing[6],
+      paddingTop: spacing[4],
+      gap: 8,
+    },
+    signalSub: {
+      fontFamily: typography.fontFamily.mono,
+      fontSize: 10,
+      color: colors.accent.warning,
+      letterSpacing: 0.14 * 10,
+    },
+    signalSubPoor: {
+      color: colors.accent.danger,
+    },
+    suppressedValue: {
+      color: colors.text.disabled,
     },
     autoPauseFoot: {
       fontFamily: typography.fontFamily.mono,
