@@ -1,5 +1,5 @@
 /** Bump when the same trace would store different numbers. See spec §6.2. */
-export const ALGORITHM_VERSION = 'v1';
+export const ALGORITHM_VERSION = 'v2';
 
 export const GAP_BRIDGE_MAX_SECONDS = 5;
 export const SPRINT_MIN_SECONDS = 1;
@@ -12,10 +12,10 @@ export const SPRINT_MERGE_CAP_SECONDS = 2;
 export const LONG_AXIS_MIN_M = 15;
 export const LONG_AXIS_MAX_M = 130;
 
+/** Gap = active time not covered by bridged quality-gate fixes. Retune with QUALITY_FIX_ACCURACY_M. */
 export const QUALITY_GOOD_GAP = 0.05;
 export const QUALITY_INSUFFICIENT_GAP = 0.25;
-export const QUALITY_GOOD_ACCEPTANCE = 0.7;
-export const QUALITY_INSUFFICIENT_ACCEPTANCE = 0.4;
+/** Minimum quality-gate fixes for a session to report anything. */
 export const QUALITY_MIN_FIXES = 120;
 export const QUALITY_MIN_ACTIVE_SECONDS = 120;
 

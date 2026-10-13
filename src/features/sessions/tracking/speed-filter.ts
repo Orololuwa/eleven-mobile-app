@@ -6,12 +6,13 @@ import {
   TOP_SPEED_MIN_FIXES,
   TOP_SPEED_SUSTAINED_MS,
 } from './constants';
+import { passesQualityGate } from './fix-gates';
 import { planeMetres, scaleAtLatitude, type DegreeScale } from './geodesic';
 import type { TrackingPointRow } from './types';
 
 type SpeedPoint = Pick<
   TrackingPointRow,
-  'recorded_at' | 'lat' | 'lng' | 'speed_kmh' | 'speed_accuracy_mps'
+  'recorded_at' | 'lat' | 'lng' | 'speed_kmh' | 'speed_accuracy_mps' | 'horizontal_accuracy_m'
 >;
 
 type WindowSample = { kmh: number; lat: number; lng: number };
@@ -24,8 +25,16 @@ type WindowState = {
 
 export type TopSpeedPeak = { kmh: number; lat: number; lng: number };
 
-const passesF1 = (point: SpeedPoint) =>
-  point.speed_accuracy_mps == null || point.speed_accuracy_mps <= SPEED_ACCURACY_MAX_MPS;
+/**
+ * F1 — confidence over both accuracy fields. Horizontal accuracy covers F3's blind spot: when
+ * position noise is the fault, the position-delta cross-check is inflated by the same noise.
+ * Null speed accuracy skips only that half.
+ */
+export const passesSpeedConfidence = (
+  point: Pick<SpeedPoint, 'speed_accuracy_mps' | 'horizontal_accuracy_m'>,
+) =>
+  passesQualityGate(point.horizontal_accuracy_m) &&
+  (point.speed_accuracy_mps == null || point.speed_accuracy_mps <= SPEED_ACCURACY_MAX_MPS);
 
 const passesF2 = (speedKmh: number) => speedKmh < TOP_SPEED_CEILING_KMH;
 
@@ -48,7 +57,10 @@ const passesF3 = ({
   const averagedOsKmh = (prev.speed_kmh + point.speed_kmh) / 2;
   if (averagedOsKmh <= 0) return true;
 
-  return deltaSpeedKmh >= averagedOsKmh * SPEED_CROSSCHECK_MIN_RATIO;
+  return (
+    deltaSpeedKmh >= averagedOsKmh * SPEED_CROSSCHECK_MIN_RATIO &&
+    deltaSpeedKmh <= averagedOsKmh / SPEED_CROSSCHECK_MIN_RATIO
+  );
 };
 
 const withinBand = ({ readingKmh, anchorKmh }: { readingKmh: number; anchorKmh: number }) =>
@@ -62,7 +74,7 @@ const isConfirmed = (window: WindowState, atMs: number) =>
   atMs - window.startedAtMs >= TOP_SPEED_SUSTAINED_MS;
 
 /**
- * F1–F4 over accepted fixes. Returns the confirmed peak and the fix that set it.
+ * F1–F4 over stored fixes. Returns the confirmed peak and the fix that set it.
  * Live HUD uses the number; the summary copies the location before the trace is deleted.
  */
 export const determineTopSpeedPeak = (points: SpeedPoint[]): TopSpeedPeak | null => {
@@ -76,7 +88,7 @@ export const determineTopSpeedPeak = (points: SpeedPoint[]): TopSpeedPeak | null
     const isCandidate =
       speedKmh != null &&
       speedKmh > 0 &&
-      passesF1(point) &&
+      passesSpeedConfidence(point) &&
       passesF2(speedKmh) &&
       passesF3({ point, prev, scale });
 

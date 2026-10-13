@@ -182,6 +182,7 @@ export type SessionMetricsPayload = {
   };
   pitch_long_axis_m: number | null;
   accepted_fix_count: number;
+  continuity_fix_count: number | null;
   gap_seconds: number;
   algorithm_version: string;
   computed_at: string;
@@ -238,9 +239,18 @@ export type TrackPointsBody = {
   points: TrackPointUpload[];
 };
 
+/**
+ * Live signal, from the summary's data-quality classification. `settling` and `poor` both mean the
+ * session would be `insufficient` right now: `settling` is a session too young to report, `poor` is
+ * one losing signal.
+ */
+export type LiveSignal = 'good' | 'estimated' | 'settling' | 'poor';
+
+/** Distance and top speed are null whenever the summary would suppress them. */
 export type LiveMetrics = {
-  distanceKm: number;
-  topSpeedKmh: number;
+  distanceKm: number | null;
+  topSpeedKmh: number | null;
+  signal: LiveSignal;
 };
 
 export const parseTrainingActivityOptions = (value: string | null | undefined): ActivityKind[] => {

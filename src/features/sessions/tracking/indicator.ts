@@ -10,18 +10,16 @@ import {
   getCurrentSegment,
   getPausesForSegment,
   getPausesForSession,
-  getPointsForSegment,
-  getPointsForSession,
   getSegmentsForSession,
 } from './db';
 import {
-  computeLiveMetrics,
   elapsedSecondsFromPauses,
   formatDistance,
   formatElapsedLong,
   formatSpeed,
 } from './live-metrics';
-import type { TrackingSegmentRow, TrackingSessionRow } from './types';
+import { readLiveReadout } from './live-readout';
+import type { LiveSignal, TrackingSegmentRow, TrackingSessionRow } from './types';
 import { segmentLabelFor } from '../segment-display';
 
 let lastAndroidNotificationBody: string | null = null;
@@ -30,10 +28,32 @@ let lastIndicatorPushAt = 0;
 
 type IndicatorSnapshot = {
   elapsedSeconds: number;
-  distanceKm: number;
-  topSpeedKmh: number;
+  /** Null when the summary would suppress it; the indicator then shows the signal state instead. */
+  distanceKm: number | null;
+  topSpeedKmh: number | null;
+  signal: LiveSignal;
   segmentLabel: string;
   distanceUnit: 'km' | 'mi';
+};
+
+const signalLabel = (signal: LiveSignal) =>
+  signal === 'poor' ? 'POOR SIGNAL' : signal === 'settling' ? 'LOCKING ON' : 'SIGNAL WEAK';
+
+const formatReadout = ({
+  elapsedSeconds,
+  distanceKm,
+  topSpeedKmh,
+  signal,
+  distanceUnit,
+}: Omit<IndicatorSnapshot, 'segmentLabel'>) => {
+  const elapsed = formatElapsedLong(elapsedSeconds);
+  if (distanceKm == null || topSpeedKmh == null) return `${elapsed} · ${signalLabel(signal)}`;
+  const distance = formatDistance({ km: distanceKm, unit: distanceUnit });
+  const speed = formatSpeed({ kmh: topSpeedKmh, unit: distanceUnit });
+  const distanceSuffix = distanceUnit === 'mi' ? 'MI' : 'KM';
+  const speedSuffix = distanceUnit === 'mi' ? 'MPH' : 'KM/H';
+  const readout = `${elapsed} · ${distance} ${distanceSuffix} · TOP ${speed} ${speedSuffix}`;
+  return signal === 'estimated' ? `${readout} · ${signalLabel(signal)}` : readout;
 };
 
 const liveActivityConfig: LiveActivity.LiveActivityConfig = {
@@ -73,38 +93,16 @@ const resolveDistanceUnit = (distanceUnit?: 'km' | 'mi'): 'km' | 'mi' => {
   return lastDistanceUnit;
 };
 
-export const buildNotificationBody = ({
-  elapsedSeconds,
-  distanceKm,
-  topSpeedKmh,
-  distanceUnit,
-}: Omit<IndicatorSnapshot, 'segmentLabel'>) => {
-  const elapsed = formatElapsedLong(elapsedSeconds);
-  const distance = formatDistance({ km: distanceKm, unit: distanceUnit });
-  const speed = formatSpeed({ kmh: topSpeedKmh, unit: distanceUnit });
-  const distanceSuffix = distanceUnit === 'mi' ? 'MI' : 'KM';
-  const speedSuffix = distanceUnit === 'mi' ? 'MPH' : 'KM/H';
-  return `${elapsed} · ${distance} ${distanceSuffix} · TOP ${speed} ${speedSuffix}`;
-};
+export const buildNotificationBody = (snapshot: Omit<IndicatorSnapshot, 'segmentLabel'>) =>
+  formatReadout(snapshot);
 
 const buildLiveActivityState = ({
   segmentLabel,
-  elapsedSeconds,
-  distanceKm,
-  topSpeedKmh,
-  distanceUnit,
-}: IndicatorSnapshot): LiveActivity.LiveActivityState => {
-  const distance = formatDistance({ km: distanceKm, unit: distanceUnit });
-  const speed = formatSpeed({ kmh: topSpeedKmh, unit: distanceUnit });
-  const distanceSuffix = distanceUnit === 'mi' ? 'MI' : 'KM';
-  const speedSuffix = distanceUnit === 'mi' ? 'MPH' : 'KM/H';
-  const elapsed = formatElapsedLong(elapsedSeconds);
-
-  return {
-    title: `TRACKING · ${segmentLabel.toUpperCase()}`,
-    subtitle: `${elapsed} · ${distance} ${distanceSuffix} · TOP ${speed} ${speedSuffix}`,
-  };
-};
+  ...snapshot
+}: IndicatorSnapshot): LiveActivity.LiveActivityState => ({
+  title: `TRACKING · ${segmentLabel.toUpperCase()}`,
+  subtitle: formatReadout(snapshot),
+});
 
 const androidLocationOptions = (notificationBody: string): Location.LocationTaskOptions => ({
   accuracy: Location.Accuracy.BestForNavigation,
@@ -242,14 +240,11 @@ export const refreshTrackingIndicator = async ({
   const segment = await getCurrentSegment(session.id);
   const allSegments = await getSegmentsForSession(session.id);
   const segmentId = segment?.id ?? null;
-  const points = segmentId
-    ? await getPointsForSegment(segmentId)
-    : await getPointsForSession(session.id);
   const pauses = segmentId
     ? await getPausesForSegment(segmentId)
     : (await getPausesForSession(session.id)).filter((pause) => pause.segment_id == null);
 
-  const metrics = computeLiveMetrics({ points, pausedRanges: pauses });
+  const metrics = await readLiveReadout({ sessionId: session.id, segmentId });
   const startedAt = segment?.started_at ?? session.started_at;
   const elapsedSeconds = elapsedSecondsFromPauses({ startedAt, pausedRanges: pauses });
 
@@ -263,6 +258,7 @@ export const refreshTrackingIndicator = async ({
       elapsedSeconds,
       distanceKm: metrics.distanceKm,
       topSpeedKmh: metrics.topSpeedKmh,
+      signal: metrics.signal,
     },
     distanceUnit: unit,
   });

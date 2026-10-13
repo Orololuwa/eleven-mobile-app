@@ -1,8 +1,5 @@
-import {
-  ACCEPTED_FIX_ACCURACY_M,
-  SPEED_ACCURACY_MAX_MPS,
-  TOP_SPEED_CEILING_KMH,
-} from '../tracking/constants';
+import { TOP_SPEED_CEILING_KMH } from '../tracking/constants';
+import { passesContinuityGate, passesQualityGate } from '../tracking/fix-gates';
 import {
   centroidLatitude,
   planeMetres,
@@ -10,14 +7,12 @@ import {
   type DegreeScale,
   type LatLng,
 } from '../tracking/geodesic';
-import { determineTopSpeedPeak } from '../tracking/speed-filter';
+import { determineTopSpeedPeak, passesSpeedConfidence } from '../tracking/speed-filter';
 import {
   ALGORITHM_VERSION,
   CALORIE_KCAL_PER_KG_PER_KM,
   GAP_BRIDGE_MAX_SECONDS,
-  QUALITY_GOOD_ACCEPTANCE,
   QUALITY_GOOD_GAP,
-  QUALITY_INSUFFICIENT_ACCEPTANCE,
   QUALITY_INSUFFICIENT_GAP,
   QUALITY_MIN_ACTIVE_SECONDS,
   QUALITY_MIN_FIXES,
@@ -64,12 +59,14 @@ const emptyZones = (): ZoneSeconds => ({
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-const isAcceptedFix = (point: ComputationPoint) =>
-  point.horizontalAccuracyM == null || point.horizontalAccuracyM < ACCEPTED_FIX_ACCURACY_M;
-
 const osSpeedKmh = (point: ComputationPoint) => {
   if (point.speedKmh == null || point.speedKmh <= 0) return null;
-  if (point.speedAccuracyMps != null && point.speedAccuracyMps > SPEED_ACCURACY_MAX_MPS)
+  if (
+    !passesSpeedConfidence({
+      speed_accuracy_mps: point.speedAccuracyMps,
+      horizontal_accuracy_m: point.horizontalAccuracyM,
+    })
+  )
     return null;
   if (point.speedKmh >= TOP_SPEED_CEILING_KMH) return null;
   return point.speedKmh;
@@ -120,6 +117,7 @@ const longAxisMetres = (corners: NonNullable<ComputationInput['corners']>, scale
   );
 };
 
+/** 0.5 §3.9. The live HUD reads this through `computeSessionMetrics` too — never a second copy. */
 const classifyQuality = ({
   gapSeconds,
   activeSeconds,
@@ -131,17 +129,14 @@ const classifyQuality = ({
 }): DataQuality => {
   if (activeSeconds <= 0) return 'insufficient';
   const gapFraction = gapSeconds / activeSeconds;
-  const acceptance = acceptedFixCount / activeSeconds;
   if (
     gapFraction > QUALITY_INSUFFICIENT_GAP ||
-    acceptance < QUALITY_INSUFFICIENT_ACCEPTANCE ||
     acceptedFixCount < QUALITY_MIN_FIXES ||
     activeSeconds < QUALITY_MIN_ACTIVE_SECONDS
   ) {
     return 'insufficient';
   }
-  if (gapFraction <= QUALITY_GOOD_GAP && acceptance >= QUALITY_GOOD_ACCEPTANCE) return 'good';
-  return 'estimated';
+  return gapFraction <= QUALITY_GOOD_GAP ? 'good' : 'estimated';
 };
 
 const kcalFromTime = ({ seconds, met, massKg }: { seconds: number; met: number; massKg: number }) =>
@@ -364,8 +359,13 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
     longAxisM: pitchLongAxisM,
   });
 
+  const segmentIds = new Set(segments.map((segment) => segment.id));
+  const continuityFixCount = input.points.filter(
+    (point) => segmentIds.has(point.segmentId) && passesContinuityGate(point.horizontalAccuracyM),
+  ).length;
+
   const accepted: AcceptedFix[] = input.points
-    .filter((point) => point.segmentId && isAcceptedFix(point))
+    .filter((point) => point.segmentId && passesQualityGate(point.horizontalAccuracyM))
     .map((point) => ({
       ...point,
       atMs: Date.parse(point.recordedAt),
@@ -374,7 +374,7 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
     .sort((a, b) => a.atMs - b.atMs || a.segmentId.localeCompare(b.segmentId));
 
   const distance = new Map<string, number>();
-  const gap = new Map<string, number>();
+  const covered = new Map<string, number>();
   const zoneFloat = new Map<string, Record<ZoneName, number>>();
   const calorieFloat = new Map<string, number>();
   const fixCount = new Map<string, number>();
@@ -384,7 +384,7 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
 
   segments.forEach((segment) => {
     distance.set(segment.id, 0);
-    gap.set(segment.id, 0);
+    covered.set(segment.id, 0);
     zoneFloat.set(segment.id, emptyZones());
     calorieFloat.set(segment.id, 0);
     fixCount.set(segment.id, 0);
@@ -411,17 +411,14 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
       endMs: current.atMs,
       pauses: input.pauses.filter((pause) => pause.segmentId === previous.segmentId),
     });
-    const playingSec = Math.max(0, dt - manualOverlap);
     const impliedKmh = (metres / dt) * 3.6;
     const bridged =
       manualOverlap === 0 && dt <= GAP_BRIDGE_MAX_SECONDS && impliedKmh < TOP_SPEED_CEILING_KMH;
 
-    if (!bridged) {
-      gap.set(previous.segmentId, (gap.get(previous.segmentId) ?? 0) + playingSec);
-      continue;
-    }
+    if (!bridged) continue;
 
     distance.set(previous.segmentId, (distance.get(previous.segmentId) ?? 0) + metres);
+    covered.set(previous.segmentId, (covered.get(previous.segmentId) ?? 0) + dt);
     const derived = impliedKmh > 0 && impliedKmh < TOP_SPEED_CEILING_KMH ? impliedKmh : null;
     const speedKmh = previous.osSpeedKmh ?? derived;
     if (previous.osSpeedKmh != null) usedOs = true;
@@ -465,7 +462,10 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
 
   const segmentRows: ComputedSegmentMetrics[] = segments.map((segment) => {
     const activeDurationSeconds = activeSecondsForSegment({ segment, pauses: input.pauses });
-    const gapSeconds = Math.min(activeDurationSeconds, Math.round(gap.get(segment.id) ?? 0));
+    const gapSeconds = Math.min(
+      activeDurationSeconds,
+      Math.max(0, Math.round(activeDurationSeconds - (covered.get(segment.id) ?? 0))),
+    );
     const points = accepted.filter((fix) => fix.segmentId === segment.id);
     const peak = suppressSpeed
       ? null
@@ -476,6 +476,7 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
             lng: fix.lng,
             speed_kmh: fix.speedKmh,
             speed_accuracy_mps: fix.speedAccuracyMps,
+            horizontal_accuracy_m: fix.horizontalAccuracyM,
           })),
         );
     const derivedPeak = spans
@@ -558,6 +559,7 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
     speedBandBoundaries: boundaries,
     pitchLongAxisM,
     acceptedFixCount,
+    continuityFixCount,
     gapSeconds,
     algorithmVersion: ALGORITHM_VERSION,
     computedAt: input.computedAt ?? new Date().toISOString(),

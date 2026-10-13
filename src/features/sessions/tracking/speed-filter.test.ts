@@ -12,6 +12,7 @@ const point = ({
   lat = 6.45,
   lng = 3.39,
   speedAccuracyMps = 1.0,
+  horizontalAccuracyM = 5,
   metresNorth = 0,
 }: {
   tSec: number;
@@ -19,6 +20,7 @@ const point = ({
   lat?: number;
   lng?: number;
   speedAccuracyMps?: number | null;
+  horizontalAccuracyM?: number | null;
   metresNorth?: number;
 }) => ({
   recorded_at: new Date(Date.UTC(2026, 0, 1, 12, 0, tSec)).toISOString(),
@@ -26,29 +28,38 @@ const point = ({
   lng,
   speed_kmh: speedKmh,
   speed_accuracy_mps: speedAccuracyMps,
+  horizontal_accuracy_m: horizontalAccuracyM,
 });
 
-/** Place points so haversine distance matches an implied constant speed over each interval. */
+/**
+ * Place points so position-delta speed matches an implied constant speed over each interval.
+ * `positionScale` multiplies the movement to simulate position noise against OS speed.
+ */
 const trailAtSpeed = ({
   speedsKmh,
   intervalSec = 1,
   speedAccuracyMps = 1.0,
+  horizontalAccuracyM = 5,
+  positionScale = 1,
 }: {
   speedsKmh: number[];
   intervalSec?: number;
   speedAccuracyMps?: number | null;
+  horizontalAccuracyM?: number | null;
+  positionScale?: number;
 }) => {
   let metresNorth = 0;
   return speedsKmh.map((speedKmh, index) => {
     if (index > 0) {
       const intervalAverage = (speedsKmh[index - 1] + speedKmh) / 2;
-      metresNorth += (intervalAverage / 3.6) * intervalSec;
+      metresNorth += (intervalAverage / 3.6) * intervalSec * positionScale;
     }
     return point({
       tSec: index * intervalSec,
       speedKmh,
       metresNorth,
       speedAccuracyMps,
+      horizontalAccuracyM,
     });
   });
 };
@@ -104,6 +115,51 @@ describe('determineTopSpeedKmh', () => {
       speedAccuracyMps: 2.5,
     });
     expect(determineTopSpeedKmh(points)).toBe(0);
+  });
+
+  it('F1 rejects a reading over the 10 m quality gate even when F3 corroborates it', () => {
+    const points = trailAtSpeed({
+      speedsKmh: [28, 28.5, 29],
+      intervalSec: 1.5,
+      horizontalAccuracyM: 15,
+    });
+    expect(determineTopSpeedKmh(points)).toBe(0);
+  });
+
+  it('F1 accepts a reading exactly at the 10 m quality gate', () => {
+    const points = trailAtSpeed({
+      speedsKmh: [28, 28.5, 29],
+      intervalSec: 1.5,
+      horizontalAccuracyM: 10,
+    });
+    expect(determineTopSpeedKmh(points)).toBe(29);
+  });
+
+  it('F1 rejects a reading with no horizontal accuracy', () => {
+    const points = trailAtSpeed({
+      speedsKmh: [28, 28.5, 29],
+      intervalSec: 1.5,
+      horizontalAccuracyM: null,
+    });
+    expect(determineTopSpeedKmh(points)).toBe(0);
+  });
+
+  it('F3 rejects a position jump when delta-speed is above 200% of averaged OS speed', () => {
+    const points = trailAtSpeed({
+      speedsKmh: [10, 10, 10, 10],
+      intervalSec: 1.5,
+      positionScale: 3,
+    });
+    expect(determineTopSpeedKmh(points)).toBe(0);
+  });
+
+  it('F3 passes position movement within 200% of averaged OS speed', () => {
+    const points = trailAtSpeed({
+      speedsKmh: [10, 10, 10, 10],
+      intervalSec: 1.5,
+      positionScale: 1.8,
+    });
+    expect(determineTopSpeedKmh(points)).toBe(10);
   });
 
   it('F2 rejects readings at or above 40 km/h', () => {

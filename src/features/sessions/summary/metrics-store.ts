@@ -30,6 +30,8 @@ export type StoredSessionMetrics = {
   speed_band_boundaries_json: string;
   pitch_long_axis_m: number | null;
   accepted_fix_count: number;
+  /** Null for metrics computed before `v2`. */
+  continuity_fix_count: number | null;
   gap_seconds: number;
   algorithm_version: string;
   computed_at: string;
@@ -93,8 +95,8 @@ export const saveComputedMetrics = async ({
         sprint_count, sprint_distance_m, zone_walk_seconds, zone_jog_seconds, zone_run_seconds,
         zone_high_run_seconds, zone_sprint_seconds, calories_kcal, mass_kg_at_computation,
         speed_source, data_quality, speed_band_bucket, speed_band_boundaries_json, pitch_long_axis_m,
-        accepted_fix_count, gap_seconds, algorithm_version, computed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        accepted_fix_count, continuity_fix_count, gap_seconds, algorithm_version, computed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         sessionId,
         computed.activeDurationSeconds,
@@ -117,6 +119,7 @@ export const saveComputedMetrics = async ({
         boundaries,
         computed.pitchLongAxisM,
         computed.acceptedFixCount,
+        computed.continuityFixCount,
         computed.gapSeconds,
         computed.algorithmVersion,
         computed.computedAt,
@@ -217,6 +220,7 @@ export const toSessionMetricsPayload = (row: StoredSessionMetrics): SessionMetri
   speed_band_boundaries_kmh: parseBandBoundaries(row.speed_band_boundaries_json),
   pitch_long_axis_m: row.pitch_long_axis_m,
   accepted_fix_count: row.accepted_fix_count,
+  continuity_fix_count: row.continuity_fix_count,
   gap_seconds: row.gap_seconds,
   algorithm_version: row.algorithm_version,
   computed_at: row.computed_at,

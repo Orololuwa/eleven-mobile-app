@@ -1,12 +1,24 @@
 /**
- * Accepted-fix horizontal accuracy threshold (metres).
- * 40m is still usable for pitch tracking; 20m was rejecting most Android
- * pocket/indoor-edge fixes and triggering permanent gps_loss.
+ * Continuity gate (metres, inclusive). A fix within it proves tracking is alive: it resets the
+ * GPS-loss timer and is stored in the trace. Generous on purpose — a false signal-loss pause is
+ * worse than a marginal fix.
  */
-export const ACCEPTED_FIX_ACCURACY_M = 40;
+export const CONTINUITY_FIX_ACCURACY_M = 50;
 
-/** No accepted fix for this long (after the first good lock) → auto-pause (gps_loss). */
+/**
+ * Quality gate (metres, inclusive). Only fixes within it feed distance, speed, sprints, and zones.
+ * Coupled to the summary's gap-based data quality: time covered only by fixes outside it is gap.
+ */
+export const QUALITY_FIX_ACCURACY_M = 10;
+
+/** No continuity-passing fix for this long (after the first lock) → auto-pause (gps_loss). */
 export const GPS_LOSS_PAUSE_MS = 30_000;
+
+/**
+ * Before this much active time, an `insufficient` live readout reads as settling rather than poor
+ * signal — the first fix has not had time to arrive. Presentation only; suppression is unchanged.
+ */
+export const LIVE_SIGNAL_SETTLE_SECONDS = 10;
 
 /** Cooldown after auto-resume before another auto-pause can fire. */
 export const AUTO_RESUME_COOLDOWN_MS = 10_000;
@@ -47,7 +59,10 @@ export const SPEED_ACCURACY_MAX_MPS = 2.0;
 /** F2 — physically implausible top-speed ceiling (km/h). Reject at or above. */
 export const TOP_SPEED_CEILING_KMH = 40;
 
-/** F3 — reject when position-delta speed is below this fraction of averaged OS speed. */
+/**
+ * F3 — reject when position-delta speed is below this fraction of averaged OS speed, or above its
+ * reciprocal (a position jump). One ratio tunes both sides.
+ */
 export const SPEED_CROSSCHECK_MIN_RATIO = 0.5;
 
 /** F4 — sustained peak must span at least this duration (ms). */

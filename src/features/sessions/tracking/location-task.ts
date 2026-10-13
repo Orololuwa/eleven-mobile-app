@@ -2,7 +2,6 @@ import { AppState, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import {
-  ACCEPTED_FIX_ACCURACY_M,
   ANDROID_FGS_TITLE,
   AUTO_RESUME_COOLDOWN_MS,
   GPS_LOSS_PAUSE_MS,
@@ -17,6 +16,7 @@ import {
   insertTrackPoint,
   updateSessionFields,
 } from './db';
+import { passesContinuityGate } from './fix-gates';
 import { getForegroundPermissionStatus } from './permissions';
 import type { PauseReason } from './types';
 
@@ -91,14 +91,14 @@ export const processLocationUpdate = async (
   const { coords, timestamp } = latest;
   const accuracy = coords.accuracy;
   const hasCoords = coords.latitude != null && coords.longitude != null;
-  const isAccurate = accuracy == null || accuracy < ACCEPTED_FIX_ACCURACY_M;
+  const isAlive = passesContinuityGate(accuracy);
 
   const openPause = await getOpenPause(session.id);
   const inManualPause = session.tracking_status === 'manual_pause';
   const inAutoPause = session.tracking_status === 'auto_pause';
   const inActivity = session.current_segment_id != null;
 
-  if (hasCoords && isAccurate) {
+  if (hasCoords && isAlive) {
     await updateSessionFields(session.id, {
       last_accepted_fix_at: new Date(timestamp).toISOString(),
     });
@@ -110,6 +110,7 @@ export const processLocationUpdate = async (
 
   const canInsert =
     hasCoords &&
+    isAlive &&
     inActivity &&
     session.current_segment_id != null &&
     !inManualPause &&
@@ -145,19 +146,21 @@ export const processLocationUpdate = async (
     source,
     reason: !hasCoords
       ? 'no-coords'
-      : !inActivity
-        ? 'no-activity'
-        : inManualPause
-          ? 'manual-pause'
-          : openPause
-            ? `pause:${openPause.reason}`
-            : 'unknown',
+      : !isAlive
+        ? 'continuity-gate'
+        : !inActivity
+          ? 'no-activity'
+          : inManualPause
+            ? 'manual-pause'
+            : openPause
+              ? `pause:${openPause.reason}`
+              : 'unknown',
     accuracy,
     trackingStatus: session.tracking_status,
   });
 
   if (!hasCoords || inManualPause || !inActivity) return;
-  if (isAccurate) return;
+  if (isAlive) return;
   if (!session.last_accepted_fix_at) return;
 
   const lastFixMs = msSince(session.last_accepted_fix_at);

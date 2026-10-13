@@ -92,7 +92,10 @@ export type ComputedSessionMetrics = {
   speedBandBucket: SpeedBandBucket;
   speedBandBoundaries: SpeedBandBoundaries;
   pitchLongAxisM: number | null;
+  /** Fixes that passed the quality gate. */
   acceptedFixCount: number;
+  /** Fixes that passed the continuity gate. Non-binding sampling signal; not used to classify. */
+  continuityFixCount: number;
   gapSeconds: number;
   algorithmVersion: string;
   computedAt: string;

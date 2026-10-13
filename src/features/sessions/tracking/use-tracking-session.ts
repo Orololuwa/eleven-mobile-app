@@ -9,7 +9,6 @@ import {
 } from '../segment-display';
 import {
   getCurrentSegment,
-  getPausesForSegment,
   getSegmentsForSession,
   getTrackingSession,
   initTrackingDb,
@@ -36,7 +35,8 @@ import {
 import { startSyncListeners } from './sync';
 import { useTrackingHudStore } from './tracking-store';
 import type { TrackingSessionRow } from './types';
-import { computeLiveMetrics, gpsStrengthBars } from './live-metrics';
+import { gpsStrengthBars } from './live-metrics';
+import { readLiveReadout } from './live-readout';
 
 export const useTrackingSession = ({
   sessionId,
@@ -140,8 +140,7 @@ export const useTrackingSession = ({
       const points = segmentId
         ? await getPointsForSegment(segmentId)
         : await getPointsForSession(sessionId);
-      const pauses = segmentId ? await getPausesForSegment(segmentId) : [];
-      const metrics = computeLiveMetrics({ points, pausedRanges: pauses });
+      const metrics = await readLiveReadout({ sessionId, segmentId });
       const elapsedSeconds = segmentId
         ? await computeSegmentElapsedSeconds(sessionId, segmentId)
         : 0;
@@ -219,9 +218,8 @@ export const useTrackingSession = ({
   const stopCurrentActivity = async () => {
     const segment = await getCurrentSegment(sessionId);
     const segmentId = segment?.id ?? null;
-    const points = segmentId ? await getPointsForSegment(segmentId) : [];
     const elapsed = await computeSegmentElapsedSeconds(sessionId, segmentId);
-    const metrics = computeLiveMetrics({ points, pausedRanges: [] });
+    const metrics = await readLiveReadout({ sessionId, segmentId });
     const row = await getTrackingSession(sessionId);
     const allSegments = await getSegmentsForSession(sessionId);
     const closedLabel = row ? segmentLabelFor({ session: row, segment, allSegments }) : '';
@@ -248,9 +246,8 @@ export const useTrackingSession = ({
 
     const segment = await getCurrentSegment(sessionId);
     const segmentId = segment?.id ?? null;
-    const points = segmentId ? await getPointsForSegment(segmentId) : [];
     const elapsed = await computeSegmentElapsedSeconds(sessionId, segmentId);
-    const metrics = computeLiveMetrics({ points, pausedRanges: [] });
+    const metrics = await readLiveReadout({ sessionId, segmentId });
 
     setHud({
       closedSegmentElapsed: elapsed,
