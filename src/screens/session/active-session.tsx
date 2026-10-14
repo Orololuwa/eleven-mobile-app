@@ -30,7 +30,6 @@ import {
   parseTrainingActivityOptions,
   type LiveSignal,
 } from '@/features/sessions/tracking/types';
-import { QUALITY_MIN_ACTIVE_SECONDS } from '@/features/sessions/summary/constants';
 import { useTrackingHudStore } from '@/features/sessions/tracking/tracking-store';
 import { useTrackingSession } from '@/features/sessions/tracking/use-tracking-session';
 import { HOLD_CONFIRM_SECONDS } from '@/features/sessions/tracking/constants';
@@ -62,13 +61,11 @@ const halvesCtaLabel = ({
 
 const SIGNAL_NOTICE: Record<Exclude<LiveSignal, 'good'>, { title: string | null; sub: string }> = {
   estimated: { title: null, sub: 'SIGNAL WEAK · NUMBERS ARE ESTIMATES' },
-  settling: {
-    title: null,
-    sub: `LOCKING ON · DISTANCE AND TOP SPEED SHOW AFTER ${QUALITY_MIN_ACTIVE_SECONDS / 60} MIN OF CLEAR SIGNAL`,
-  },
+  settling: { title: null, sub: 'MEASURING · EARLY NUMBERS ARE ESTIMATES' },
+  recovering: { title: null, sub: 'SIGNAL BACK · EARLIER GAPS · NUMBERS READ LOW' },
   poor: {
     title: 'Poor signal — not tracking accurately.',
-    sub: 'MOVE INTO OPEN SKY · DISTANCE AND TOP SPEED RETURN WHEN IT CLEARS',
+    sub: 'MOVE INTO OPEN SKY · DISTANCE PAUSES UNTIL IT CLEARS',
   },
 };
 

@@ -7,15 +7,9 @@ import {
   plannedMinutesForSegment,
   segmentLabelFor,
 } from '../segment-display';
+import { getCurrentSegment, getSegmentsForSession, getTrackingSession, initTrackingDb } from './db';
 import {
-  getCurrentSegment,
-  getSegmentsForSession,
-  getTrackingSession,
-  initTrackingDb,
-  getPointsForSegment,
-  getPointsForSession,
-} from './db';
-import {
+  getLatestFix,
   handleAppBackgrounded,
   handleAppForegrounded,
   isLocationTaskRunning,
@@ -35,7 +29,7 @@ import {
 import { startSyncListeners } from './sync';
 import { useTrackingHudStore } from './tracking-store';
 import type { TrackingSessionRow } from './types';
-import { gpsStrengthBars } from './live-metrics';
+import { currentFixAccuracyM, gpsStrengthBars } from './live-metrics';
 import { readLiveReadout } from './live-readout';
 
 export const useTrackingSession = ({
@@ -137,9 +131,6 @@ export const useTrackingSession = ({
       const segment = await getCurrentSegment(sessionId);
       const allSegments = await getSegmentsForSession(sessionId);
       const segmentId = segment?.id ?? null;
-      const points = segmentId
-        ? await getPointsForSegment(segmentId)
-        : await getPointsForSession(sessionId);
       const metrics = await readLiveReadout({ sessionId, segmentId });
       const elapsedSeconds = segmentId
         ? await computeSegmentElapsedSeconds(sessionId, segmentId)
@@ -162,12 +153,7 @@ export const useTrackingSession = ({
         allSegments,
       });
 
-      const latestAccuracy =
-        points.length > 0
-          ? points[points.length - 1].horizontal_accuracy_m
-          : row.last_accepted_fix_at
-            ? 10
-            : null;
+      const latestAccuracy = currentFixAccuracyM({ fix: getLatestFix() });
 
       setHud({
         elapsedSeconds,

@@ -153,7 +153,7 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
       }),
       ...(metrics
         ? {
-            session_metrics: toSessionMetricsPayload(metrics),
+            metrics: toSessionMetricsPayload(metrics),
             segment_metrics: segmentMetrics.flatMap((row) => {
               const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
               if (segmentIndex == null) return [];

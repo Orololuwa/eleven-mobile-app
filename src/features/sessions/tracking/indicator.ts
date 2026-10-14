@@ -36,8 +36,14 @@ type IndicatorSnapshot = {
   distanceUnit: 'km' | 'mi';
 };
 
-const signalLabel = (signal: LiveSignal) =>
-  signal === 'poor' ? 'POOR SIGNAL' : signal === 'settling' ? 'LOCKING ON' : 'SIGNAL WEAK';
+const SIGNAL_LABEL: Record<Exclude<LiveSignal, 'good'>, string> = {
+  estimated: 'SIGNAL WEAK',
+  settling: 'MEASURING',
+  recovering: 'SIGNAL BACK',
+  poor: 'POOR SIGNAL',
+};
+
+const signalLabel = (signal: LiveSignal) => (signal === 'good' ? '' : SIGNAL_LABEL[signal]);
 
 const formatReadout = ({
   elapsedSeconds,

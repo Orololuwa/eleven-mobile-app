@@ -219,7 +219,7 @@ export type SessionFinalizeBody = {
   ended_at: string;
   segments: SessionFinalizeSegment[];
   pauses: SessionFinalizePause[];
-  session_metrics?: SessionMetricsPayload;
+  metrics?: SessionMetricsPayload;
   segment_metrics?: SegmentMetricsPayload[];
   sprint_efforts?: SprintEffortPayload[];
 };
@@ -240,11 +240,13 @@ export type TrackPointsBody = {
 };
 
 /**
- * Live signal, from the summary's data-quality classification. `settling` and `poor` both mean the
- * session would be `insufficient` right now: `settling` is a session too young to report, `poor` is
- * one losing signal.
+ * Live signal, from the summary's data-quality classification. `settling`, `recovering`, and `poor`
+ * all mean the session would be `insufficient` right now; they differ only in wording:
+ * `settling` — measuring now, session too young to report;
+ * `recovering` — measuring now, but too much earlier time went unmeasured;
+ * `poor` — not measuring now (no fresh, bridgeable quality fixes).
  */
-export type LiveSignal = 'good' | 'estimated' | 'settling' | 'poor';
+export type LiveSignal = 'good' | 'estimated' | 'settling' | 'recovering' | 'poor';
 
 /** Distance and top speed are null whenever the summary would suppress them. */
 export type LiveMetrics = {
