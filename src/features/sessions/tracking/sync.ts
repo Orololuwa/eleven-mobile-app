@@ -157,13 +157,16 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
             segment_metrics: segmentMetrics.flatMap((row) => {
               const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
               if (segmentIndex == null) return [];
-              return [toSegmentMetricsPayload(row, segmentIndex)];
+              return [toSegmentMetricsPayload(row, segmentIndex, metrics.speed_source)];
             }),
-            sprint_efforts: sprintEfforts.flatMap((row) => {
-              const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
-              if (segmentIndex == null) return [];
-              return [toSprintEffortPayload(row, segmentIndex)];
-            }),
+            sprint_efforts:
+              metrics.speed_source === 'none'
+                ? []
+                : sprintEfforts.flatMap((row) => {
+                    const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
+                    if (segmentIndex == null) return [];
+                    return [toSprintEffortPayload(row, segmentIndex)];
+                  }),
           }
         : {}),
     };

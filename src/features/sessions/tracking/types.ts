@@ -1,4 +1,5 @@
 import type { ActivityKind, AttackDirection, PlayStructure, SessionType } from '../types';
+import type { SpeedBandBoundaries } from '../summary/speed-bands';
 import type { LocationIn } from '@/features/pitches/types';
 
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed' | 'rejected';
@@ -161,28 +162,21 @@ export type SessionMetricsPayload = {
   distance_m: number;
   top_speed_kmh: number | null;
   top_speed_location: SessionFinalizeLocation | null;
-  sprint_count: number;
-  sprint_distance_m: number;
-  zone_walk_seconds: number;
-  zone_jog_seconds: number;
-  zone_run_seconds: number;
-  zone_high_run_seconds: number;
-  zone_sprint_seconds: number;
+  sprint_count: number | null;
+  sprint_distance_m: number | null;
+  zone_walk_seconds: number | null;
+  zone_jog_seconds: number | null;
+  zone_run_seconds: number | null;
+  zone_high_run_seconds: number | null;
+  zone_sprint_seconds: number | null;
   calories_kcal: number | null;
   mass_kg_at_computation: number | null;
   speed_source: string;
   data_quality: string;
   speed_band_bucket: string;
-  speed_band_boundaries_kmh: {
-    walk_max_kmh: number;
-    jog_max_kmh: number;
-    run_max_kmh: number;
-    high_run_max_kmh: number;
-    sprint_min_kmh: number;
-  };
+  speed_band_boundaries_kmh: SpeedBandBoundaries;
   pitch_long_axis_m: number | null;
   accepted_fix_count: number;
-  continuity_fix_count: number | null;
   gap_seconds: number;
   algorithm_version: string;
   computed_at: string;
@@ -194,13 +188,13 @@ export type SegmentMetricsPayload = {
   distance_m: number;
   gap_seconds: number;
   top_speed_kmh: number | null;
-  sprint_count: number;
-  sprint_distance_m: number;
-  zone_walk_seconds: number;
-  zone_jog_seconds: number;
-  zone_run_seconds: number;
-  zone_high_run_seconds: number;
-  zone_sprint_seconds: number;
+  sprint_count: number | null;
+  sprint_distance_m: number | null;
+  zone_walk_seconds: number | null;
+  zone_jog_seconds: number | null;
+  zone_run_seconds: number | null;
+  zone_high_run_seconds: number | null;
+  zone_sprint_seconds: number | null;
   calories_kcal: number | null;
 };
 

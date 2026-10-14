@@ -50,7 +50,7 @@ export const sprintCaption = ({
   bucket: SpeedBandBucket;
   unit: DistanceUnit;
 }) => {
-  const threshold = formatSummarySpeed({ kmh: boundaries.sprint_min_kmh, unit });
+  const threshold = formatSummarySpeed({ kmh: boundaries.sprint, unit });
   const noun = count === 1 ? 'SPRINT' : 'SPRINTS';
   return `${count} ${noun} ABOVE ${threshold} ${speedUnitLabel(unit)} · ${BAND_BUCKET_LABEL[bucket]}`;
 };
@@ -72,21 +72,21 @@ export const estimatedSignalCopy = ({
 };
 
 export const zoneRows = (boundaries: SpeedBandBoundaries) => [
-  { key: 'walk' as const, label: 'WALK', range: `< ${boundaries.walk_max_kmh}` },
+  { key: 'walk' as const, label: 'WALK', range: `< ${boundaries.walk}` },
   {
     key: 'jog' as const,
     label: 'JOG',
-    range: `${boundaries.walk_max_kmh} – ${boundaries.jog_max_kmh}`,
+    range: `${boundaries.walk} – ${boundaries.jog}`,
   },
   {
     key: 'run' as const,
     label: 'RUN',
-    range: `${boundaries.jog_max_kmh} – ${boundaries.run_max_kmh}`,
+    range: `${boundaries.jog} – ${boundaries.run}`,
   },
   {
     key: 'high_run' as const,
     label: 'HIGH RUN',
-    range: `${boundaries.run_max_kmh} – ${boundaries.sprint_min_kmh}`,
+    range: `${boundaries.run} – ${boundaries.sprint}`,
   },
-  { key: 'sprint' as const, label: 'SPRINT', range: `${boundaries.sprint_min_kmh}+` },
+  { key: 'sprint' as const, label: 'SPRINT', range: `${boundaries.sprint}+` },
 ];

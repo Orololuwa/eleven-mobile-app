@@ -174,7 +174,7 @@ describe('computeSessionMetrics', () => {
       }),
     );
 
-    expect(merged.speedBandBoundaries.sprint_min_kmh).toBe(17);
+    expect(merged.speedBandBoundaries.sprint).toBe(17);
     expect(merged.sprints).toHaveLength(1);
     expect(merged.sprints[0]?.durationS).toBeCloseTo(4, 5);
     expect(merged.sprintCount).toBe(1);
@@ -238,7 +238,7 @@ describe('computeSessionMetrics', () => {
     );
 
     expect(futsal.speedBandBucket).toBe('futsal');
-    expect(futsal.speedBandBoundaries.sprint_min_kmh).toBe(15);
+    expect(futsal.speedBandBoundaries.sprint).toBe(15);
     expect(training.speedBandBucket).toBe('full');
     expect(degenerate.speedBandBucket).toBe('full');
     expect(noPitch.speedBandBucket).toBe('full');

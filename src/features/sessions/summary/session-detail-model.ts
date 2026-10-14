@@ -65,18 +65,20 @@ const isBucket = (value: string): value is SpeedBandBucket =>
 
 const toBucket = (value: string): SpeedBandBucket => (isBucket(value) ? value : 'full');
 
+const zoneSeconds = (value: number | null | undefined) => value ?? 0;
+
 const zonesOf = (row: {
-  zone_walk_seconds: number;
-  zone_jog_seconds: number;
-  zone_run_seconds: number;
-  zone_high_run_seconds: number;
-  zone_sprint_seconds: number;
+  zone_walk_seconds: number | null;
+  zone_jog_seconds: number | null;
+  zone_run_seconds: number | null;
+  zone_high_run_seconds: number | null;
+  zone_sprint_seconds: number | null;
 }): ZoneSeconds => ({
-  walk: row.zone_walk_seconds,
-  jog: row.zone_jog_seconds,
-  run: row.zone_run_seconds,
-  high_run: row.zone_high_run_seconds,
-  sprint: row.zone_sprint_seconds,
+  walk: zoneSeconds(row.zone_walk_seconds),
+  jog: zoneSeconds(row.zone_jog_seconds),
+  run: zoneSeconds(row.zone_run_seconds),
+  high_run: zoneSeconds(row.zone_high_run_seconds),
+  sprint: zoneSeconds(row.zone_sprint_seconds),
 });
 
 const rankSprints = (
@@ -122,7 +124,7 @@ export const loadLocalSessionDetail = async ({
           activeDurationSeconds: metrics.active_duration_seconds,
           distanceM: metrics.distance_m,
           topSpeedKmh: metrics.top_speed_kmh,
-          sprintCount: metrics.sprint_count,
+          sprintCount: metrics.sprint_count ?? 0,
           caloriesKcal: metrics.calories_kcal,
           gapSeconds: metrics.gap_seconds,
           acceptedFixCount: metrics.accepted_fix_count,
@@ -140,7 +142,7 @@ export const loadLocalSessionDetail = async ({
           label: segmentLabelFor({ session, segment, allSegments: segments }),
           distanceM: row.distance_m,
           activeDurationSeconds: row.active_duration_seconds,
-          sprintCount: row.sprint_count,
+          sprintCount: row.sprint_count ?? 0,
           topSpeedKmh: row.top_speed_kmh,
           zones: zonesOf(row),
         },
@@ -174,7 +176,7 @@ export const fromServerDetail = (detail: SessionDetail): SessionDetailModel => {
           activeDurationSeconds: metrics.active_duration_seconds,
           distanceM: metrics.distance_m,
           topSpeedKmh: metrics.top_speed_kmh,
-          sprintCount: metrics.sprint_count,
+          sprintCount: metrics.sprint_count ?? 0,
           caloriesKcal: metrics.calories_kcal,
           gapSeconds: metrics.gap_seconds,
           acceptedFixCount: metrics.accepted_fix_count,
@@ -194,7 +196,7 @@ export const fromServerDetail = (detail: SessionDetail): SessionDetailModel => {
             label: segmentLabelFor({ session, segment, allSegments: detail.segments }),
             distanceM: row.distance_m,
             activeDurationSeconds: row.active_duration_seconds,
-            sprintCount: row.sprint_count,
+            sprintCount: row.sprint_count ?? 0,
             topSpeedKmh: row.top_speed_kmh,
             zones: zonesOf(row),
           },
