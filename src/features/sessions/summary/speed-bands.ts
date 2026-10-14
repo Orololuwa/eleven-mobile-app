@@ -3,22 +3,23 @@ import { LONG_AXIS_MAX_M, LONG_AXIS_MIN_M } from './constants';
 
 export type SpeedBandBucket = 'futsal' | 'small' | 'mid' | 'full';
 
+/** Kilometre-per-hour thresholds, matching `SpeedBandBoundaries` on the API. */
 export type SpeedBandBoundaries = {
-  walk_max_kmh: number;
-  jog_max_kmh: number;
-  run_max_kmh: number;
-  high_run_max_kmh: number;
-  sprint_min_kmh: number;
+  walk: number;
+  jog: number;
+  run: number;
+  high_run: number;
+  sprint: number;
 };
 
 export type ZoneName = 'walk' | 'jog' | 'run' | 'high_run' | 'sprint';
 
-const bands = (jogMax: number, runMax: number, sprintMin: number): SpeedBandBoundaries => ({
-  walk_max_kmh: 7,
-  jog_max_kmh: jogMax,
-  run_max_kmh: runMax,
-  high_run_max_kmh: sprintMin,
-  sprint_min_kmh: sprintMin,
+const bands = (jog: number, run: number, sprint: number): SpeedBandBoundaries => ({
+  walk: 7,
+  jog,
+  run,
+  high_run: sprint,
+  sprint,
 });
 
 export const SPEED_BANDS: Record<SpeedBandBucket, SpeedBandBoundaries> = {
@@ -70,10 +71,10 @@ export const resolveSpeedBands = ({
 };
 
 export const zoneForSpeed = (kmh: number, boundaries: SpeedBandBoundaries): ZoneName => {
-  if (kmh < boundaries.walk_max_kmh) return 'walk';
-  if (kmh < boundaries.jog_max_kmh) return 'jog';
-  if (kmh < boundaries.run_max_kmh) return 'run';
-  if (kmh < boundaries.sprint_min_kmh) return 'high_run';
+  if (kmh < boundaries.walk) return 'walk';
+  if (kmh < boundaries.jog) return 'jog';
+  if (kmh < boundaries.run) return 'run';
+  if (kmh < boundaries.sprint) return 'high_run';
   return 'sprint';
 };
 

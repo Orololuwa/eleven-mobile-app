@@ -1,11 +1,5 @@
 import { createTrackingId } from '../tracking/id';
 import { withDb } from '../tracking/db';
-import type {
-  SegmentMetricsPayload,
-  SessionMetricsPayload,
-  SprintEffortPayload,
-} from '../tracking/types';
-import type { SpeedBandBoundaries } from './speed-bands';
 import type { ComputedSessionMetrics, DataQuality, SpeedSource } from './types';
 
 export type StoredSessionMetrics = {
@@ -67,14 +61,6 @@ export type StoredSprintEffort = {
   peak_speed_kmh: number;
   peak_lat: number | null;
   peak_lng: number | null;
-};
-
-const locationOf = (lat: number | null, lng: number | null) =>
-  lat == null || lng == null ? null : { lat, lng };
-
-export const parseBandBoundaries = (json: string): SpeedBandBoundaries => {
-  const parsed = JSON.parse(json) as SpeedBandBoundaries;
-  return parsed;
 };
 
 export const saveComputedMetrics = async ({
@@ -200,61 +186,9 @@ export const getStoredSprintEfforts = (sessionId: string) =>
     ),
   );
 
-export const toSessionMetricsPayload = (row: StoredSessionMetrics): SessionMetricsPayload => ({
-  active_duration_seconds: row.active_duration_seconds,
-  distance_m: row.distance_m,
-  top_speed_kmh: row.top_speed_kmh,
-  top_speed_location: locationOf(row.top_speed_lat, row.top_speed_lng),
-  sprint_count: row.sprint_count,
-  sprint_distance_m: row.sprint_distance_m,
-  zone_walk_seconds: row.zone_walk_seconds,
-  zone_jog_seconds: row.zone_jog_seconds,
-  zone_run_seconds: row.zone_run_seconds,
-  zone_high_run_seconds: row.zone_high_run_seconds,
-  zone_sprint_seconds: row.zone_sprint_seconds,
-  calories_kcal: row.calories_kcal,
-  mass_kg_at_computation: row.mass_kg_at_computation,
-  speed_source: row.speed_source,
-  data_quality: row.data_quality,
-  speed_band_bucket: row.speed_band_bucket,
-  speed_band_boundaries_kmh: parseBandBoundaries(row.speed_band_boundaries_json),
-  pitch_long_axis_m: row.pitch_long_axis_m,
-  accepted_fix_count: row.accepted_fix_count,
-  continuity_fix_count: row.continuity_fix_count,
-  gap_seconds: row.gap_seconds,
-  algorithm_version: row.algorithm_version,
-  computed_at: row.computed_at,
-});
-
-export const toSegmentMetricsPayload = (
-  row: StoredSegmentMetrics,
-  segmentIndex: number,
-): SegmentMetricsPayload => ({
-  segment_index: segmentIndex,
-  active_duration_seconds: row.active_duration_seconds,
-  distance_m: row.distance_m,
-  gap_seconds: row.gap_seconds,
-  top_speed_kmh: row.top_speed_kmh,
-  sprint_count: row.sprint_count,
-  sprint_distance_m: row.sprint_distance_m,
-  zone_walk_seconds: row.zone_walk_seconds,
-  zone_jog_seconds: row.zone_jog_seconds,
-  zone_run_seconds: row.zone_run_seconds,
-  zone_high_run_seconds: row.zone_high_run_seconds,
-  zone_sprint_seconds: row.zone_sprint_seconds,
-  calories_kcal: row.calories_kcal,
-});
-
-export const toSprintEffortPayload = (
-  row: StoredSprintEffort,
-  segmentIndex: number,
-): SprintEffortPayload => ({
-  segment_index: segmentIndex,
-  effort_index: row.effort_index,
-  started_at: row.started_at,
-  ended_at: row.ended_at,
-  duration_s: row.duration_s,
-  distance_m: row.distance_m,
-  peak_speed_kmh: row.peak_speed_kmh,
-  peak_location: locationOf(row.peak_lat, row.peak_lng),
-});
+export {
+  parseBandBoundaries,
+  toSegmentMetricsPayload,
+  toSessionMetricsPayload,
+  toSprintEffortPayload,
+} from './metrics-payload';

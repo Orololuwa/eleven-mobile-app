@@ -1,9 +1,13 @@
 import { computeSessionMetrics } from '../summary/compute-session-metrics';
-import { QUALITY_INSUFFICIENT_GAP, QUALITY_MIN_ACTIVE_SECONDS } from '../summary/constants';
-import type { ComputationInput } from '../summary/types';
+import {
+  GAP_BRIDGE_MAX_SECONDS,
+  QUALITY_INSUFFICIENT_GAP,
+  QUALITY_MIN_ACTIVE_SECONDS,
+} from '../summary/constants';
+import type { ComputationInput, ComputedSessionMetrics } from '../summary/types';
 import { LIVE_SIGNAL_SETTLE_SECONDS } from './constants';
 import { passesContinuityGate, passesQualityGate } from './fix-gates';
-import type { LiveMetrics } from './types';
+import type { LiveMetrics, LiveSignal } from './types';
 
 export const elapsedSecondsFromPauses = ({
   startedAt,
@@ -23,10 +27,70 @@ export const elapsedSecondsFromPauses = ({
   return Math.max(0, Math.floor((nowMs - startMs - pausedMs) / 1000));
 };
 
+const msOf = (point: { recordedAt: string }) => Date.parse(point.recordedAt);
+
 /**
- * Live HUD readout over the session so far. Classification and figures come from the summary's own
- * `computeSessionMetrics`, so the HUD never shows a number the summary would refuse to show.
- * Distance and top speed are for `segmentId` (session totals when null), or null when suppressed.
+ * True when the latest two quality fixes are fresh and close enough to bridge (0.5 §3.3), i.e. the
+ * session is being measured right now. Accuracy alone is not enough: accurate fixes arriving more
+ * than the bridge window apart measure nothing.
+ */
+export const isMeasuringNow = ({
+  points,
+  nowMs = Date.now(),
+}: {
+  points: ComputationInput['points'];
+  nowMs?: number;
+}) => {
+  const [previous, latest] = points
+    .filter((point) => passesQualityGate(point.horizontalAccuracyM))
+    .map(msOf)
+    .sort((a, b) => a - b)
+    .slice(-2);
+  const bridgeMs = GAP_BRIDGE_MAX_SECONDS * 1000;
+  return (
+    previous != null &&
+    latest != null &&
+    nowMs - latest <= bridgeMs &&
+    latest - previous <= bridgeMs
+  );
+};
+
+/** Accuracy of the latest fix, or null when it is too old to say anything about the signal now. */
+export const currentFixAccuracyM = ({
+  fix,
+  nowMs = Date.now(),
+}: {
+  fix: { accuracyM: number | null; atMs: number } | null;
+  nowMs?: number;
+}) => {
+  if (!fix) return null;
+  return nowMs - fix.atMs <= GAP_BRIDGE_MAX_SECONDS * 1000 ? fix.accuracyM : null;
+};
+
+const insufficientSignal = ({
+  input,
+  computed,
+}: {
+  input: ComputationInput;
+  computed: ComputedSessionMetrics;
+}): LiveSignal => {
+  const { activeDurationSeconds, gapSeconds } = computed;
+  const nowMs = input.computedAt ? Date.parse(input.computedAt) : Date.now();
+  const isLockingOn =
+    activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS &&
+    input.points.filter((point) => passesQualityGate(point.horizontalAccuracyM)).length < 2;
+  if (isLockingOn) return 'settling';
+  if (!isMeasuringNow({ points: input.points, nowMs })) return 'poor';
+  return activeDurationSeconds >= QUALITY_MIN_ACTIVE_SECONDS &&
+    gapSeconds / activeDurationSeconds > QUALITY_INSUFFICIENT_GAP
+    ? 'recovering'
+    : 'settling';
+};
+
+/**
+ * Live HUD readout over the session so far, from the summary's own `computeSessionMetrics`.
+ * Distance and top speed (for `segmentId`, session totals when null) are always shown — they only
+ * ever count quality-gated, bridged fixes. `signal` tells the player how far to trust them.
  */
 export const computeLiveReadout = ({
   input,
@@ -36,24 +100,16 @@ export const computeLiveReadout = ({
   segmentId?: string | null;
 }): LiveMetrics => {
   const computed = computeSessionMetrics(input);
-  if (computed.dataQuality === 'insufficient') {
-    const { activeDurationSeconds, gapSeconds } = computed;
-    const isSettling =
-      activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS ||
-      (activeDurationSeconds < QUALITY_MIN_ACTIVE_SECONDS &&
-        gapSeconds / activeDurationSeconds <= QUALITY_INSUFFICIENT_GAP);
-    return { distanceKm: null, topSpeedKmh: null, signal: isSettling ? 'settling' : 'poor' };
-  }
-
   const segment = segmentId
     ? computed.segments.find((row) => row.segmentId === segmentId)
     : undefined;
-  const distanceM = segment ? segment.distanceM : computed.distanceM;
-  const topSpeedKmh = segment ? segment.topSpeedKmh : computed.topSpeedKmh;
   return {
-    distanceKm: distanceM / 1000,
-    topSpeedKmh: topSpeedKmh ?? 0,
-    signal: computed.dataQuality,
+    distanceKm: (segment ? segment.distanceM : computed.distanceM) / 1000,
+    topSpeedKmh: (segment ? segment.topSpeedKmh : computed.topSpeedKmh) ?? 0,
+    signal:
+      computed.dataQuality === 'insufficient'
+        ? insufficientSignal({ input, computed })
+        : computed.dataQuality,
   };
 };
 

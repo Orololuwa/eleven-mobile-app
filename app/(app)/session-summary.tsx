@@ -13,6 +13,7 @@ import {
 import { useSessionDetailQuery } from '@/features/sessions/history/use-session-detail-query';
 import { useRenameSessionMutation } from '@/features/sessions/history/use-rename-session-mutation';
 import { useDeleteSessionMutation } from '@/features/sessions/history/use-delete-session-mutation';
+import { retrySessionSync } from '@/features/sessions/tracking/sync';
 import { useAppStore } from '@/stores/app-store';
 import { useColors } from '@/theme';
 
@@ -130,6 +131,10 @@ export default function SessionSummaryRoute() {
         onBack={leave}
         onOpenRejectedWhy={() => setShowWhy(true)}
         onCloseRejectedWhy={() => setShowWhy(false)}
+        onResync={() => {
+          setShowWhy(false);
+          void retrySessionSync(model.id);
+        }}
         onRename={() => setShowRename(true)}
         onDelete={() => setShowDelete(true)}
         onOpenHistory={fromHistory ? null : () => router.replace('/(app)/(tabs)/history')}

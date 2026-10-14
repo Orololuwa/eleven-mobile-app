@@ -153,17 +153,20 @@ export const syncSession = async (sessionId: string): Promise<boolean> => {
       }),
       ...(metrics
         ? {
-            session_metrics: toSessionMetricsPayload(metrics),
+            metrics: toSessionMetricsPayload(metrics),
             segment_metrics: segmentMetrics.flatMap((row) => {
               const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
               if (segmentIndex == null) return [];
-              return [toSegmentMetricsPayload(row, segmentIndex)];
+              return [toSegmentMetricsPayload(row, segmentIndex, metrics.speed_source)];
             }),
-            sprint_efforts: sprintEfforts.flatMap((row) => {
-              const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
-              if (segmentIndex == null) return [];
-              return [toSprintEffortPayload(row, segmentIndex)];
-            }),
+            sprint_efforts:
+              metrics.speed_source === 'none'
+                ? []
+                : sprintEfforts.flatMap((row) => {
+                    const segmentIndex = segmentIndexFor(segmentIndexes, row.segment_id);
+                    if (segmentIndex == null) return [];
+                    return [toSprintEffortPayload(row, segmentIndex)];
+                  }),
           }
         : {}),
     };
@@ -336,6 +339,13 @@ export const processOutboxes = async () => {
 /** Drops a session's in-memory retry state, e.g. after it is deleted locally. */
 export const forgetSessionSync = (sessionId: string) => {
   resetDelay(sessionId);
+};
+
+/** Puts a rejected, phone-only session back in the upload queue and tries immediately. */
+export const retrySessionSync = async (sessionId: string) => {
+  forgetSessionSync(sessionId);
+  await setSyncFields(sessionId, { sync_status: 'pending' });
+  enqueueSessionSync(sessionId);
 };
 
 const runSyncPass = () => {

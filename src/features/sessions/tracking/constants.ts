@@ -15,10 +15,11 @@ export const QUALITY_FIX_ACCURACY_M = 10;
 export const GPS_LOSS_PAUSE_MS = 30_000;
 
 /**
- * Before this much active time, an `insufficient` live readout reads as settling rather than poor
- * signal — the first fix has not had time to arrive. Presentation only; suppression is unchanged.
+ * Until the session's first bridgeable pair of quality fixes, an `insufficient` live readout reads as settling rather
+ * than poor signal, for at most this much active time: a cold GPS start takes 30–40 s to reach the
+ * quality gate. Presentation only; suppression is unchanged.
  */
-export const LIVE_SIGNAL_SETTLE_SECONDS = 10;
+export const LIVE_SIGNAL_SETTLE_SECONDS = 60;
 
 /** Cooldown after auto-resume before another auto-pause can fire. */
 export const AUTO_RESUME_COOLDOWN_MS = 10_000;

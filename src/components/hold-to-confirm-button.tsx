@@ -33,6 +33,7 @@ export const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
   const colors = useColors();
   const styles = useThemedStyles(createStyles);
   const [holdProgress, setHoldProgress] = useState(0);
+  const progressRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearHold = () => {
@@ -40,23 +41,24 @@ export const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    progressRef.current = 0;
     setHoldProgress(0);
   };
 
+  /** `onConfirm` runs from the timer, never inside a state updater (updaters can run twice). */
   const handlePressIn = (_event: GestureResponderEvent) => {
     if (disabled) return;
     clearHold();
     const stepMs = 100;
     const increment = (stepMs / HOLD_CONFIRM_MS) * 100;
     intervalRef.current = setInterval(() => {
-      setHoldProgress((prev) => {
-        if (prev >= 100) {
-          clearHold();
-          onConfirm();
-          return 0;
-        }
-        return prev + increment;
-      });
+      if (progressRef.current >= 100) {
+        clearHold();
+        onConfirm();
+        return;
+      }
+      progressRef.current += increment;
+      setHoldProgress(progressRef.current);
     }, stepMs);
   };
 

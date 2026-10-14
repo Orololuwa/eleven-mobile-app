@@ -454,7 +454,7 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
   const suppressSpeed = speedSource === 'none';
   const sprintDrafts = suppressSpeed
     ? []
-    : detectSprints({ spans, sprintMinKmh: boundaries.sprint_min_kmh });
+    : detectSprints({ spans, sprintMinKmh: boundaries.sprint });
   const sprints: ComputedSprint[] = sprintDrafts.map((sprint, index) => ({
     ...sprint,
     effortIndex: index + 1,

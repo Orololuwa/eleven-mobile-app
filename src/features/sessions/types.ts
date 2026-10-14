@@ -116,14 +116,14 @@ export type SessionDetailSegmentMetrics = {
   distance_m: number;
   gap_seconds: number;
   top_speed_kmh: number | null;
-  sprint_count: number;
-  sprint_distance_m: number;
-  zone_walk_seconds: number;
-  zone_jog_seconds: number;
-  zone_run_seconds: number;
-  zone_high_run_seconds: number;
-  zone_sprint_seconds: number;
-  calories_kcal: number | null;
+  sprint_count: number | null;
+  sprint_distance_m: number | null;
+  zone_walk_seconds: number | null;
+  zone_jog_seconds: number | null;
+  zone_run_seconds: number | null;
+  zone_high_run_seconds: number | null;
+  zone_sprint_seconds: number | null;
+  calories_kcal: number;
 };
 
 export type SessionDetailSprint = {
@@ -138,14 +138,14 @@ export type SessionDetailMetrics = {
   active_duration_seconds: number;
   distance_m: number;
   top_speed_kmh: number | null;
-  sprint_count: number;
-  sprint_distance_m: number;
-  zone_walk_seconds: number;
-  zone_jog_seconds: number;
-  zone_run_seconds: number;
-  zone_high_run_seconds: number;
-  zone_sprint_seconds: number;
-  calories_kcal: number | null;
+  sprint_count: number | null;
+  sprint_distance_m: number | null;
+  zone_walk_seconds: number | null;
+  zone_jog_seconds: number | null;
+  zone_run_seconds: number | null;
+  zone_high_run_seconds: number | null;
+  zone_sprint_seconds: number | null;
+  calories_kcal: number;
   speed_source: 'os' | 'position_delta' | 'none';
   data_quality: 'good' | 'estimated' | 'insufficient';
   speed_band_bucket: string;

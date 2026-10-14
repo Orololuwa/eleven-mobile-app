@@ -52,21 +52,64 @@ describe('computeLiveReadout', () => {
     expect(readout.topSpeedKmh).toBeCloseTo(7.2, 1);
   });
 
-  it('suppresses distance and top speed whenever the summary would say insufficient', () => {
+  it('counts nothing from fixes that fail the quality gate', () => {
     const session = input({ endSec: 180, points: steady({ count: 181, horizontalAccuracyM: 30 }) });
     expect(computeSessionMetrics(session).dataQuality).toBe('insufficient');
     expect(computeLiveReadout({ input: session, segmentId: 's1' })).toEqual({
-      distanceKm: null,
-      topSpeedKmh: null,
+      distanceKm: 0,
+      topSpeedKmh: 0,
       signal: 'poor',
     });
   });
 
-  it('reads a young session with clean signal as settling, still suppressed', () => {
+  it('shows distance and top speed from the start, reading a young session as settling', () => {
     const readout = computeLiveReadout({
       input: input({ endSec: 60, points: steady({ count: 61 }) }),
       segmentId: 's1',
     });
-    expect(readout).toEqual({ distanceKm: null, topSpeedKmh: null, signal: 'settling' });
+    expect(readout.signal).toBe('settling');
+    expect(readout.distanceKm).toBeCloseTo(0.12, 2);
+    expect(readout.topSpeedKmh).toBeCloseTo(7.2, 1);
+  });
+
+  it('reads a cold GPS start as settling until the first quality fix', () => {
+    const warming = steady({ count: 31, horizontalAccuracyM: 20 });
+    const readout = computeLiveReadout({ input: input({ endSec: 30, points: warming }) });
+    expect(readout.signal).toBe('settling');
+  });
+
+  it('keeps reading settling when only the first quality fix has arrived', () => {
+    const points = [
+      ...steady({ count: 30, horizontalAccuracyM: 20 }),
+      { ...steady({ count: 31 })[30]! },
+    ];
+    const readout = computeLiveReadout({ input: input({ endSec: 30, points }) });
+    expect(readout.signal).toBe('settling');
+  });
+
+  it('reads a start that never locks on as poor once the settle window passes', () => {
+    const indoors = steady({ count: 91, horizontalAccuracyM: 20 });
+    const readout = computeLiveReadout({ input: input({ endSec: 90, points: indoors }) });
+    expect(readout.signal).toBe('poor');
+  });
+
+  it('reads accurate fixes arriving wider apart than the bridge window as poor', () => {
+    const sparse = steady({ count: 61 }).filter((_, index) => index % 8 === 0);
+    const readout = computeLiveReadout({ input: input({ endSec: 56, points: sparse }) });
+    expect(readout.signal).toBe('poor');
+  });
+
+  it('reads clean signal after earlier gaps as recovering, not poor', () => {
+    const points = steady({ count: 181 }).filter((_, index) => index >= 100);
+    const readout = computeLiveReadout({ input: input({ endSec: 180, points }) });
+    expect(readout.signal).toBe('recovering');
+  });
+
+  it('reads a session that lost signal just now as poor', () => {
+    const points = steady({ count: 181 }).filter(
+      (_, index) => index <= 60 || (index >= 110 && index <= 170),
+    );
+    const readout = computeLiveReadout({ input: input({ endSec: 180, points }) });
+    expect(readout.signal).toBe('poor');
   });
 });

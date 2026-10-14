@@ -22,7 +22,13 @@ import type { PauseReason } from './types';
 
 let startLock: Promise<void> = Promise.resolve();
 let lastProcessedAt = 0;
+let latestFix: LatestFix | null = null;
 let foregroundWatch: Location.LocationSubscription | null = null;
+
+export type LatestFix = { accuracyM: number | null; atMs: number };
+
+/** Newest fix delivered by the OS, stored or not — the GPS label reflects the signal, not storage. */
+export const getLatestFix = () => latestFix;
 
 const isForegroundServiceStartNotAllowed = (error: unknown) =>
   error instanceof Error &&
@@ -73,22 +79,49 @@ const resumeFromAutoPause = async (sessionId: string) => {
   });
 };
 
+type FixContext = { source: 'task' | 'watch'; intervalMs: number | null; batchSize: number };
+
+/**
+ * Every fix in a delivery is processed, oldest first. Android batches fixes on battery-managed
+ * devices; keeping only the newest would leave gaps wider than the bridge window and nothing would
+ * be measured even with accurate fixes.
+ */
 export const processLocationUpdate = async (
   locations: Location.LocationObject[],
   { source = 'task' }: { source?: 'task' | 'watch' } = {},
 ) => {
+  const fresh = [...locations]
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .filter((location) => location.timestamp > lastProcessedAt);
+  const newest = fresh[fresh.length - 1];
+  if (!newest) return;
+
+  const previousProcessedAt = lastProcessedAt;
+  lastProcessedAt = newest.timestamp;
+  latestFix = { accuracyM: newest.coords.accuracy, atMs: newest.timestamp };
+
+  for (const [index, location] of fresh.entries()) {
+    const previousAt = index === 0 ? previousProcessedAt : (fresh[index - 1]?.timestamp ?? 0);
+    const shouldContinue = await processFix(location, {
+      source,
+      intervalMs: previousAt > 0 ? location.timestamp - previousAt : null,
+      batchSize: fresh.length,
+    });
+    if (!shouldContinue) return;
+  }
+};
+
+const processFix = async (
+  location: Location.LocationObject,
+  { source, intervalMs, batchSize }: FixContext,
+): Promise<boolean> => {
   const session = await getActiveTrackingSession();
   if (!session || session.tracking_status === 'ended' || session.ended_at) {
     void stopLocationTracking();
-    return;
+    return false;
   }
 
-  const latest = locations[locations.length - 1];
-  if (!latest) return;
-  if (latest.timestamp <= lastProcessedAt) return;
-  lastProcessedAt = latest.timestamp;
-
-  const { coords, timestamp } = latest;
+  const { coords, timestamp } = location;
   const accuracy = coords.accuracy;
   const hasCoords = coords.latitude != null && coords.longitude != null;
   const isAlive = passesContinuityGate(accuracy);
@@ -135,11 +168,13 @@ export const processLocationUpdate = async (
       source,
       sessionId: session.id,
       accuracy,
+      intervalMs,
+      batchSize,
       lat: coords.latitude,
       lng: coords.longitude,
       speedKmh,
     });
-    return;
+    return true;
   }
 
   console.log('[location-task] skip', {
@@ -159,9 +194,9 @@ export const processLocationUpdate = async (
     trackingStatus: session.tracking_status,
   });
 
-  if (!hasCoords || inManualPause || !inActivity) return;
-  if (isAlive) return;
-  if (!session.last_accepted_fix_at) return;
+  if (!hasCoords || inManualPause || !inActivity) return true;
+  if (isAlive) return true;
+  if (!session.last_accepted_fix_at) return true;
 
   const lastFixMs = msSince(session.last_accepted_fix_at);
   const cooldownActive =
@@ -180,6 +215,7 @@ export const processLocationUpdate = async (
       reason: 'gps_loss',
     });
   }
+  return true;
 };
 
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
@@ -315,6 +351,7 @@ export const stopLocationTracking = async () => {
   stopInFlight = (async () => {
     stopForegroundWatch();
     lastProcessedAt = 0;
+    latestFix = null;
     try {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
     } catch {
