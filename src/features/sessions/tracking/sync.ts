@@ -341,6 +341,13 @@ export const forgetSessionSync = (sessionId: string) => {
   resetDelay(sessionId);
 };
 
+/** Puts a rejected, phone-only session back in the upload queue and tries immediately. */
+export const retrySessionSync = async (sessionId: string) => {
+  forgetSessionSync(sessionId);
+  await setSyncFields(sessionId, { sync_status: 'pending' });
+  enqueueSessionSync(sessionId);
+};
+
 const runSyncPass = () => {
   void processSyncQueue();
   void processOutboxes();

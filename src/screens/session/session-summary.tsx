@@ -51,6 +51,7 @@ type SessionSummaryScreenProps = {
   onBack: () => void;
   onOpenRejectedWhy: () => void;
   onCloseRejectedWhy: () => void;
+  onResync: () => void;
   onRename: () => void;
   onDelete: () => void;
   /** Null hides View History (already came from it). */
@@ -109,6 +110,7 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
   onBack,
   onOpenRejectedWhy,
   onCloseRejectedWhy,
+  onResync,
   onRename,
   onDelete,
   onOpenHistory,
@@ -247,7 +249,21 @@ export const SessionSummaryScreen: React.FC<SessionSummaryScreenProps> = ({
             <Text style={styles.body}>
               Your numbers above are still yours — they were worked out on the phone.
             </Text>
-            <Button title="Got it" onPress={onCloseRejectedWhy} />
+            <View style={styles.whyActions}>
+              <Button
+                title="Got it"
+                variant="secondary"
+                fullWidth={false}
+                style={styles.whyButton}
+                onPress={onCloseRejectedWhy}
+              />
+              <Button
+                title="Resync"
+                fullWidth={false}
+                style={styles.whyButton}
+                onPress={onResync}
+              />
+            </View>
           </View>
         </View>
       ) : null}
@@ -844,6 +860,13 @@ const createStyles = (colors: Colors) =>
       fontSize: 12,
       letterSpacing: 1.4,
       color: colors.accent.danger,
+    },
+    whyActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    whyButton: {
+      flex: 1,
     },
     sprintHeader: {
       paddingHorizontal: spacing[6],
