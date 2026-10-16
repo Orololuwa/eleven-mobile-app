@@ -5,7 +5,9 @@ import {
   ANDROID_FGS_TITLE,
   AUTO_RESUME_COOLDOWN_MS,
   GPS_LOSS_PAUSE_MS,
+  LOCATION_FIX_STALE_MS,
   LOCATION_TASK_NAME,
+  LOCATION_WATCHDOG_INTERVAL_MS,
 } from './constants';
 import {
   closeOpenPause,
@@ -16,16 +18,25 @@ import {
   insertTrackPoint,
   updateSessionFields,
 } from './db';
+import { isFixFeedStale } from './fix-feed';
 import { passesContinuityGate } from './fix-gates';
 import { getForegroundPermissionStatus } from './permissions';
-import type { PauseReason } from './types';
+import { nextTeardownAction } from './registration-teardown';
+import type { LatestFix, PauseReason } from './types';
 
 let startLock: Promise<void> = Promise.resolve();
+let stopInFlight: Promise<void> | null = null;
 let lastProcessedAt = 0;
 let latestFix: LatestFix | null = null;
 let foregroundWatch: Location.LocationSubscription | null = null;
+let consecutiveNullSessions = 0;
+let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+let lastNotificationBody = 'Tracking session…';
 
-export type LatestFix = { accuracyM: number | null; atMs: number };
+export type { LatestFix };
+
+export type RegistrationReason =
+  'start' | 'stop' | 'watchdog' | 'foreground' | 'ended' | 'null-session-confirmed';
 
 /** Newest fix delivered by the OS, stored or not — the GPS label reflects the signal, not storage. */
 export const getLatestFix = () => latestFix;
@@ -116,8 +127,24 @@ const processFix = async (
   { source, intervalMs, batchSize }: FixContext,
 ): Promise<boolean> => {
   const session = await getActiveTrackingSession();
-  if (!session || session.tracking_status === 'ended' || session.ended_at) {
-    void stopLocationTracking();
+  const teardown = nextTeardownAction({
+    session,
+    previousNullCount: consecutiveNullSessions,
+  });
+  consecutiveNullSessions = teardown.nullCount;
+
+  if (teardown.action === 'stop') {
+    const reason: RegistrationReason =
+      teardown.reason === 'null-session-confirmed' ? 'null-session-confirmed' : 'ended';
+    void stopLocationTracking({ reason });
+    return false;
+  }
+  if (teardown.action === 'skip' || !session) {
+    console.warn('[location-task] skip fix — no live session', {
+      reason: teardown.reason,
+      nullCount: consecutiveNullSessions,
+      source,
+    });
     return false;
   }
 
@@ -295,16 +322,86 @@ const ensureForegroundWatch = async () => {
   );
 };
 
-const startLocationTrackingOnce = async ({ notificationBody }: { notificationBody: string }) => {
+const clearWatchdog = () => {
+  if (!watchdogTimer) return;
+  clearInterval(watchdogTimer);
+  watchdogTimer = null;
+};
+
+const startWatchdog = () => {
+  if (watchdogTimer) return;
+  watchdogTimer = setInterval(() => {
+    void ensureLocationRegistration({ reason: 'watchdog' }).catch((error) => {
+      console.warn('[location-task] watchdog failed', error);
+    });
+  }, LOCATION_WATCHDOG_INTERVAL_MS);
+};
+
+const hasLiveSession = async () => {
+  const session = await getActiveTrackingSession();
+  return session != null && session.tracking_status !== 'ended' && !session.ended_at;
+};
+
+/**
+ * While a session is live, assert that the location task is registered and a fix arrived recently.
+ * Re-registers when either check fails. Survives whatever dropped the registration.
+ */
+export const ensureLocationRegistration = async ({
+  reason,
+}: {
+  reason: Extract<RegistrationReason, 'watchdog' | 'foreground'>;
+}) => {
+  if (!(await hasLiveSession())) return;
+
+  const running = await isLocationTaskRunning();
+  const feedOk = !isFixFeedStale({ fix: latestFix, staleMs: LOCATION_FIX_STALE_MS });
+  if (running && feedOk) return;
+
+  console.log('[location-task] registration re-register', {
+    reason,
+    running,
+    feedOk,
+    latestFixAtMs: latestFix?.atMs ?? null,
+  });
+
+  try {
+    await startLocationTracking({
+      notificationBody: lastNotificationBody,
+      reason,
+    });
+  } catch (error) {
+    if (Platform.OS === 'android' && isForegroundServiceStartNotAllowed(error)) {
+      console.warn('[location-task] re-register deferred — FGS not allowed in background', {
+        reason,
+      });
+      return;
+    }
+    throw error;
+  }
+};
+
+const startLocationTrackingOnce = async ({
+  notificationBody,
+  reason,
+}: {
+  notificationBody: string;
+  reason: RegistrationReason;
+}) => {
+  if (stopInFlight) await stopInFlight;
+
   if (!(await getForegroundPermissionStatus())) {
     throw new Error('Location permission is required to start tracking');
   }
+
+  lastNotificationBody = notificationBody;
 
   if (!(await isLocationTaskRunning())) {
     if (Platform.OS === 'android' && AppState.currentState !== 'active') {
       await whenAppActive();
       if (await isLocationTaskRunning()) {
         await ensureForegroundWatch();
+        startWatchdog();
+        console.log('[location-task] registration start', { reason, alreadyRunning: true });
         return;
       }
     }
@@ -327,10 +424,17 @@ const startLocationTrackingOnce = async ({ notificationBody }: { notificationBod
   }
 
   await ensureForegroundWatch();
-  console.log('[location-task] started');
+  startWatchdog();
+  console.log('[location-task] registration start', { reason });
 };
 
-export const startLocationTracking = async ({ notificationBody }: { notificationBody: string }) => {
+export const startLocationTracking = async ({
+  notificationBody,
+  reason = 'start',
+}: {
+  notificationBody: string;
+  reason?: RegistrationReason;
+}) => {
   const previous = startLock;
   let release = () => {};
   startLock = new Promise<void>((resolve) => {
@@ -338,25 +442,31 @@ export const startLocationTracking = async ({ notificationBody }: { notification
   });
   await previous;
   try {
-    await startLocationTrackingOnce({ notificationBody });
+    await startLocationTrackingOnce({ notificationBody, reason });
   } finally {
     release();
   }
 };
 
-let stopInFlight: Promise<void> | null = null;
-
-export const stopLocationTracking = async () => {
+export const stopLocationTracking = async ({
+  reason = 'stop',
+}: {
+  reason?: RegistrationReason;
+} = {}) => {
   if (stopInFlight) return stopInFlight;
   stopInFlight = (async () => {
+    await startLock;
+    clearWatchdog();
     stopForegroundWatch();
     lastProcessedAt = 0;
     latestFix = null;
+    consecutiveNullSessions = 0;
     try {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
     } catch {
       // Task was already stopped.
     }
+    console.log('[location-task] registration stop', { reason });
   })().finally(() => {
     stopInFlight = null;
   });
@@ -392,6 +502,7 @@ export const handleAppForegrounded = async () => {
   if (session.tracking_status !== 'ended' && !session.ended_at) {
     if (await getForegroundPermissionStatus()) {
       await ensureForegroundWatch();
+      await ensureLocationRegistration({ reason: 'foreground' });
     }
   }
 
