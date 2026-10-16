@@ -67,6 +67,10 @@ const SIGNAL_NOTICE: Record<Exclude<LiveSignal, 'good'>, { title: string | null;
     title: 'Poor signal — not tracking accurately.',
     sub: 'MOVE INTO OPEN SKY · DISTANCE PAUSES UNTIL IT CLEARS',
   },
+  offline: {
+    title: 'Lost GPS connection — reconnecting.',
+    sub: 'NOT A SIGNAL PROBLEM · WAITING FOR FIXES',
+  },
 };
 
 const SignalNoticeComponent: React.FC<{ signal: LiveSignal }> = ({ signal }) => {
@@ -76,7 +80,14 @@ const SignalNoticeComponent: React.FC<{ signal: LiveSignal }> = ({ signal }) => 
   return (
     <View style={styles.signalBlock}>
       {title ? <Text style={styles.autoPauseTitle}>{title}</Text> : null}
-      <Text style={[styles.signalSub, signal === 'poor' && styles.signalSubPoor]}>{sub}</Text>
+      <Text
+        style={[
+          styles.signalSub,
+          (signal === 'poor' || signal === 'offline') && styles.signalSubPoor,
+        ]}
+      >
+        {sub}
+      </Text>
     </View>
   );
 };

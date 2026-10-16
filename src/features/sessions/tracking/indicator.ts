@@ -41,6 +41,7 @@ const SIGNAL_LABEL: Record<Exclude<LiveSignal, 'good'>, string> = {
   settling: 'MEASURING',
   recovering: 'SIGNAL BACK',
   poor: 'POOR SIGNAL',
+  offline: 'NO GPS FEED',
 };
 
 const signalLabel = (signal: LiveSignal) => (signal === 'good' ? '' : SIGNAL_LABEL[signal]);

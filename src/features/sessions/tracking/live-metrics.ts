@@ -6,8 +6,9 @@ import {
 } from '../summary/constants';
 import type { ComputationInput, ComputedSessionMetrics } from '../summary/types';
 import { LIVE_SIGNAL_SETTLE_SECONDS } from './constants';
+import { isFixFeedStale } from './fix-feed';
 import { passesContinuityGate, passesQualityGate } from './fix-gates';
-import type { LiveMetrics, LiveSignal } from './types';
+import type { LatestFix, LiveMetrics, LiveSignal } from './types';
 
 export const elapsedSecondsFromPauses = ({
   startedAt,
@@ -70,15 +71,25 @@ export const currentFixAccuracyM = ({
 const insufficientSignal = ({
   input,
   computed,
+  latestFix,
 }: {
   input: ComputationInput;
   computed: ComputedSessionMetrics;
+  /** `undefined` skips the feed check (unit tests). `null` means no fix has arrived. */
+  latestFix?: LatestFix | null;
 }): LiveSignal => {
   const { activeDurationSeconds, gapSeconds } = computed;
   const nowMs = input.computedAt ? Date.parse(input.computedAt) : Date.now();
   const isLockingOn =
     activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS &&
     input.points.filter((point) => passesQualityGate(point.horizontalAccuracyM)).length < 2;
+
+  if (latestFix !== undefined && isFixFeedStale({ fix: latestFix, nowMs })) {
+    // Cold start before the first delivery still reads as settling, not offline.
+    if (isLockingOn && latestFix == null) return 'settling';
+    return 'offline';
+  }
+
   if (isLockingOn) return 'settling';
   if (!isMeasuringNow({ points: input.points, nowMs })) return 'poor';
   return activeDurationSeconds >= QUALITY_MIN_ACTIVE_SECONDS &&
@@ -95,20 +106,35 @@ const insufficientSignal = ({
 export const computeLiveReadout = ({
   input,
   segmentId = null,
+  latestFix,
 }: {
   input: ComputationInput;
   segmentId?: string | null;
+  /** Newest OS fix. When stale, signal is `offline` even if earlier metrics look fine. */
+  latestFix?: LatestFix | null;
 }): LiveMetrics => {
   const computed = computeSessionMetrics(input);
   const segment = segmentId
     ? computed.segments.find((row) => row.segmentId === segmentId)
     : undefined;
+  const distanceKm = (segment ? segment.distanceM : computed.distanceM) / 1000;
+  const topSpeedKmh = (segment ? segment.topSpeedKmh : computed.topSpeedKmh) ?? 0;
+  const nowMs = input.computedAt ? Date.parse(input.computedAt) : Date.now();
+
+  if (latestFix !== undefined && isFixFeedStale({ fix: latestFix, nowMs })) {
+    const lockingOn =
+      computed.activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS && latestFix == null;
+    if (!lockingOn) {
+      return { distanceKm, topSpeedKmh, signal: 'offline' };
+    }
+  }
+
   return {
-    distanceKm: (segment ? segment.distanceM : computed.distanceM) / 1000,
-    topSpeedKmh: (segment ? segment.topSpeedKmh : computed.topSpeedKmh) ?? 0,
+    distanceKm,
+    topSpeedKmh,
     signal:
       computed.dataQuality === 'insufficient'
-        ? insufficientSignal({ input, computed })
+        ? insufficientSignal({ input, computed, latestFix })
         : computed.dataQuality,
   };
 };

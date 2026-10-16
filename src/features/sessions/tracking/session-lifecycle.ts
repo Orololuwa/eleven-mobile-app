@@ -268,7 +268,7 @@ export const endTrackingSession = async ({
     await closeSegment(current.id, closedAt);
   }
 
-  await stopLocationTracking();
+  await stopLocationTracking({ reason: 'ended' });
   try {
     await stopTrackingIndicator(session.live_activity_id);
   } catch (error) {
