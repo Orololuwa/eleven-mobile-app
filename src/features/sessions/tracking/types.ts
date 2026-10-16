@@ -233,14 +233,19 @@ export type TrackPointsBody = {
   points: TrackPointUpload[];
 };
 
+/** Newest fix delivered by the OS — accuracy and wall time, whether stored or not. */
+export type LatestFix = { accuracyM: number | null; atMs: number };
+
 /**
- * Live signal, from the summary's data-quality classification. `settling`, `recovering`, and `poor`
- * all mean the session would be `insufficient` right now; they differ only in wording:
+ * Live signal, from the summary's data-quality classification plus the fix feed.
+ * `settling`, `recovering`, and `poor` all mean the session would be `insufficient` right now;
+ * they differ only in wording:
  * `settling` — measuring now, session too young to report;
  * `recovering` — measuring now, but too much earlier time went unmeasured;
- * `poor` — not measuring now (no fresh, bridgeable quality fixes).
+ * `poor` — fixes are arriving, but not measuring now (no fresh, bridgeable quality fixes);
+ * `offline` — no fix feed (unsubscribed or OS not delivering); not a sky/signal problem.
  */
-export type LiveSignal = 'good' | 'estimated' | 'settling' | 'recovering' | 'poor';
+export type LiveSignal = 'good' | 'estimated' | 'settling' | 'recovering' | 'poor' | 'offline';
 
 /** Distance and top speed are null whenever the summary would suppress them. */
 export type LiveMetrics = {

@@ -112,4 +112,46 @@ describe('computeLiveReadout', () => {
     const readout = computeLiveReadout({ input: input({ endSec: 180, points }) });
     expect(readout.signal).toBe('poor');
   });
+
+  it('reads a stale OS fix feed as offline, not poor', () => {
+    const session = input({ endSec: 180, points: steady({ count: 181, horizontalAccuracyM: 30 }) });
+    const endMs = Date.parse(session.computedAt!);
+    const readout = computeLiveReadout({
+      input: session,
+      segmentId: 's1',
+      latestFix: { accuracyM: 8, atMs: endMs - 20_000 },
+    });
+    expect(readout.signal).toBe('offline');
+    expect(readout.distanceKm).toBe(0);
+  });
+
+  it('reads a fresh weak fix as poor when quality fails (feed is alive)', () => {
+    const session = input({ endSec: 90, points: steady({ count: 91, horizontalAccuracyM: 20 }) });
+    const endMs = Date.parse(session.computedAt!);
+    const readout = computeLiveReadout({
+      input: session,
+      latestFix: { accuracyM: 52, atMs: endMs - 1_000 },
+    });
+    expect(readout.signal).toBe('poor');
+  });
+
+  it('reads offline even when earlier metrics would have been good', () => {
+    const session = input({ endSec: 180, points: steady({ count: 181 }) });
+    const endMs = Date.parse(session.computedAt!);
+    expect(computeSessionMetrics(session).dataQuality).toBe('good');
+    const readout = computeLiveReadout({
+      input: session,
+      segmentId: 's1',
+      latestFix: { accuracyM: 3, atMs: endMs - 20_000 },
+    });
+    expect(readout.signal).toBe('offline');
+    expect(readout.distanceKm).toBeCloseTo(0.36, 2);
+  });
+
+  it('keeps settling on a cold start before any OS fix arrives', () => {
+    const warming = steady({ count: 31, horizontalAccuracyM: 20 });
+    const session = input({ endSec: 30, points: warming });
+    const readout = computeLiveReadout({ input: session, latestFix: null });
+    expect(readout.signal).toBe('settling');
+  });
 });

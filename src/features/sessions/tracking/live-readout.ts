@@ -6,6 +6,7 @@ import {
   getTrackingSession,
 } from './db';
 import { computeLiveReadout } from './live-metrics';
+import { getLatestFix } from './location-task';
 import type { LiveMetrics } from './types';
 
 const SUPPRESSED: LiveMetrics = { distanceKm: null, topSpeedKmh: null, signal: 'settling' };
@@ -37,5 +38,6 @@ export const readLiveReadout = async ({
       computedAt: now,
     }),
     segmentId,
+    latestFix: getLatestFix(),
   });
 };
