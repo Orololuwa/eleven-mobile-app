@@ -339,7 +339,15 @@ const sumZones = (rows: ZoneSeconds[]): ZoneSeconds =>
     emptyZones(),
   );
 
-export const computeSessionMetrics = (input: ComputationInput): ComputedSessionMetrics => {
+export const computeSessionMetrics = (
+  input: ComputationInput,
+  {
+    passesQuality = passesQualityGate,
+  }: {
+    /** Defaults to the summary quality gate (≤10 m). Live HUD passes `passesLiveQualityGate`. */
+    passesQuality?: (accuracyM: number | null) => boolean;
+  } = {},
+): ComputedSessionMetrics => {
   const segments = [...input.segments].sort((a, b) => a.segmentIndex - b.segmentIndex);
   const cornerPoints = input.corners
     ? [
@@ -365,7 +373,7 @@ export const computeSessionMetrics = (input: ComputationInput): ComputedSessionM
   ).length;
 
   const accepted: AcceptedFix[] = input.points
-    .filter((point) => point.segmentId && passesQualityGate(point.horizontalAccuracyM))
+    .filter((point) => point.segmentId && passesQuality(point.horizontalAccuracyM))
     .map((point) => ({
       ...point,
       atMs: Date.parse(point.recordedAt),
