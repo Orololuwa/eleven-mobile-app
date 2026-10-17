@@ -58,12 +58,6 @@ export const LOCATION_WATCHDOG_INTERVAL_MS = 10_000;
 /** No OS fix delivered for this long → treat as registration dropout (re-register / offline). */
 export const LOCATION_FIX_STALE_MS = 15_000;
 
-/**
- * Consecutive null `getActiveTrackingSession()` reads before self-teardown. A single miss must not
- * unsubscribe mid-run (segment switches / transient DB reads).
- */
-export const LOCATION_NULL_SESSION_STOP_AFTER = 3;
-
 export const ANDROID_FGS_TITLE = 'Eleven — tracking your session';
 
 /** F1 — max OS speed accuracy (m/s). Null speed_accuracy_mps skips F1. */

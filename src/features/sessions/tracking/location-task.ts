@@ -21,6 +21,7 @@ import {
 import { isFixFeedStale } from './fix-feed';
 import { passesContinuityGate } from './fix-gates';
 import { getForegroundPermissionStatus } from './permissions';
+import { needsForcedRenew, shouldWaitForAppActive } from './registration-recovery';
 import { nextTeardownAction } from './registration-teardown';
 import type { LatestFix, PauseReason } from './types';
 
@@ -36,7 +37,7 @@ let lastNotificationBody = 'Tracking session…';
 export type { LatestFix };
 
 export type RegistrationReason =
-  'start' | 'stop' | 'watchdog' | 'foreground' | 'ended' | 'null-session-confirmed';
+  'start' | 'stop' | 'watchdog' | 'foreground' | 'app-state' | 'ended';
 
 /** Newest fix delivered by the OS, stored or not — the GPS label reflects the signal, not storage. */
 export const getLatestFix = () => latestFix;
@@ -134,9 +135,7 @@ const processFix = async (
   consecutiveNullSessions = teardown.nullCount;
 
   if (teardown.action === 'stop') {
-    const reason: RegistrationReason =
-      teardown.reason === 'null-session-confirmed' ? 'null-session-confirmed' : 'ended';
-    void stopLocationTracking({ reason });
+    void stopLocationTracking({ reason: 'ended' });
     return false;
   }
   if (teardown.action === 'skip' || !session) {
@@ -342,25 +341,34 @@ const hasLiveSession = async () => {
   return session != null && session.tracking_status !== 'ended' && !session.ended_at;
 };
 
+const startLocationUpdates = async (notificationBody: string) => {
+  await Location.startLocationUpdatesAsync(
+    LOCATION_TASK_NAME,
+    buildLocationOptions({ notificationBody }),
+  );
+};
+
 /**
  * While a session is live, assert that the location task is registered and a fix arrived recently.
- * Re-registers when either check fails. Survives whatever dropped the registration.
+ * Forces a renew when the feed is stale even if Expo still reports the task as started (GMS can
+ * drop the fused→GPS request while hasStartedLocationUpdatesAsync stays true).
  */
 export const ensureLocationRegistration = async ({
   reason,
 }: {
-  reason: Extract<RegistrationReason, 'watchdog' | 'foreground'>;
+  reason: Extract<RegistrationReason, 'watchdog' | 'foreground' | 'app-state'>;
 }) => {
   if (!(await hasLiveSession())) return;
 
   const running = await isLocationTaskRunning();
-  const feedOk = !isFixFeedStale({ fix: latestFix, staleMs: LOCATION_FIX_STALE_MS });
-  if (running && feedOk) return;
+  const feedStale = isFixFeedStale({ fix: latestFix, staleMs: LOCATION_FIX_STALE_MS });
+  if (!needsForcedRenew({ running, feedStale })) return;
 
   console.log('[location-task] registration re-register', {
     reason,
     running,
-    feedOk,
+    feedStale,
+    forceRenew: true,
     latestFixAtMs: latestFix?.atMs ?? null,
   });
 
@@ -368,6 +376,7 @@ export const ensureLocationRegistration = async ({
     await startLocationTracking({
       notificationBody: lastNotificationBody,
       reason,
+      forceRenew: true,
     });
   } catch (error) {
     if (Platform.OS === 'android' && isForegroundServiceStartNotAllowed(error)) {
@@ -383,9 +392,11 @@ export const ensureLocationRegistration = async ({
 const startLocationTrackingOnce = async ({
   notificationBody,
   reason,
+  forceRenew = false,
 }: {
   notificationBody: string;
   reason: RegistrationReason;
+  forceRenew?: boolean;
 }) => {
   if (stopInFlight) await stopInFlight;
 
@@ -394,11 +405,20 @@ const startLocationTrackingOnce = async ({
   }
 
   lastNotificationBody = notificationBody;
+  const running = await isLocationTaskRunning();
+  const waitForActive = shouldWaitForAppActive(reason);
 
-  if (!(await isLocationTaskRunning())) {
-    if (Platform.OS === 'android' && AppState.currentState !== 'active') {
+  // Force renew: always call startLocationUpdatesAsync so Expo's setOptions restarts the fused
+  // request even when the task is still marked started.
+  if (forceRenew || !running) {
+    if (
+      !running &&
+      waitForActive &&
+      Platform.OS === 'android' &&
+      AppState.currentState !== 'active'
+    ) {
       await whenAppActive();
-      if (await isLocationTaskRunning()) {
+      if ((await isLocationTaskRunning()) && !forceRenew) {
         await ensureForegroundWatch();
         startWatchdog();
         console.log('[location-task] registration start', { reason, alreadyRunning: true });
@@ -407,33 +427,31 @@ const startLocationTrackingOnce = async ({
     }
 
     try {
-      await Location.startLocationUpdatesAsync(
-        LOCATION_TASK_NAME,
-        buildLocationOptions({ notificationBody }),
-      );
+      await startLocationUpdates(notificationBody);
     } catch (error) {
       if (Platform.OS !== 'android' || !isForegroundServiceStartNotAllowed(error)) throw error;
+      // Recovery must not hold startLock on whenAppActive — unlock / next tick retries.
+      if (!waitForActive) throw error;
       await whenAppActive();
-      if (!(await isLocationTaskRunning())) {
-        await Location.startLocationUpdatesAsync(
-          LOCATION_TASK_NAME,
-          buildLocationOptions({ notificationBody }),
-        );
+      if (!(await isLocationTaskRunning()) || forceRenew) {
+        await startLocationUpdates(notificationBody);
       }
     }
   }
 
   await ensureForegroundWatch();
   startWatchdog();
-  console.log('[location-task] registration start', { reason });
+  console.log('[location-task] registration start', { reason, forceRenew, wasRunning: running });
 };
 
 export const startLocationTracking = async ({
   notificationBody,
   reason = 'start',
+  forceRenew = false,
 }: {
   notificationBody: string;
   reason?: RegistrationReason;
+  forceRenew?: boolean;
 }) => {
   const previous = startLock;
   let release = () => {};
@@ -442,7 +460,7 @@ export const startLocationTracking = async ({
   });
   await previous;
   try {
-    await startLocationTrackingOnce({ notificationBody, reason });
+    await startLocationTrackingOnce({ notificationBody, reason, forceRenew });
   } finally {
     release();
   }
@@ -494,6 +512,17 @@ export const handleAppBackgrounded = async () => {
   await updateSessionFields(session.id, { tracking_status: 'auto_pause' });
 };
 
+/**
+ * AppState cue (inactive / background / active): renew registration if the fix feed is stale.
+ * Unlock must force-renew even when Expo still reports the task as started.
+ */
+export const handleAppStateForRegistration = async () => {
+  if (!(await getForegroundPermissionStatus())) return;
+  const session = await getActiveTrackingSession();
+  if (!session || session.tracking_status === 'ended' || session.ended_at) return;
+  await ensureLocationRegistration({ reason: 'app-state' });
+};
+
 /** Called when app returns to foreground — resume backgrounded auto-pause. */
 export const handleAppForegrounded = async () => {
   const session = await getActiveTrackingSession();
@@ -502,7 +531,7 @@ export const handleAppForegrounded = async () => {
   if (session.tracking_status !== 'ended' && !session.ended_at) {
     if (await getForegroundPermissionStatus()) {
       await ensureForegroundWatch();
-      await ensureLocationRegistration({ reason: 'foreground' });
+      await ensureLocationRegistration({ reason: 'app-state' });
     }
   }
 

@@ -11,7 +11,7 @@ describe('nextTeardownAction', () => {
     ).toEqual({ nullCount: 0, action: 'process', reason: 'live' });
   });
 
-  it('stops on explicit ended status without needing null confirmation', () => {
+  it('stops on explicit ended status', () => {
     expect(
       nextTeardownAction({
         session: { tracking_status: 'ended', ended_at: null },
@@ -29,7 +29,7 @@ describe('nextTeardownAction', () => {
     ).toEqual({ nullCount: 0, action: 'stop', reason: 'ended' });
   });
 
-  it('skips a single null session read without stopping', () => {
+  it('skips a null session read without stopping', () => {
     expect(nextTeardownAction({ session: null, previousNullCount: 0 })).toEqual({
       nullCount: 1,
       action: 'skip',
@@ -37,19 +37,16 @@ describe('nextTeardownAction', () => {
     });
   });
 
-  it('skips the second consecutive null', () => {
-    expect(nextTeardownAction({ session: null, previousNullCount: 1 })).toEqual({
-      nullCount: 2,
+  it('never stops on repeated null session reads', () => {
+    expect(nextTeardownAction({ session: null, previousNullCount: 2 })).toEqual({
+      nullCount: 3,
       action: 'skip',
       reason: 'null-session',
     });
-  });
-
-  it('stops only after three consecutive null session reads', () => {
-    expect(nextTeardownAction({ session: null, previousNullCount: 2 })).toEqual({
-      nullCount: 3,
-      action: 'stop',
-      reason: 'null-session-confirmed',
+    expect(nextTeardownAction({ session: null, previousNullCount: 99 })).toEqual({
+      nullCount: 100,
+      action: 'skip',
+      reason: 'null-session',
     });
   });
 });

@@ -12,6 +12,7 @@ import {
   getLatestFix,
   handleAppBackgrounded,
   handleAppForegrounded,
+  handleAppStateForRegistration,
   isLocationTaskRunning,
   resumeManualPause,
   startManualPause,
@@ -111,6 +112,11 @@ export const useTrackingSession = ({
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'inactive' || state === 'background') {
+        void handleAppStateForRegistration().catch((error) => {
+          console.warn('[tracking] app-state registration ensure failed', error);
+        });
+      }
       if (state === 'background') {
         void handleAppBackgrounded();
       } else if (state === 'active') {
