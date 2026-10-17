@@ -33,6 +33,9 @@ let foregroundWatch: Location.LocationSubscription | null = null;
 let consecutiveNullSessions = 0;
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
 let lastNotificationBody = 'Tracking session…';
+/** Cleared at the first line of stop; set when start succeeds. Leftover fixes with no session stop. */
+let trackingDesired = false;
+let lastNullSessionWarnAtMs = 0;
 
 export type { LatestFix };
 
@@ -131,19 +134,24 @@ const processFix = async (
   const teardown = nextTeardownAction({
     session,
     previousNullCount: consecutiveNullSessions,
+    trackingDesired,
   });
   consecutiveNullSessions = teardown.nullCount;
 
   if (teardown.action === 'stop') {
-    void stopLocationTracking({ reason: 'ended' });
+    void stopLocationTracking({ reason: teardown.reason === 'tracking-off' ? 'stop' : 'ended' });
     return false;
   }
   if (teardown.action === 'skip' || !session) {
-    console.warn('[location-task] skip fix — no live session', {
-      reason: teardown.reason,
-      nullCount: consecutiveNullSessions,
-      source,
-    });
+    const now = Date.now();
+    if (now - lastNullSessionWarnAtMs >= 5_000) {
+      lastNullSessionWarnAtMs = now;
+      console.warn('[location-task] skip fix — no live session', {
+        reason: teardown.reason,
+        nullCount: consecutiveNullSessions,
+        source,
+      });
+    }
     return false;
   }
 
@@ -419,6 +427,7 @@ const startLocationTrackingOnce = async ({
     ) {
       await whenAppActive();
       if ((await isLocationTaskRunning()) && !forceRenew) {
+        if (!stopInFlight) trackingDesired = true;
         await ensureForegroundWatch();
         startWatchdog();
         console.log('[location-task] registration start', { reason, alreadyRunning: true });
@@ -439,6 +448,8 @@ const startLocationTrackingOnce = async ({
     }
   }
 
+  // A stop queued while we held the lock wins — do not re-arm desire after user end.
+  if (!stopInFlight) trackingDesired = true;
   await ensureForegroundWatch();
   startWatchdog();
   console.log('[location-task] registration start', { reason, forceRenew, wasRunning: running });
@@ -471,9 +482,12 @@ export const stopLocationTracking = async ({
 }: {
   reason?: RegistrationReason;
 } = {}) => {
+  // Drop desire immediately so in-flight / leftover fixes tear down instead of skip-flooding.
+  trackingDesired = false;
   if (stopInFlight) return stopInFlight;
   stopInFlight = (async () => {
     await startLock;
+    trackingDesired = false;
     clearWatchdog();
     stopForegroundWatch();
     lastProcessedAt = 0;

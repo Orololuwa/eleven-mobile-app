@@ -209,17 +209,15 @@ export const useTrackingSession = ({
 
   const stopCurrentActivity = async () => {
     const segment = await getCurrentSegment(sessionId);
-    const segmentId = segment?.id ?? null;
-    const elapsed = await computeSegmentElapsedSeconds(sessionId, segmentId);
-    const metrics = await readLiveReadout({ sessionId, segmentId });
+    const hud = useTrackingHudStore.getState();
     const row = await getTrackingSession(sessionId);
     const allSegments = await getSegmentsForSession(sessionId);
     const closedLabel = row ? segmentLabelFor({ session: row, segment, allSegments }) : '';
 
     setHud({
-      closedSegmentElapsed: elapsed,
-      closedSegmentDistanceKm: metrics.distanceKm,
-      closedSegmentIndex: segment?.segment_index ?? 1,
+      closedSegmentElapsed: hud.elapsedSeconds,
+      closedSegmentDistanceKm: hud.metrics.distanceKm,
+      closedSegmentIndex: segment?.segment_index ?? hud.segmentIndex,
       closedSegmentLabel: closedLabel,
       activityKind: null,
       elapsedSeconds: 0,
@@ -237,14 +235,12 @@ export const useTrackingSession = ({
     if (!row) return;
 
     const segment = await getCurrentSegment(sessionId);
-    const segmentId = segment?.id ?? null;
-    const elapsed = await computeSegmentElapsedSeconds(sessionId, segmentId);
-    const metrics = await readLiveReadout({ sessionId, segmentId });
+    const hud = useTrackingHudStore.getState();
 
     setHud({
-      closedSegmentElapsed: elapsed,
-      closedSegmentDistanceKm: metrics.distanceKm,
-      closedSegmentIndex: segment?.segment_index ?? 1,
+      closedSegmentElapsed: hud.elapsedSeconds,
+      closedSegmentDistanceKm: hud.metrics.distanceKm,
+      closedSegmentIndex: segment?.segment_index ?? hud.segmentIndex,
     });
     setPendingActivityKind(activityKind);
 
@@ -258,9 +254,10 @@ export const useTrackingSession = ({
       return;
     }
 
+    // Show the switch UI immediately; compass resolve is capped so it cannot freeze the hold path.
+    setPhase('segment-switch');
     const direction = await resolveCompassAttackDirection(sessionId);
     setHud({ pendingAttackDirection: direction });
-    setPhase('segment-switch');
   };
 
   const confirmSegmentSwitch = async (attackDirection: AttackDirection | null) => {
@@ -281,10 +278,10 @@ export const useTrackingSession = ({
     setHud({ pendingAttackDirection: current === 'end_a' ? 'end_b' : 'end_a' });
   };
 
-  const endSession = async () => {
-    await endTrackingSession({ sessionId, massKg });
-    const row = await loadSession();
-    setSession(row);
+  const endSession = async (onStopped?: () => void) => {
+    // Do not loadSession after end — that re-renders the live HUD with status "ended" and races
+    // the summary replace (view flicker). Navigate on stop; metrics finish in the background.
+    await endTrackingSession({ sessionId, massKg, onStopped });
   };
 
   const trackingStatus = session?.tracking_status ?? 'live';

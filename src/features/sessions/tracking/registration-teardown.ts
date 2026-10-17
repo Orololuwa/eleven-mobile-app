@@ -7,17 +7,27 @@ export type TeardownAction = 'process' | 'stop' | 'skip';
 
 /**
  * Decides whether a delivered fix should be processed, skipped, or tear down location updates.
- * Explicit end always stops. A null session read must never unsubscribe mid-run — orphaned FGS
- * until the user ends the session is better than a silent dropout (Amendment 02 B0.1).
+ *
+ * - Explicit end (`ended` / `ended_at`) always stops.
+ * - A null session while tracking is still **desired** must never unsubscribe mid-run — orphaned
+ *   FGS until the user ends is better than a silent dropout (Amendment 02 B0.1).
+ * - A null session after tracking is **not** desired (user ended / stop already called) must stop
+ *   so leftover watch/task callbacks do not flood the JS thread.
  */
 export const nextTeardownAction = ({
   session,
   previousNullCount,
+  trackingDesired = true,
 }: {
   session: SessionTeardownProbe;
   previousNullCount: number;
+  /** False once stop/end has been requested — leftover deliveries should tear down, not skip forever. */
+  trackingDesired?: boolean;
 }): { nullCount: number; action: TeardownAction; reason: string } => {
   if (!session) {
+    if (!trackingDesired) {
+      return { nullCount: 0, action: 'stop', reason: 'tracking-off' };
+    }
     return {
       nullCount: previousNullCount + 1,
       action: 'skip',
