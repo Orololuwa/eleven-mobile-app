@@ -9,7 +9,7 @@ import {
   type TextStyle,
 } from 'react-native';
 import { typography, type Colors, useThemedStyles, useColors } from '@/theme';
-import { HOLD_CONFIRM_MS, HOLD_CONFIRM_SECONDS } from '@/features/sessions/tracking/constants';
+import { HOLD_CONFIRM_MS } from '@/features/sessions/tracking/constants';
 
 type HoldToConfirmButtonProps = {
   title: string;
@@ -45,14 +45,22 @@ export const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
     setHoldProgress(0);
   };
 
+  const confirmedRef = useRef(false);
+
   /** `onConfirm` runs from the timer, never inside a state updater (updaters can run twice). */
   const handlePressIn = (_event: GestureResponderEvent) => {
     if (disabled) return;
+    confirmedRef.current = false;
     clearHold();
     const stepMs = 100;
     const increment = (stepMs / HOLD_CONFIRM_MS) * 100;
     intervalRef.current = setInterval(() => {
       if (progressRef.current >= 100) {
+        if (confirmedRef.current) {
+          clearHold();
+          return;
+        }
+        confirmedRef.current = true;
         clearHold();
         onConfirm();
         return;

@@ -29,24 +29,40 @@ describe('nextTeardownAction', () => {
     ).toEqual({ nullCount: 0, action: 'stop', reason: 'ended' });
   });
 
-  it('skips a null session read without stopping', () => {
-    expect(nextTeardownAction({ session: null, previousNullCount: 0 })).toEqual({
+  it('skips a null session read without stopping while tracking is desired', () => {
+    expect(
+      nextTeardownAction({ session: null, previousNullCount: 0, trackingDesired: true }),
+    ).toEqual({
       nullCount: 1,
       action: 'skip',
       reason: 'null-session',
     });
   });
 
-  it('never stops on repeated null session reads', () => {
-    expect(nextTeardownAction({ session: null, previousNullCount: 2 })).toEqual({
+  it('never stops on repeated null session reads while tracking is desired', () => {
+    expect(
+      nextTeardownAction({ session: null, previousNullCount: 2, trackingDesired: true }),
+    ).toEqual({
       nullCount: 3,
       action: 'skip',
       reason: 'null-session',
     });
-    expect(nextTeardownAction({ session: null, previousNullCount: 99 })).toEqual({
+    expect(
+      nextTeardownAction({ session: null, previousNullCount: 99, trackingDesired: true }),
+    ).toEqual({
       nullCount: 100,
       action: 'skip',
       reason: 'null-session',
+    });
+  });
+
+  it('stops on null session once tracking is no longer desired', () => {
+    expect(
+      nextTeardownAction({ session: null, previousNullCount: 5, trackingDesired: false }),
+    ).toEqual({
+      nullCount: 0,
+      action: 'stop',
+      reason: 'tracking-off',
     });
   });
 });

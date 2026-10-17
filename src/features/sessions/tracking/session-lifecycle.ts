@@ -23,6 +23,7 @@ import {
 } from './indicator';
 import { elapsedSecondsFromPauses } from './live-metrics';
 import { requestTrackingPermissions } from './permissions';
+import { invalidateHistory } from '../history/history-cache';
 import { computeAndStoreSessionMetrics } from '../summary/run-computation';
 import { enqueueSessionSync } from './sync';
 import type { BackgroundPermission, StoredPitchCorners } from './types';
@@ -228,6 +229,16 @@ export const completeSegmentSwitch = async ({
   }
 };
 
+const COMPASS_RESOLVE_TIMEOUT_MS = 2_500;
+
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
+  Promise.race([
+    promise,
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    }),
+  ]);
+
 export const resolveCompassAttackDirection = async (
   sessionId: string,
 ): Promise<AttackDirection | null> => {
@@ -237,11 +248,16 @@ export const resolveCompassAttackDirection = async (
   const corners = cornersFromSessionRow(session);
   if (!corners) return null;
 
-  const [heading, location] = await Promise.all([
-    Location.getHeadingAsync(),
-    Location.getCurrentPositionAsync({}),
-  ]);
+  const settled = await withTimeout(
+    Promise.all([Location.getHeadingAsync(), Location.getCurrentPositionAsync({})]),
+    COMPASS_RESOLVE_TIMEOUT_MS,
+  );
+  if (!settled) {
+    console.warn('[tracking] compass resolve timed out — direction left blank');
+    return null;
+  }
 
+  const [heading, location] = settled;
   const headingDegrees = heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
 
   return resolveAttackDirection({
@@ -254,9 +270,12 @@ export const resolveCompassAttackDirection = async (
 export const endTrackingSession = async ({
   sessionId,
   massKg,
+  onStopped,
 }: {
   sessionId: string;
   massKg: number | null;
+  /** Called after location/indicator stop so the UI can navigate while metrics still compute. */
+  onStopped?: () => void;
 }) => {
   const session = await getTrackingSession(sessionId);
   if (!session) return;
@@ -268,6 +287,13 @@ export const endTrackingSession = async ({
     await closeSegment(current.id, closedAt);
   }
 
+  // Mark ended before stop so the HUD tick exits and getActiveTrackingSession goes null.
+  // stop clears trackingDesired immediately so leftover watch/task fixes tear down (no skip flood).
+  await updateSessionFields(sessionId, {
+    ended_at: closedAt,
+    tracking_status: 'ended',
+  });
+
   await stopLocationTracking({ reason: 'ended' });
   try {
     await stopTrackingIndicator(session.live_activity_id);
@@ -275,12 +301,10 @@ export const endTrackingSession = async ({
     console.warn('[tracking] indicator stop failed', error);
   }
 
-  await updateSessionFields(sessionId, {
-    ended_at: closedAt,
-    tracking_status: 'ended',
-  });
+  onStopped?.();
 
   await computeAndStoreSessionMetrics({ sessionId, massKg });
+  invalidateHistory();
   enqueueSessionSync(sessionId);
 };
 
