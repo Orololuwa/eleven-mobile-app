@@ -65,7 +65,7 @@ const SIGNAL_NOTICE: Record<Exclude<LiveSignal, 'good'>, { title: string | null;
   recovering: { title: null, sub: 'SIGNAL BACK · EARLIER GAPS · NUMBERS READ LOW' },
   poor: {
     title: 'Poor signal — not tracking accurately.',
-    sub: 'MOVE INTO OPEN SKY · DISTANCE PAUSES UNTIL IT CLEARS',
+    sub: 'MOVE INTO OPEN SKY · LIVE NUMBERS MAY FREEZE',
   },
   offline: {
     title: 'Lost GPS connection — reconnecting.',
