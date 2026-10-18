@@ -65,7 +65,7 @@ const SIGNAL_NOTICE: Record<Exclude<LiveSignal, 'good'>, { title: string | null;
   recovering: { title: null, sub: 'SIGNAL BACK · EARLIER GAPS · NUMBERS READ LOW' },
   poor: {
     title: 'Poor signal — not tracking accurately.',
-    sub: 'MOVE INTO OPEN SKY · DISTANCE PAUSES UNTIL IT CLEARS',
+    sub: 'MOVE INTO OPEN SKY · LIVE NUMBERS MAY FREEZE',
   },
   offline: {
     title: 'Lost GPS connection — reconnecting.',
@@ -352,8 +352,9 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
   const handleEnd = async () => {
     setBusy(true);
     try {
-      await endSession();
-      onEnd();
+      await endSession(() => {
+        onEnd();
+      });
     } finally {
       setBusy(false);
     }
@@ -598,17 +599,34 @@ export const ActiveSessionScreen: React.FC<ActiveSessionScreenProps> = ({
                   <Button
                     key={kind}
                     title={`START ${activityKindLabel(kind)}`}
-                    onPress={() => void beginSegmentSwitch({ activityKind: kind })}
+                    onPress={() => {
+                      setBusy(true);
+                      void beginSegmentSwitch({ activityKind: kind }).finally(() => setBusy(false));
+                    }}
                     disabled={busy}
                     variant="secondary"
                   />
                 ))
               : null}
             {!isTraining && !isPaused && halvesCta ? (
-              <Button title={halvesCta} onPress={() => void beginSegmentSwitch()} disabled={busy} />
+              <Button
+                title={halvesCta}
+                onPress={() => {
+                  setBusy(true);
+                  void beginSegmentSwitch().finally(() => setBusy(false));
+                }}
+                disabled={busy}
+              />
             ) : null}
             {!isTraining && !isPaused && setsCta ? (
-              <Button title={setsCta} onPress={() => void beginSegmentSwitch()} disabled={busy} />
+              <Button
+                title={setsCta}
+                onPress={() => {
+                  setBusy(true);
+                  void beginSegmentSwitch().finally(() => setBusy(false));
+                }}
+                disabled={busy}
+              />
             ) : null}
             <View style={styles.holdRow}>
               {trainingIdle ? null : (

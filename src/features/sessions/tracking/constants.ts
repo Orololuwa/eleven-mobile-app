@@ -6,10 +6,17 @@
 export const CONTINUITY_FIX_ACCURACY_M = 50;
 
 /**
- * Quality gate (metres, inclusive). Only fixes within it feed distance, speed, sprints, and zones.
- * Coupled to the summary's gap-based data quality: time covered only by fixes outside it is gap.
+ * Quality gate (metres, inclusive). Only fixes within it feed **summary** distance, speed, sprints,
+ * and zones. Coupled to the summary's gap-based data quality: time covered only by fixes outside it
+ * is gap.
  */
 export const QUALITY_FIX_ACCURACY_M = 10;
+
+/**
+ * Live HUD gate (metres, inclusive). Matches continuity so every stored fix can feed live distance
+ * and "measuring now". Summary metrics stay on `QUALITY_FIX_ACCURACY_M`.
+ */
+export const LIVE_QUALITY_FIX_ACCURACY_M = CONTINUITY_FIX_ACCURACY_M;
 
 /** No continuity-passing fix for this long (after the first lock) → auto-pause (gps_loss). */
 export const GPS_LOSS_PAUSE_MS = 30_000;
@@ -57,12 +64,6 @@ export const LOCATION_WATCHDOG_INTERVAL_MS = 10_000;
 
 /** No OS fix delivered for this long → treat as registration dropout (re-register / offline). */
 export const LOCATION_FIX_STALE_MS = 15_000;
-
-/**
- * Consecutive null `getActiveTrackingSession()` reads before self-teardown. A single miss must not
- * unsubscribe mid-run (segment switches / transient DB reads).
- */
-export const LOCATION_NULL_SESSION_STOP_AFTER = 3;
 
 export const ANDROID_FGS_TITLE = 'Eleven — tracking your session';
 
