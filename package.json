@@ -76,7 +76,9 @@
   "expo": {
     "autolinking": {
       "android": {
-        "buildFromSource": ["expo-location"]
+        "buildFromSource": [
+          "expo-location"
+        ]
       }
     }
   }
