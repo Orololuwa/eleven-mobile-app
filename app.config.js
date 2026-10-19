@@ -62,5 +62,6 @@ module.exports = ({ config }) => ({
     ],
     './plugins/with-safe-react-delegate.js',
     './plugins/with-speed-accuracy.js',
+    './plugins/with-direct-gps.js',
   ],
 });

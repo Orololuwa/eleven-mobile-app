@@ -416,8 +416,8 @@ const startLocationTrackingOnce = async ({
   const running = await isLocationTaskRunning();
   const waitForActive = shouldWaitForAppActive(reason);
 
-  // Force renew: always call startLocationUpdatesAsync so Expo's setOptions restarts the fused
-  // request even when the task is still marked started.
+  // Force renew: always call startLocationUpdatesAsync even when Expo still reports the task as
+  // started. On Android that re-registers LocationManager GPS_PROVIDER (with-direct-gps), not fused.
   if (forceRenew || !running) {
     if (
       !running &&
