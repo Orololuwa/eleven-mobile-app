@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { elapsedSecondsFromPauses } from './live-metrics';
 import {
+  chronometerBaseMs,
   elapsedSecondsAt,
   hudPatchFromSnapshot,
   isLiveSnapshotStale,
@@ -109,5 +110,27 @@ describe('hudPatchFromSnapshot', () => {
   it('counts GPS search seconds from the persisted start', () => {
     const snapshot = snapshotWith({ gpsSearchStartedAtMs: T0 + 50_000 });
     expect(hudPatchFromSnapshot({ snapshot, nowMs: T0 + 80_000 }).gpsSearchSeconds).toBe(30);
+  });
+});
+
+describe('chronometerBaseMs', () => {
+  it('puts 0:00 at start plus closed pauses, so the system clock matches elapsedSecondsAt', () => {
+    const clock = liveClockFromRows({
+      startedAt: iso(0),
+      pauses: [{ started_at: iso(60), ended_at: iso(90) }],
+    });
+    const base = chronometerBaseMs(clock);
+    expect(base).toBe(T0 + 30_000);
+    const nowMs = T0 + 600_000;
+    expect(Math.floor((nowMs - (base ?? 0)) / 1000)).toBe(elapsedSecondsAt(clock, nowMs));
+  });
+
+  it('is null while paused or with nothing running', () => {
+    expect(
+      chronometerBaseMs(
+        liveClockFromRows({ startedAt: iso(0), pauses: [{ started_at: iso(10), ended_at: null }] }),
+      ),
+    ).toBeNull();
+    expect(chronometerBaseMs(liveClockFromRows({ startedAt: null, pauses: [] }))).toBeNull();
   });
 });

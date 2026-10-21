@@ -19,7 +19,7 @@ import {
   recordLatestFix,
   updateSessionFields,
 } from './db';
-import { isFixFeedStale } from './fix-feed';
+import { isFixFeedStale, watchShouldYieldToTask } from './fix-feed';
 import { passesContinuityGate } from './fix-gates';
 import { getLatestFix, setLatestFix } from './latest-fix';
 import { refreshLiveSnapshot } from './live-snapshot';
@@ -33,6 +33,8 @@ let stopInFlight: Promise<void> | null = null;
 let lastProcessedAt = 0;
 /** Deliveries (task + watch) run one at a time — interleaved fixes raced pauses and DB reads. */
 let processQueue: Promise<void> = Promise.resolve();
+/** Wall time of the last direct-GPS (task) delivery; the fused watch yields while it is recent. */
+let lastTaskDeliveryAtMs: number | null = null;
 let foregroundWatch: Location.LocationSubscription | null = null;
 let consecutiveNullSessions = 0;
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
@@ -84,7 +86,7 @@ const startAutoPause = async ({
     tracking_status: 'auto_pause',
     gps_search_started_at: reason === 'gps_loss' ? new Date().toISOString() : null,
   });
-  void refreshLiveSnapshot({ sessionId, force: true }).catch(() => undefined);
+  void refreshIndicatorNow(sessionId).catch(() => undefined);
 };
 
 const resumeFromAutoPause = async (sessionId: string) => {
@@ -97,7 +99,14 @@ const resumeFromAutoPause = async (sessionId: string) => {
     auto_resume_cooldown_until: new Date(Date.now() + AUTO_RESUME_COOLDOWN_MS).toISOString(),
     gps_search_started_at: null,
   });
-  void refreshLiveSnapshot({ sessionId, force: true }).catch(() => undefined);
+  void refreshIndicatorNow(sessionId).catch(() => undefined);
+};
+
+/** Pause / resume flips the notification chronometer — push it now, not on the 5 s throttle. */
+const refreshIndicatorNow = async (sessionId: string) => {
+  await refreshLiveSnapshot({ sessionId, force: true });
+  const { refreshTrackingIndicator } = await import('./indicator');
+  await refreshTrackingIndicator({ force: true });
 };
 
 type FixContext = { source: 'task' | 'watch'; intervalMs: number | null; batchSize: number };
@@ -120,6 +129,13 @@ const processLocationBatch = async (
   locations: Location.LocationObject[],
   source: 'task' | 'watch',
 ) => {
+  // Direct GPS is the session's source of truth; the fused watch only fills in when it is quiet.
+  if (source === 'task') {
+    lastTaskDeliveryAtMs = Date.now();
+  } else if (watchShouldYieldToTask({ lastTaskDeliveryAtMs })) {
+    return;
+  }
+
   const fresh = [...locations]
     .sort((a, b) => a.timestamp - b.timestamp)
     .filter((location) => location.timestamp > lastProcessedAt);
@@ -377,6 +393,9 @@ const startLocationUpdates = async (notificationBody: string) => {
     LOCATION_TASK_NAME,
     buildLocationOptions({ notificationBody }),
   );
+  // Expo rebuilt the FGS notification from these options — re-post ours (body + chronometer).
+  const { invalidateAndroidIndicator } = await import('./indicator');
+  invalidateAndroidIndicator();
 };
 
 /**
@@ -515,6 +534,7 @@ export const stopLocationTracking = async ({
     clearWatchdog();
     stopForegroundWatch();
     lastProcessedAt = 0;
+    lastTaskDeliveryAtMs = null;
     setLatestFix(null);
     consecutiveNullSessions = 0;
     try {
@@ -596,7 +616,7 @@ export const startManualPause = async (sessionId: string) => {
     reason: 'manual',
   });
   await updateSessionFields(sessionId, { tracking_status: 'manual_pause' });
-  await refreshLiveSnapshot({ sessionId, force: true });
+  await refreshIndicatorNow(sessionId);
 };
 
 export const resumeManualPause = async (sessionId: string) => {
@@ -608,5 +628,5 @@ export const resumeManualPause = async (sessionId: string) => {
     await closePause(openPause.id);
   }
   await updateSessionFields(sessionId, { tracking_status: 'live' });
-  await refreshLiveSnapshot({ sessionId, force: true });
+  await refreshIndicatorNow(sessionId);
 };

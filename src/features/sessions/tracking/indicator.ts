@@ -8,11 +8,12 @@ import { ANDROID_FGS_TITLE, INDICATOR_UPDATE_INTERVAL_MS, LOCATION_TASK_NAME } f
 import { getActiveTrackingSession } from './db';
 import { formatDistance, formatElapsedLong, formatSpeed } from './live-metrics';
 import { readFreshLiveSnapshot } from './live-snapshot';
-import { elapsedSecondsAt } from './live-snapshot-model';
+import { chronometerBaseMs, elapsedSecondsAt } from './live-snapshot-model';
 import type { LiveSignal, TrackingSegmentRow, TrackingSessionRow } from './types';
 import { segmentLabelFor } from '../segment-display';
 
-let lastAndroidNotificationBody: string | null = null;
+/** Body + chronometer base last posted; skips identical re-posts. */
+let lastAndroidNotificationKey: string | null = null;
 let lastDistanceUnit: 'km' | 'mi' = 'km';
 let lastIndicatorPushAt = 0;
 
@@ -24,6 +25,11 @@ type IndicatorSnapshot = {
   signal: LiveSignal;
   segmentLabel: string;
   distanceUnit: 'km' | 'mi';
+  /**
+   * Android: wall time the running clock reads 0:00 at. The notification's system chronometer ticks
+   * every second from it, so the body leaves the clock out. Null/absent → the body prints the time.
+   */
+  chronometerBaseMs?: number | null;
 };
 
 const SIGNAL_LABEL: Record<Exclude<LiveSignal, 'good'>, string> = {
@@ -36,21 +42,29 @@ const SIGNAL_LABEL: Record<Exclude<LiveSignal, 'good'>, string> = {
 
 const signalLabel = (signal: LiveSignal) => (signal === 'good' ? '' : SIGNAL_LABEL[signal]);
 
-const formatReadout = ({
-  elapsedSeconds,
-  distanceKm,
-  topSpeedKmh,
-  signal,
-  distanceUnit,
-}: Omit<IndicatorSnapshot, 'segmentLabel'>) => {
-  const elapsed = formatElapsedLong(elapsedSeconds);
-  if (distanceKm == null || topSpeedKmh == null) return `${elapsed} · ${signalLabel(signal)}`;
+const formatReadout = (
+  {
+    elapsedSeconds,
+    distanceKm,
+    topSpeedKmh,
+    signal,
+    distanceUnit,
+  }: Omit<IndicatorSnapshot, 'segmentLabel' | 'chronometerBaseMs'>,
+  { includeClock = true }: { includeClock?: boolean } = {},
+) => {
+  const parts = includeClock ? [formatElapsedLong(elapsedSeconds)] : [];
+  if (distanceKm == null || topSpeedKmh == null) {
+    const label = signalLabel(signal);
+    if (label) parts.push(label);
+    return parts.join(' · ') || 'TRACKING';
+  }
   const distance = formatDistance({ km: distanceKm, unit: distanceUnit });
   const speed = formatSpeed({ kmh: topSpeedKmh, unit: distanceUnit });
   const distanceSuffix = distanceUnit === 'mi' ? 'MI' : 'KM';
   const speedSuffix = distanceUnit === 'mi' ? 'MPH' : 'KM/H';
-  const readout = `${elapsed} · ${distance} ${distanceSuffix} · TOP ${speed} ${speedSuffix}`;
-  return signal === 'estimated' ? `${readout} · ${signalLabel(signal)}` : readout;
+  parts.push(`${distance} ${distanceSuffix}`, `TOP ${speed} ${speedSuffix}`);
+  if (signal === 'estimated') parts.push(signalLabel(signal));
+  return parts.join(' · ');
 };
 
 const liveActivityConfig: LiveActivity.LiveActivityConfig = {
@@ -91,7 +105,7 @@ const resolveDistanceUnit = (distanceUnit?: 'km' | 'mi'): 'km' | 'mi' => {
 };
 
 export const buildNotificationBody = (snapshot: Omit<IndicatorSnapshot, 'segmentLabel'>) =>
-  formatReadout(snapshot);
+  formatReadout(snapshot, { includeClock: snapshot.chronometerBaseMs == null });
 
 const buildLiveActivityState = ({
   segmentLabel,
@@ -114,19 +128,24 @@ const androidLocationOptions = (notificationBody: string): Location.LocationTask
   },
 });
 
-const updateAndroidIndicator = async (notificationBody: string) => {
-  if (notificationBody === lastAndroidNotificationBody) return;
-  lastAndroidNotificationBody = notificationBody;
+const updateAndroidIndicator = async (
+  notificationBody: string,
+  chronometerBase: number | null = null,
+) => {
+  const key = `${notificationBody}|${chronometerBase ?? ''}`;
+  if (key === lastAndroidNotificationKey) return;
+  lastAndroidNotificationKey = key;
 
   const updatedInPlace = await updateAndroidTrackingNotification({
     title: ANDROID_FGS_TITLE,
     body: notificationBody,
     color: colors.brand.fill,
+    chronometerBaseMs: chronometerBase,
   });
   if (updatedInPlace) return;
 
   if (AppState.currentState !== 'active') {
-    lastAndroidNotificationBody = null;
+    lastAndroidNotificationKey = null;
     return;
   }
 
@@ -136,8 +155,20 @@ const updateAndroidIndicator = async (notificationBody: string) => {
       androidLocationOptions(notificationBody),
     );
   } catch {
-    lastAndroidNotificationBody = null;
+    // fall through — the next refresh retries
   }
+  // Expo rebuilt the notification from options (no chronometer); post ours again next refresh.
+  lastAndroidNotificationKey = null;
+};
+
+/**
+ * Expo rebuilds the FGS notification from task options whenever `startLocationUpdatesAsync` runs
+ * (registration renew), dropping our body and chronometer. Forget what we posted so the next
+ * refresh re-posts it.
+ */
+export const invalidateAndroidIndicator = () => {
+  lastAndroidNotificationKey = null;
+  lastIndicatorPushAt = 0;
 };
 
 export const startTrackingIndicator = async ({
@@ -167,31 +198,8 @@ export const startTrackingIndicator = async ({
     return activityId ?? null;
   }
 
-  await updateAndroidIndicator(notificationBody);
+  await updateAndroidIndicator(notificationBody, fullSnapshot.chronometerBaseMs ?? null);
   return null;
-};
-
-export const updateTrackingIndicator = async ({
-  liveActivityId,
-  session,
-  segment,
-  allSegments = [],
-  snapshot,
-  distanceUnit,
-}: {
-  liveActivityId: string | null;
-  session: TrackingSessionRow;
-  segment: TrackingSegmentRow | null;
-  allSegments?: TrackingSegmentRow[];
-  snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
-  distanceUnit: 'km' | 'mi';
-}) => {
-  await pushTrackingIndicator({
-    liveActivityId,
-    segmentLabel: resolveSegmentLabel(session, segment, allSegments),
-    snapshot,
-    distanceUnit,
-  });
 };
 
 const pushTrackingIndicator = async ({
@@ -219,7 +227,7 @@ const pushTrackingIndicator = async ({
   }
 
   if (Platform.OS === 'android') {
-    await updateAndroidIndicator(notificationBody);
+    await updateAndroidIndicator(notificationBody, fullSnapshot.chronometerBaseMs ?? null);
   }
 };
 
@@ -231,7 +239,7 @@ export const stopTrackingIndicator = async (liveActivityId: string | null) => {
       console.warn('[indicator] Live Activity stop failed', error);
     }
   }
-  lastAndroidNotificationBody = null;
+  lastAndroidNotificationKey = null;
   lastIndicatorPushAt = 0;
 };
 
@@ -262,6 +270,7 @@ export const refreshTrackingIndicator = async ({
       distanceKm: live.metrics.distanceKm,
       topSpeedKmh: live.metrics.topSpeedKmh,
       signal: live.metrics.signal,
+      chronometerBaseMs: chronometerBaseMs(clock),
     },
     distanceUnit: resolveDistanceUnit(distanceUnit),
   });

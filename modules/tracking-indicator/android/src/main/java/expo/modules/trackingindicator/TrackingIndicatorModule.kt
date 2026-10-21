@@ -18,7 +18,12 @@ class TrackingIndicatorModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("TrackingIndicator")
 
-    AsyncFunction("updateNotification") { title: String, body: String, color: String ->
+    /**
+     * `chronometerBaseMs`: wall time the running clock reads 0:00 at. The system ticks the
+     * notification's chronometer every second with no JS — null while paused (the body then carries
+     * the frozen time).
+     */
+    AsyncFunction("updateNotification") { title: String, body: String, color: String, chronometerBaseMs: Double? ->
       val context =
         appContext.reactContext?.applicationContext
           ?: return@AsyncFunction false
@@ -44,6 +49,12 @@ class TrackingIndicatorModule : Module() {
           .setOngoing(true)
           .setOnlyAlertOnce(true)
           .setCategory(Notification.CATEGORY_SERVICE)
+
+      if (chronometerBaseMs != null) {
+        builder.setWhen(chronometerBaseMs.toLong()).setShowWhen(true).setUsesChronometer(true)
+      } else {
+        builder.setShowWhen(false).setUsesChronometer(false)
+      }
 
       existing.notification.contentIntent?.let { builder.setContentIntent(it) }
 

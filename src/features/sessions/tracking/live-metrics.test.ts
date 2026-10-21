@@ -70,9 +70,9 @@ describe('computeLiveReadout', () => {
     ];
     const session = input({ endSec: 180, points });
     const endMs = Date.parse(session.computedAt!);
-    expect(computeSessionMetrics(session, { passesQuality: passesLiveQualityGate }).dataQuality).toBe(
-      'estimated',
-    );
+    expect(
+      computeSessionMetrics(session, { passesQuality: passesLiveQualityGate }).dataQuality,
+    ).toBe('estimated');
     const readout = computeLiveReadout({
       input: session,
       segmentId: 's1',

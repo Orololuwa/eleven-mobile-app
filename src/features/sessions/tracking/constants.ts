@@ -71,6 +71,13 @@ export const LOCATION_TASK_NAME = 'eleven-location-tracking';
 /** Poll cadence while a session is live — assert registration and recent fix delivery. */
 export const LOCATION_WATCHDOG_INTERVAL_MS = 10_000;
 
+/**
+ * The foreground watch (Play Services fused) stands down while the direct GPS task delivered
+ * within this window. Both share one newest-timestamp guard, so a fused fix landing first used to
+ * shadow the GPS fixes, and mixing two position estimates zig-zags distance.
+ */
+export const WATCH_YIELDS_TO_TASK_MS = 3_000;
+
 /** No OS fix delivered for this long → treat as registration dropout (re-register / offline). */
 export const LOCATION_FIX_STALE_MS = 15_000;
 

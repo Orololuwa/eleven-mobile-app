@@ -70,6 +70,15 @@ export const elapsedSecondsAt = (clock: LiveClock, nowMs = Date.now()) => {
   return Math.max(0, Math.floor((endMs - clock.startedAtMs - clock.closedPausedMs) / 1000));
 };
 
+/**
+ * Wall time a running clock reads 0:00 at, for the notification chronometer (the system ticks it).
+ * Null while paused or with nothing running — the indicator then prints the frozen time.
+ */
+export const chronometerBaseMs = (clock: LiveClock): number | null =>
+  clock.startedAtMs == null || clock.openPauseStartedAtMs != null
+    ? null
+    : clock.startedAtMs + clock.closedPausedMs;
+
 /** Newer of two fixes — the in-memory feed wins unless the persisted one is newer. */
 export const newestFix = (a: LatestFix | null, b: LatestFix | null): LatestFix | null => {
   if (!a) return b;

@@ -6,6 +6,7 @@ const PLUGIN_NAME = 'with-direct-gps';
 const MARKER = 'direct-gps request GPS_PROVIDER';
 const WAKE_LOCK_MARKER = 'direct-gps session wake lock';
 const WAKE_LOCK_SAFE_MARKER = 'direct-gps wake lock unavailable';
+const EVERY_FIX_MARKER = 'direct-gps every chip fix';
 
 const CONSUMER = [
   'android',
@@ -297,6 +298,23 @@ const WAKE_SAFE_START_AFTER = `    directGpsRenewArmed = true
     directGpsHandler.postDelayed(directGpsRenew, 5_000L)
     holdSessionWakeLock()`;
 
+/*
+ * Stage 4 — a 1000 ms request makes LocationManager drop any fix that lands more than ~10% early
+ * (jitter rule), turning some 1 s gaps into 2 s. Nike Run Club asks for 10 ms and so keeps every
+ * fix the chip produces (still ~1 Hz). Keep the 1 s power hint, accept every fix.
+ */
+const EVERY_FIX_BEFORE = `          .setMinUpdateDistanceMeters(0f)
+          .build()`;
+
+const EVERY_FIX_AFTER = `          .setMinUpdateDistanceMeters(0f)
+          // ${EVERY_FIX_MARKER}
+          .setMinUpdateIntervalMillis(0L)
+          .build()`;
+
+const EVERY_FIX_LEGACY_BEFORE = `GPS_PROVIDER, 1000L, 0f, intent)`;
+
+const EVERY_FIX_LEGACY_AFTER = `GPS_PROVIDER, 0L, 0f, intent)`;
+
 const replaceOnce = ({ filePath, before, after, label }) => {
   const contents = fs.readFileSync(filePath, 'utf8');
   if (!contents.includes(before)) {
@@ -348,11 +366,23 @@ const patchWakeLockSafe = (filePath) => {
   });
 };
 
+const patchEveryFix = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(EVERY_FIX_MARKER)) return;
+  replaceOnce({ filePath, before: EVERY_FIX_BEFORE, after: EVERY_FIX_AFTER, label: 'every fix' });
+  replaceOnce({
+    filePath,
+    before: EVERY_FIX_LEGACY_BEFORE,
+    after: EVERY_FIX_LEGACY_AFTER,
+    label: 'every fix legacy',
+  });
+};
+
 const patchAndroid = (projectRoot) => {
   const filePath = path.join(projectRoot, 'node_modules', 'expo-location', ...CONSUMER);
   patchDirectGps(filePath);
   patchWakeLock(filePath);
   patchWakeLockSafe(filePath);
+  patchEveryFix(filePath);
 };
 
 /** @type {import('expo/config-plugins').ConfigPlugin} */

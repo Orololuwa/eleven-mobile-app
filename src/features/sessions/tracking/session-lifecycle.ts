@@ -19,10 +19,9 @@ import {
   refreshTrackingIndicator,
   startTrackingIndicator,
   stopTrackingIndicator,
-  updateTrackingIndicator,
 } from './indicator';
 import { refreshLiveSnapshot } from './live-snapshot';
-import { elapsedSecondsAt } from './live-snapshot-model';
+import { chronometerBaseMs, elapsedSecondsAt } from './live-snapshot-model';
 import { promptBackgroundPowerIfNeeded } from './background-power';
 import { requestTrackingPermissions } from './permissions';
 import { invalidateHistory } from '../history/history-cache';
@@ -101,6 +100,7 @@ export const beginTrackingAfterPermission = async ({
           distanceKm: live.metrics.distanceKm,
           topSpeedKmh: live.metrics.topSpeedKmh,
           signal: live.metrics.signal,
+          chronometerBaseMs: chronometerBaseMs(live.segmentId ? live.clock : live.sessionClock),
         }
       : { elapsedSeconds: 0, distanceKm: null, topSpeedKmh: null, signal: 'settling' },
     distanceUnit,
@@ -230,19 +230,8 @@ export const completeSegmentSwitch = async ({
     segment_clock_origin_ms: Date.now(),
   });
   await refreshLiveSnapshot({ sessionId, force: true });
-
-  const updatedSession = await getTrackingSession(sessionId);
-  const segment = await getCurrentSegment(sessionId);
-  if (updatedSession) {
-    await updateTrackingIndicator({
-      liveActivityId: updatedSession.live_activity_id,
-      session: updatedSession,
-      segment,
-      allSegments: await getSegmentsForSession(sessionId),
-      snapshot: { elapsedSeconds: 0, distanceKm: null, topSpeedKmh: null, signal: 'settling' },
-      distanceUnit,
-    });
-  }
+  // New segment: the indicator reads the fresh snapshot (clock from the new segment start).
+  await refreshTrackingIndicator({ distanceUnit, force: true });
 };
 
 const COMPASS_RESOLVE_TIMEOUT_MS = 2_500;
