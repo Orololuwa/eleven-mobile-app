@@ -246,6 +246,12 @@ const processFix = async (
       lat: coords.latitude,
       lng: coords.longitude,
       speedKmh,
+      // Raw value from expo-location: absent (`'absent'`) means the native layer sent no key —
+      // either the OS fix had no speed accuracy or the with-speed-accuracy patch is missing.
+      speedAccuracy:
+        'speedAccuracy' in coordsWithSpeedAccuracy
+          ? coordsWithSpeedAccuracy.speedAccuracy
+          : 'absent',
     });
     return true;
   }
