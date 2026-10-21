@@ -55,6 +55,9 @@ export type TrackingSessionRow = {
   title: string | null;
   /** Set when `finalize` is acknowledged; never cleared. */
   finalized_at: string | null;
+  /** Newest OS fix (stored or not) — survives a JS restart so the HUD knows the feed state. */
+  last_fix_at_ms: number | null;
+  last_fix_accuracy_m: number | null;
 };
 
 /** An ended, unsynced local session with its metrics left-joined (all metric fields null when absent). */

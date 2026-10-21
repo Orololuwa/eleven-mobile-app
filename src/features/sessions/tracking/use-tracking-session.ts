@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform, type AppStateStatus } from 'react-native';
 import { useAppStore } from '@/stores/app-store';
 import type { ActivityKind, AttackDirection } from '../types';
-import {
-  normalizePlayStructure,
-  plannedMinutesForSegment,
-  segmentLabelFor,
-} from '../segment-display';
+import { normalizePlayStructure, segmentLabelFor } from '../segment-display';
 import { getCurrentSegment, getSegmentsForSession, getTrackingSession, initTrackingDb } from './db';
 import {
   getLatestFix,
@@ -20,7 +16,6 @@ import {
 import {
   closeCurrentSegmentForSwitch,
   completeSegmentSwitch,
-  computeSegmentElapsedSeconds,
   endCurrentActivity,
   endTrackingSession,
   refreshIndicatorIfNeeded,
@@ -30,8 +25,9 @@ import {
 import { startSyncListeners } from './sync';
 import { useTrackingHudStore } from './tracking-store';
 import type { TrackingSessionRow } from './types';
-import { currentFixAccuracyM, gpsStrengthBars } from './live-metrics';
-import { readLiveReadout } from './live-readout';
+import { gpsStrengthBars } from './live-metrics';
+import { readFreshLiveSnapshot, readLiveSnapshot } from './live-snapshot';
+import { hudPatchFromSnapshot, type LiveSnapshot } from './live-snapshot-model';
 
 export const useTrackingSession = ({
   sessionId,
@@ -50,22 +46,45 @@ export const useTrackingSession = ({
   const [session, setSession] = useState<TrackingSessionRow | null>(null);
   const [ready, setReady] = useState(false);
   const [pendingActivityKind, setPendingActivityKind] = useState<ActivityKind | null>(null);
+  /** Latest snapshot from the location task; the 1 s clock repaints from it with no I/O. */
+  const snapshotRef = useRef<LiveSnapshot | null>(null);
+
+  const paintSnapshot = useCallback(
+    (snapshot: LiveSnapshot) => {
+      snapshotRef.current = snapshot;
+      setHud(hudPatchFromSnapshot({ snapshot, memoryFix: getLatestFix() }));
+    },
+    [setHud],
+  );
+
+  /** After a lifecycle write (which forces a snapshot), drop the held anchors at once. */
+  const repaintFromStore = useCallback(async () => {
+    const snapshot = await readLiveSnapshot(sessionId);
+    if (snapshot) paintSnapshot(snapshot);
+  }, [paintSnapshot, sessionId]);
 
   const loadSession = useCallback(async () => {
     await initTrackingDb();
     const row = await getTrackingSession(sessionId);
     setSession(row);
     if (row) {
-      const segment = await getCurrentSegment(sessionId);
-      const allSegments = await getSegmentsForSession(sessionId);
-      setHud({
-        activityKind: segment?.activity_kind ?? null,
-        segmentIndex: segment?.segment_index ?? 1,
-        segmentLabel: segmentLabelFor({ session: row, segment, allSegments }),
-      });
+      // Paint the persisted snapshot first so a remount (unlock, kill, freeze) shows the real clock
+      // and numbers immediately instead of 0:00 until the next pass.
+      const snapshot = await readLiveSnapshot(sessionId);
+      if (snapshot) {
+        paintSnapshot(snapshot);
+      } else {
+        const segment = await getCurrentSegment(sessionId);
+        const allSegments = await getSegmentsForSession(sessionId);
+        setHud({
+          activityKind: segment?.activity_kind ?? null,
+          segmentIndex: segment?.segment_index ?? 1,
+          segmentLabel: segmentLabelFor({ session: row, segment, allSegments }),
+        });
+      }
     }
     return row;
-  }, [sessionId, setHud]);
+  }, [paintSnapshot, sessionId, setHud]);
 
   useEffect(() => {
     startSyncListeners();
@@ -126,55 +145,36 @@ export const useTrackingSession = ({
     return () => sub.remove();
   }, []);
 
+  const sessionLive = session != null && session.tracking_status !== 'ended';
+
   useEffect(() => {
-    if (!ready || !session || session.tracking_status === 'ended') return;
+    if (!ready || !sessionLive) return;
+    let cancelled = false;
+    let reading = false;
 
     const tick = async () => {
-      const row = await getTrackingSession(sessionId);
-      if (!row) return;
-      setSession(row);
+      // Clock first, from the anchors we already hold — never blocked behind SQLite.
+      const held = snapshotRef.current;
+      if (held) setHud(hudPatchFromSnapshot({ snapshot: held, memoryFix: getLatestFix() }));
+      if (reading) return;
+      reading = true;
+      try {
+        const row = await getTrackingSession(sessionId);
+        if (cancelled || !row) return;
+        setSession(row);
+        if (row.tracking_status === 'ended') return;
 
-      const segment = await getCurrentSegment(sessionId);
-      const allSegments = await getSegmentsForSession(sessionId);
-      const segmentId = segment?.id ?? null;
-      const metrics = await readLiveReadout({ sessionId, segmentId });
-      const elapsedSeconds = segmentId
-        ? await computeSegmentElapsedSeconds(sessionId, segmentId)
-        : 0;
+        // The location task writes this after each delivery; the HUD only recomputes when it has
+        // gone quiet (no fixes / process was frozen) so `offline` still shows.
+        const snapshot = await readFreshLiveSnapshot(sessionId);
+        if (cancelled || !snapshot) return;
+        paintSnapshot(snapshot);
 
-      const plannedMinutes = plannedMinutesForSegment({ session: row, segment });
-      const plannedSeconds = plannedMinutes ? plannedMinutes * 60 : null;
-      const extraSeconds =
-        plannedSeconds != null && elapsedSeconds > plannedSeconds
-          ? elapsedSeconds - plannedSeconds
-          : 0;
-
-      const gpsSearchSeconds = row.gps_search_started_at
-        ? Math.floor((Date.now() - new Date(row.gps_search_started_at).getTime()) / 1000)
-        : 0;
-
-      const segmentLabel = segmentLabelFor({
-        session: row,
-        segment,
-        allSegments,
-      });
-
-      const latestAccuracy = currentFixAccuracyM({ fix: getLatestFix() });
-
-      setHud({
-        elapsedSeconds,
-        extraSeconds,
-        metrics,
-        gpsAccuracyM: latestAccuracy,
-        segmentIndex: segment?.segment_index ?? 1,
-        segmentLabel,
-        activityKind: segment?.activity_kind ?? null,
-        attackDirection: segment?.attack_direction ?? null,
-        gpsSearchSeconds,
-      });
-
-      if (row.tracking_status === 'live') {
-        await refreshIndicatorIfNeeded({ distanceUnit });
+        if (row.tracking_status === 'live') {
+          await refreshIndicatorIfNeeded({ distanceUnit });
+        }
+      } finally {
+        reading = false;
       }
     };
 
@@ -183,8 +183,11 @@ export const useTrackingSession = ({
       void tick();
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [ready, session, sessionId, distanceUnit, setHud]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [ready, sessionLive, sessionId, distanceUnit, paintSnapshot, setHud]);
 
   const grantPermissionAndStart = async (requestBackground = true) => {
     const result = await requestAndBeginTracking(distanceUnit, { requestBackground });
@@ -199,12 +202,14 @@ export const useTrackingSession = ({
     await startManualPause(sessionId);
     const row = await loadSession();
     setSession(row);
+    await repaintFromStore();
   };
 
   const resume = async () => {
     await resumeManualPause(sessionId);
     const row = await loadSession();
     setSession(row);
+    await repaintFromStore();
   };
 
   const stopCurrentActivity = async () => {
@@ -224,6 +229,7 @@ export const useTrackingSession = ({
     });
 
     await endCurrentActivity(sessionId);
+    await repaintFromStore();
     await refreshIndicatorIfNeeded({ distanceUnit, force: true });
     await loadSession();
   };
@@ -250,6 +256,7 @@ export const useTrackingSession = ({
     if (result.skippedCompass) {
       setPendingActivityKind(null);
       setPhase('tracking');
+      await repaintFromStore();
       await loadSession();
       return;
     }
@@ -269,6 +276,7 @@ export const useTrackingSession = ({
     });
     setPendingActivityKind(null);
     setPhase('tracking');
+    await repaintFromStore();
     await loadSession();
   };
 

@@ -5,24 +5,15 @@ import { darkColors as colors } from '@/theme';
 import { useAppStore } from '@/stores/app-store';
 import { updateAndroidTrackingNotification } from './android-notification';
 import { ANDROID_FGS_TITLE, INDICATOR_UPDATE_INTERVAL_MS, LOCATION_TASK_NAME } from './constants';
-import {
-  getActiveTrackingSession,
-  getCurrentSegment,
-  getPausesForSegment,
-  getPausesForSession,
-  getSegmentsForSession,
-} from './db';
-import {
-  elapsedSecondsFromPauses,
-  formatDistance,
-  formatElapsedLong,
-  formatSpeed,
-} from './live-metrics';
-import { readLiveReadout } from './live-readout';
+import { getActiveTrackingSession } from './db';
+import { formatDistance, formatElapsedLong, formatSpeed } from './live-metrics';
+import { readFreshLiveSnapshot } from './live-snapshot';
+import { chronometerBaseMs, elapsedSecondsAt } from './live-snapshot-model';
 import type { LiveSignal, TrackingSegmentRow, TrackingSessionRow } from './types';
 import { segmentLabelFor } from '../segment-display';
 
-let lastAndroidNotificationBody: string | null = null;
+/** Body + chronometer base last posted; skips identical re-posts. */
+let lastAndroidNotificationKey: string | null = null;
 let lastDistanceUnit: 'km' | 'mi' = 'km';
 let lastIndicatorPushAt = 0;
 
@@ -34,6 +25,11 @@ type IndicatorSnapshot = {
   signal: LiveSignal;
   segmentLabel: string;
   distanceUnit: 'km' | 'mi';
+  /**
+   * Android: wall time the running clock reads 0:00 at. The notification's system chronometer ticks
+   * every second from it, so the body leaves the clock out. Null/absent → the body prints the time.
+   */
+  chronometerBaseMs?: number | null;
 };
 
 const SIGNAL_LABEL: Record<Exclude<LiveSignal, 'good'>, string> = {
@@ -46,21 +42,29 @@ const SIGNAL_LABEL: Record<Exclude<LiveSignal, 'good'>, string> = {
 
 const signalLabel = (signal: LiveSignal) => (signal === 'good' ? '' : SIGNAL_LABEL[signal]);
 
-const formatReadout = ({
-  elapsedSeconds,
-  distanceKm,
-  topSpeedKmh,
-  signal,
-  distanceUnit,
-}: Omit<IndicatorSnapshot, 'segmentLabel'>) => {
-  const elapsed = formatElapsedLong(elapsedSeconds);
-  if (distanceKm == null || topSpeedKmh == null) return `${elapsed} · ${signalLabel(signal)}`;
+const formatReadout = (
+  {
+    elapsedSeconds,
+    distanceKm,
+    topSpeedKmh,
+    signal,
+    distanceUnit,
+  }: Omit<IndicatorSnapshot, 'segmentLabel' | 'chronometerBaseMs'>,
+  { includeClock = true }: { includeClock?: boolean } = {},
+) => {
+  const parts = includeClock ? [formatElapsedLong(elapsedSeconds)] : [];
+  if (distanceKm == null || topSpeedKmh == null) {
+    const label = signalLabel(signal);
+    if (label) parts.push(label);
+    return parts.join(' · ') || 'TRACKING';
+  }
   const distance = formatDistance({ km: distanceKm, unit: distanceUnit });
   const speed = formatSpeed({ kmh: topSpeedKmh, unit: distanceUnit });
   const distanceSuffix = distanceUnit === 'mi' ? 'MI' : 'KM';
   const speedSuffix = distanceUnit === 'mi' ? 'MPH' : 'KM/H';
-  const readout = `${elapsed} · ${distance} ${distanceSuffix} · TOP ${speed} ${speedSuffix}`;
-  return signal === 'estimated' ? `${readout} · ${signalLabel(signal)}` : readout;
+  parts.push(`${distance} ${distanceSuffix}`, `TOP ${speed} ${speedSuffix}`);
+  if (signal === 'estimated') parts.push(signalLabel(signal));
+  return parts.join(' · ');
 };
 
 const liveActivityConfig: LiveActivity.LiveActivityConfig = {
@@ -101,7 +105,7 @@ const resolveDistanceUnit = (distanceUnit?: 'km' | 'mi'): 'km' | 'mi' => {
 };
 
 export const buildNotificationBody = (snapshot: Omit<IndicatorSnapshot, 'segmentLabel'>) =>
-  formatReadout(snapshot);
+  formatReadout(snapshot, { includeClock: snapshot.chronometerBaseMs == null });
 
 const buildLiveActivityState = ({
   segmentLabel,
@@ -124,19 +128,24 @@ const androidLocationOptions = (notificationBody: string): Location.LocationTask
   },
 });
 
-const updateAndroidIndicator = async (notificationBody: string) => {
-  if (notificationBody === lastAndroidNotificationBody) return;
-  lastAndroidNotificationBody = notificationBody;
+const updateAndroidIndicator = async (
+  notificationBody: string,
+  chronometerBase: number | null = null,
+) => {
+  const key = `${notificationBody}|${chronometerBase ?? ''}`;
+  if (key === lastAndroidNotificationKey) return;
+  lastAndroidNotificationKey = key;
 
   const updatedInPlace = await updateAndroidTrackingNotification({
     title: ANDROID_FGS_TITLE,
     body: notificationBody,
     color: colors.brand.fill,
+    chronometerBaseMs: chronometerBase,
   });
   if (updatedInPlace) return;
 
   if (AppState.currentState !== 'active') {
-    lastAndroidNotificationBody = null;
+    lastAndroidNotificationKey = null;
     return;
   }
 
@@ -146,8 +155,20 @@ const updateAndroidIndicator = async (notificationBody: string) => {
       androidLocationOptions(notificationBody),
     );
   } catch {
-    lastAndroidNotificationBody = null;
+    // fall through — the next refresh retries
   }
+  // Expo rebuilt the notification from options (no chronometer); post ours again next refresh.
+  lastAndroidNotificationKey = null;
+};
+
+/**
+ * Expo rebuilds the FGS notification from task options whenever `startLocationUpdatesAsync` runs
+ * (registration renew), dropping our body and chronometer. Forget what we posted so the next
+ * refresh re-posts it.
+ */
+export const invalidateAndroidIndicator = () => {
+  lastAndroidNotificationKey = null;
+  lastIndicatorPushAt = 0;
 };
 
 export const startTrackingIndicator = async ({
@@ -177,31 +198,23 @@ export const startTrackingIndicator = async ({
     return activityId ?? null;
   }
 
-  await updateAndroidIndicator(notificationBody);
+  await updateAndroidIndicator(notificationBody, fullSnapshot.chronometerBaseMs ?? null);
   return null;
 };
 
-export const updateTrackingIndicator = async ({
+const pushTrackingIndicator = async ({
   liveActivityId,
-  session,
-  segment,
-  allSegments = [],
+  segmentLabel,
   snapshot,
   distanceUnit,
 }: {
   liveActivityId: string | null;
-  session: TrackingSessionRow;
-  segment: TrackingSegmentRow | null;
-  allSegments?: TrackingSegmentRow[];
+  segmentLabel: string;
   snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
   distanceUnit: 'km' | 'mi';
 }) => {
   const unit = resolveDistanceUnit(distanceUnit);
-  const fullSnapshot: IndicatorSnapshot = {
-    ...snapshot,
-    segmentLabel: resolveSegmentLabel(session, segment, allSegments),
-    distanceUnit: unit,
-  };
+  const fullSnapshot: IndicatorSnapshot = { ...snapshot, segmentLabel, distanceUnit: unit };
   const notificationBody = buildNotificationBody(fullSnapshot);
 
   if (Platform.OS === 'ios' && liveActivityId) {
@@ -214,7 +227,7 @@ export const updateTrackingIndicator = async ({
   }
 
   if (Platform.OS === 'android') {
-    await updateAndroidIndicator(notificationBody);
+    await updateAndroidIndicator(notificationBody, fullSnapshot.chronometerBaseMs ?? null);
   }
 };
 
@@ -226,7 +239,7 @@ export const stopTrackingIndicator = async (liveActivityId: string | null) => {
       console.warn('[indicator] Live Activity stop failed', error);
     }
   }
-  lastAndroidNotificationBody = null;
+  lastAndroidNotificationKey = null;
   lastIndicatorPushAt = 0;
 };
 
@@ -243,30 +256,22 @@ export const refreshTrackingIndicator = async ({
   const session = await getActiveTrackingSession();
   if (!session || session.ended_at || session.tracking_status === 'ended') return;
 
-  const unit = resolveDistanceUnit(distanceUnit);
-  const segment = await getCurrentSegment(session.id);
-  const allSegments = await getSegmentsForSession(session.id);
-  const segmentId = segment?.id ?? null;
-  const pauses = segmentId
-    ? await getPausesForSegment(segmentId)
-    : (await getPausesForSession(session.id)).filter((pause) => pause.segment_id == null);
-
-  const metrics = await readLiveReadout({ sessionId: session.id, segmentId });
-  const startedAt = segment?.started_at ?? session.started_at;
-  const elapsedSeconds = elapsedSecondsFromPauses({ startedAt, pausedRanges: pauses });
+  // The location task keeps this current; recomputed here only if the task has gone quiet.
+  const live = await readFreshLiveSnapshot(session.id);
+  if (!live) return;
+  const clock = live.segmentId ? live.clock : live.sessionClock;
 
   lastIndicatorPushAt = now;
-  await updateTrackingIndicator({
+  await pushTrackingIndicator({
     liveActivityId: session.live_activity_id,
-    session,
-    segment,
-    allSegments,
+    segmentLabel: live.segmentLabel,
     snapshot: {
-      elapsedSeconds,
-      distanceKm: metrics.distanceKm,
-      topSpeedKmh: metrics.topSpeedKmh,
-      signal: metrics.signal,
+      elapsedSeconds: elapsedSecondsAt(clock, now),
+      distanceKm: live.metrics.distanceKm,
+      topSpeedKmh: live.metrics.topSpeedKmh,
+      signal: live.metrics.signal,
+      chronometerBaseMs: chronometerBaseMs(clock),
     },
-    distanceUnit: unit,
+    distanceUnit: resolveDistanceUnit(distanceUnit),
   });
 };

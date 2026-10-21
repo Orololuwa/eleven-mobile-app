@@ -1,7 +1,12 @@
 import { requireOptionalNativeModule } from 'expo';
 
 type TrackingIndicatorNative = {
-  updateNotification: (title: string, body: string, color: string) => Promise<boolean>;
+  updateNotification: (
+    title: string,
+    body: string,
+    color: string,
+    chronometerBaseMs: number | null,
+  ) => Promise<boolean>;
 };
 
 const TrackingIndicator = requireOptionalNativeModule<TrackingIndicatorNative>('TrackingIndicator');
@@ -17,7 +22,7 @@ export const updateAndroidTrackingNotification = async ({
 }) => {
   if (!TrackingIndicator) return false;
   try {
-    return await TrackingIndicator.updateNotification(title, body, color);
+    return await TrackingIndicator.updateNotification(title, body, color, null);
   } catch {
     return false;
   }

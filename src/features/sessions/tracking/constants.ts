@@ -34,6 +34,15 @@ export const AUTO_RESUME_COOLDOWN_MS = 10_000;
 /** Push distance / top speed into notification & Live Activity. */
 export const INDICATOR_UPDATE_INTERVAL_MS = 5_000;
 
+/** Location task recomputes the live snapshot at most this often while the HUD is on screen. */
+export const LIVE_SNAPSHOT_ACTIVE_INTERVAL_MS = 1_000;
+
+/** …and this often while backgrounded / locked (only the notification reads it then). */
+export const LIVE_SNAPSHOT_BACKGROUND_INTERVAL_MS = INDICATOR_UPDATE_INTERVAL_MS;
+
+/** HUD recomputes itself when the persisted snapshot is older than this (task idle or frozen). */
+export const LIVE_SNAPSHOT_STALE_MS = 2_500;
+
 /** High-activity speed threshold for downsampling (km/h). */
 export const DOWNSAMPLE_HIGH_SPEED_KMH = 12;
 
@@ -61,6 +70,13 @@ export const LOCATION_TASK_NAME = 'eleven-location-tracking';
 
 /** Poll cadence while a session is live — assert registration and recent fix delivery. */
 export const LOCATION_WATCHDOG_INTERVAL_MS = 10_000;
+
+/**
+ * The foreground watch (Play Services fused) stands down while the direct GPS task delivered
+ * within this window. Both share one newest-timestamp guard, so a fused fix landing first used to
+ * shadow the GPS fixes, and mixing two position estimates zig-zags distance.
+ */
+export const WATCH_YIELDS_TO_TASK_MS = 3_000;
 
 /** No OS fix delivered for this long → treat as registration dropout (re-register / offline). */
 export const LOCATION_FIX_STALE_MS = 15_000;

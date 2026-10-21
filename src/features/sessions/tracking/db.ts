@@ -93,7 +93,14 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await addColumnIfMissing(db, 'tracking_sessions', 'title', 'TEXT');
   await addColumnIfMissing(db, 'tracking_sessions', 'finalized_at', 'TEXT');
   await addColumnIfMissing(db, 'session_metrics', 'continuity_fix_count', 'INTEGER');
+  await addColumnIfMissing(db, 'tracking_sessions', 'last_fix_at_ms', 'INTEGER');
+  await addColumnIfMissing(db, 'tracking_sessions', 'last_fix_accuracy_m', 'REAL');
   await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS live_snapshots (
+      session_id TEXT PRIMARY KEY NOT NULL,
+      computed_at_ms INTEGER NOT NULL,
+      payload TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS pending_deletions (
       session_id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT NOT NULL,
@@ -552,6 +559,53 @@ export const updateSessionFields = async (
   await withDb((db) =>
     db.runAsync(`UPDATE tracking_sessions SET ${setClause} WHERE id = ?`, [...values, sessionId]),
   );
+};
+
+/** Newest OS fix, stored or not, so a fresh JS context (or the HUD after a freeze) knows the feed. */
+export const recordLatestFix = async ({
+  atMs,
+  accuracyM,
+}: {
+  atMs: number;
+  accuracyM: number | null;
+}) => {
+  await withDb((db) =>
+    db.runAsync(
+      `UPDATE tracking_sessions SET last_fix_at_ms = ?, last_fix_accuracy_m = ? WHERE ended_at IS NULL`,
+      [atMs, accuracyM],
+    ),
+  );
+};
+
+export const upsertLiveSnapshot = async ({
+  sessionId,
+  computedAtMs,
+  payload,
+}: {
+  sessionId: string;
+  computedAtMs: number;
+  payload: string;
+}) => {
+  await withDb((db) =>
+    db.runAsync(
+      `INSERT OR REPLACE INTO live_snapshots (session_id, computed_at_ms, payload) VALUES (?, ?, ?)`,
+      [sessionId, computedAtMs, payload],
+    ),
+  );
+};
+
+export const getLiveSnapshotPayload = async (sessionId: string): Promise<string | null> => {
+  const row = await withDb((db) =>
+    db.getFirstAsync<{ payload: string }>(
+      `SELECT payload FROM live_snapshots WHERE session_id = ?`,
+      [sessionId],
+    ),
+  );
+  return row?.payload ?? null;
+};
+
+export const deleteLiveSnapshot = async (sessionId: string) => {
+  await withDb((db) => db.runAsync(`DELETE FROM live_snapshots WHERE session_id = ?`, [sessionId]));
 };
 
 export const insertPause = async ({

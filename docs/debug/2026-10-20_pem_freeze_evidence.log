@@ -1,0 +1,104 @@
+# 2026-10-20 repro — Vivo V2310 / Android 15. Session 8801b881, Training · Run, screen locked, battery simulated (dumpsys battery unplug).
+# Filtered to com.eleven.app (uid 10326, pid 20610), com.vivo.pem, and location/freezer events.
+10-20 14:44:04.517 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:44:04.525 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:44:04.531 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:44:04.535 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:44:07.133 I/screen_toggled( 1735): 1
+10-20 14:44:08.938 I/start_navigating( 1735): 1
+10-20 14:44:14.541 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:44:14.548 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:44:14.555 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:44:14.558 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:44:15.140 I/am_wtf  ( 1735): [0,1735,system_server,-1,ActivityManager,Sending non-protected broadcast com.vivo.pem.PEM_ELAPSED_REALTIME_WAKEUP from system uid 1000 pkg com.vivo.pem Caller=com
+10-20 14:44:15.521 I/am_wtf  ( 1735): [0,1735,system_server,-1,ActivityManager,Sending non-protected broadcast action.topinfo from system 2622:com.vivo.pem/1000 pkg com.vivo.pem Caller=com.android.ser
+10-20 14:44:15.625 I/screen_toggled( 1735): 0
+10-20 14:44:24.564 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:44:24.568 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:44:24.577 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:44:24.582 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:44:25.340 I/am_wtf  ( 1735): [0,1735,system_server,-1,ActivityManager,Sending non-protected broadcast action.vivo.powercontrol from system 2622:com.vivo.pem/1000 pkg com.vivo.pem Caller=com.a
+10-20 14:44:34.589 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:44:34.594 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:44:34.601 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:44:34.606 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:44:44.613 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:44:44.618 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:44:44.625 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:44:44.629 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:44:54.636 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:44:54.641 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:44:54.649 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:44:54.654 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:45:04.660 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:45:04.665 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:45:04.673 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:45:04.677 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:45:14.684 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:45:14.689 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:45:14.696 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:45:14.700 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:45:24.707 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:45:24.712 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:45:24.717 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:45:24.721 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:45:34.727 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:45:34.731 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:45:34.739 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:45:34.742 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:45:44.747 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:45:44.751 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:45:44.759 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:45:44.761 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:46:45.653 I/request_location_remove( 1735): [A286D86A,10187,20163,com.google.android.gms]
+10-20 14:46:45.655 I/am_wtf  ( 1735): [0,1735,system_server,-1,ActivityManager,Sending non-protected broadcast action.vivo.powercontrol from system 2622:com.vivo.pem/1000 pkg com.vivo.pem Caller=com.a
+10-20 14:46:45.660 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:46:45.669 I/am_wtf  ( 1735): [0,1735,system_server,-1,ActivityManager,Sending non-protected broadcast action.topinfo from system 2622:com.vivo.pem/1000 pkg com.vivo.pem Caller=com.android.ser
+10-20 14:46:45.676 I/am_app_frozen( 1735): [0,10326,com.eleven.app,from pem_freezer]
+10-20 14:46:45.705 I/start_navigating( 1735): 0
+10-20 14:48:32.820 I/screen_toggled( 1735): 1
+10-20 14:48:32.887 I/LocationTaskConsumer(20610): direct-gps renew — no fix within 10s
+10-20 14:48:32.958 I/request_location_update( 1735): [gps,52214202,10326,com.eleven.app]
+10-20 14:48:32.999 I/LocationTaskConsumer(20610): direct-gps request GPS_PROVIDER
+10-20 14:48:33.000 I/request_location_remove( 1735): [52214202,10326,20610,com.eleven.app]
+10-20 14:48:33.044 I/am_app_unfrozen( 1735): [0,10326,com.eleven.app,screen on]
+10-20 14:48:33.064 I/start_navigating( 1735): 1
+
+# dumpsys location event log, same window
+    10-20 14:44:04.526: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:44:04.530: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:44:14.551: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:44:14.554: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:44:24.569: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:44:24.572: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:44:34.596: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:44:34.600: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:44:44.619: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:44:44.624: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:44:54.643: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:44:54.647: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:45:04.667: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:45:04.671: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:45:14.690: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:45:14.695: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:45:24.713: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:45:24.716: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:45:34.733: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:45:34.738: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:45:44.752: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:45:44.756: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:46:45.660: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:48:32.975: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:48:32.984: gps provider request = ProviderRequest[@+1s0ms, HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:48:32.996: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:48:32.999: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:48:43.013: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:48:43.015: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+    10-20 14:48:53.037: gps provider -registration 10326/com.eleven.app/52214202
+    10-20 14:48:53.039: gps provider +registration 10326/com.eleven.app/52214202 -> Request[@+1s0ms HIGH_ACCURACY, WorkSource{10326 com.eleven.app}]
+
+# exit-info: pid 6415 (the 12:46–13:12 session) lived until 13:44 — frozen, not killed
+    Historical Process Exit for uid=10326
+        ApplicationExitInfo #0:
+          timestamp=2026-10-20 14:37:55.623 pid=19811 realUid=10326 packageUid=10326 definingUid=10326 user=0
+          process=com.eleven.app reason=3 (LOW_MEMORY) subreason=0 (UNKNOWN) status=0

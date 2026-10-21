@@ -4,6 +4,9 @@ const { createRunOncePlugin, withDangerousMod } = require('expo/config-plugins')
 
 const PLUGIN_NAME = 'with-direct-gps';
 const MARKER = 'direct-gps request GPS_PROVIDER';
+const WAKE_LOCK_MARKER = 'direct-gps session wake lock';
+const WAKE_LOCK_SAFE_MARKER = 'direct-gps wake lock unavailable';
+const EVERY_FIX_MARKER = 'direct-gps every chip fix';
 
 const CONSUMER = [
   'android',
@@ -222,6 +225,96 @@ const START_AFTER = `  private fun startLocationUpdates() {
     }
   }`;
 
+/*
+ * Stage 2 — applied on top of stage 1's output (also to trees patched before this stage existed).
+ * Without a wake lock the renew Handler does not run while the CPU sleeps: once the GPS listener is
+ * gone nothing wakes the process, so a locked phone never re-subscribes until the screen comes on.
+ * The lock is re-armed on every renew tick with a timeout, so it lapses if the loop ever stops.
+ */
+const WAKE_IMPORT_BEFORE = `import android.os.Looper`;
+
+const WAKE_IMPORT_AFTER = `import android.os.Looper
+import android.os.PowerManager`;
+
+const WAKE_FIELDS_BEFORE = `  private var lastDirectFixAtMs = 0L
+  private val directGpsRenew = object : Runnable {
+    override fun run() {`;
+
+const WAKE_FIELDS_AFTER = `  private var lastDirectFixAtMs = 0L
+  /** ${WAKE_LOCK_MARKER}: keeps the renew loop running under lock. */
+  private var sessionWakeLock: PowerManager.WakeLock? = null
+  private fun holdSessionWakeLock() {
+    val appContext = context ?: return
+    val lock = sessionWakeLock ?: (appContext.getSystemService(Context.POWER_SERVICE) as PowerManager)
+      .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "eleven:session-gps")
+      .also {
+        it.setReferenceCounted(false)
+        sessionWakeLock = it
+      }
+    lock.acquire(10 * 60 * 1000L)
+  }
+  private fun releaseSessionWakeLock() {
+    sessionWakeLock?.let { if (it.isHeld) it.release() }
+    sessionWakeLock = null
+  }
+  private val directGpsRenew = object : Runnable {
+    override fun run() {
+      if (directGpsRenewArmed) holdSessionWakeLock()`;
+
+const WAKE_START_BEFORE = `    directGpsRenewArmed = true
+    directGpsHandler.postDelayed(directGpsRenew, 5_000L)`;
+
+const WAKE_START_AFTER = `    directGpsRenewArmed = true
+    holdSessionWakeLock()
+    directGpsHandler.postDelayed(directGpsRenew, 5_000L)`;
+
+const WAKE_STOP_BEFORE = `    directGpsRenewArmed = false
+    directGpsHandler.removeCallbacks(directGpsRenew)`;
+
+const WAKE_STOP_AFTER = `    directGpsRenewArmed = false
+    directGpsHandler.removeCallbacks(directGpsRenew)
+    releaseSessionWakeLock()`;
+
+/*
+ * Stage 3 — a missing WAKE_LOCK permission (stale prebuild manifest) made acquire() throw inside
+ * didRegister, rejecting startLocationUpdatesAsync and leaving the renew loop unarmed (20 Oct dev
+ * build). The lock is best-effort; the renew loop must arm regardless.
+ */
+const WAKE_SAFE_BEFORE = `    lock.acquire(10 * 60 * 1000L)
+  }`;
+
+const WAKE_SAFE_AFTER = `    try {
+      lock.acquire(10 * 60 * 1000L)
+    } catch (e: SecurityException) {
+      Log.w(TAG, "${WAKE_LOCK_SAFE_MARKER} — renew runs only while the CPU is awake", e)
+    }
+  }`;
+
+const WAKE_SAFE_START_BEFORE = `    directGpsRenewArmed = true
+    holdSessionWakeLock()
+    directGpsHandler.postDelayed(directGpsRenew, 5_000L)`;
+
+const WAKE_SAFE_START_AFTER = `    directGpsRenewArmed = true
+    directGpsHandler.postDelayed(directGpsRenew, 5_000L)
+    holdSessionWakeLock()`;
+
+/*
+ * Stage 4 — a 1000 ms request makes LocationManager drop any fix that lands more than ~10% early
+ * (jitter rule), turning some 1 s gaps into 2 s. Nike Run Club asks for 10 ms and so keeps every
+ * fix the chip produces (still ~1 Hz). Keep the 1 s power hint, accept every fix.
+ */
+const EVERY_FIX_BEFORE = `          .setMinUpdateDistanceMeters(0f)
+          .build()`;
+
+const EVERY_FIX_AFTER = `          .setMinUpdateDistanceMeters(0f)
+          // ${EVERY_FIX_MARKER}
+          .setMinUpdateIntervalMillis(0L)
+          .build()`;
+
+const EVERY_FIX_LEGACY_BEFORE = `GPS_PROVIDER, 1000L, 0f, intent)`;
+
+const EVERY_FIX_LEGACY_AFTER = `GPS_PROVIDER, 0L, 0f, intent)`;
+
 const replaceOnce = ({ filePath, before, after, label }) => {
   const contents = fs.readFileSync(filePath, 'utf8');
   if (!contents.includes(before)) {
@@ -230,15 +323,66 @@ const replaceOnce = ({ filePath, before, after, label }) => {
   fs.writeFileSync(filePath, contents.replace(before, after));
 };
 
-const patchAndroid = (projectRoot) => {
-  const filePath = path.join(projectRoot, 'node_modules', 'expo-location', ...CONSUMER);
-  const contents = fs.readFileSync(filePath, 'utf8');
-  if (contents.includes(MARKER)) return;
+const patchDirectGps = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(MARKER)) return;
   replaceOnce({ filePath, before: IMPORT_BEFORE, after: IMPORT_AFTER, label: 'imports' });
   replaceOnce({ filePath, before: FIELDS_BEFORE, after: FIELDS_AFTER, label: 'fields' });
   replaceOnce({ filePath, before: REGISTER_BEFORE, after: REGISTER_AFTER, label: 'register' });
   replaceOnce({ filePath, before: BROADCAST_BEFORE, after: BROADCAST_AFTER, label: 'broadcast' });
   replaceOnce({ filePath, before: START_BEFORE, after: START_AFTER, label: 'start/stop' });
+};
+
+const patchWakeLock = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(WAKE_LOCK_MARKER)) return;
+  replaceOnce({
+    filePath,
+    before: WAKE_IMPORT_BEFORE,
+    after: WAKE_IMPORT_AFTER,
+    label: 'wake imports',
+  });
+  replaceOnce({
+    filePath,
+    before: WAKE_FIELDS_BEFORE,
+    after: WAKE_FIELDS_AFTER,
+    label: 'wake fields',
+  });
+  replaceOnce({
+    filePath,
+    before: WAKE_START_BEFORE,
+    after: WAKE_START_AFTER,
+    label: 'wake start',
+  });
+  replaceOnce({ filePath, before: WAKE_STOP_BEFORE, after: WAKE_STOP_AFTER, label: 'wake stop' });
+};
+
+const patchWakeLockSafe = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(WAKE_LOCK_SAFE_MARKER)) return;
+  replaceOnce({ filePath, before: WAKE_SAFE_BEFORE, after: WAKE_SAFE_AFTER, label: 'wake safe' });
+  replaceOnce({
+    filePath,
+    before: WAKE_SAFE_START_BEFORE,
+    after: WAKE_SAFE_START_AFTER,
+    label: 'wake safe start',
+  });
+};
+
+const patchEveryFix = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(EVERY_FIX_MARKER)) return;
+  replaceOnce({ filePath, before: EVERY_FIX_BEFORE, after: EVERY_FIX_AFTER, label: 'every fix' });
+  replaceOnce({
+    filePath,
+    before: EVERY_FIX_LEGACY_BEFORE,
+    after: EVERY_FIX_LEGACY_AFTER,
+    label: 'every fix legacy',
+  });
+};
+
+const patchAndroid = (projectRoot) => {
+  const filePath = path.join(projectRoot, 'node_modules', 'expo-location', ...CONSUMER);
+  patchDirectGps(filePath);
+  patchWakeLock(filePath);
+  patchWakeLockSafe(filePath);
+  patchEveryFix(filePath);
 };
 
 /** @type {import('expo/config-plugins').ConfigPlugin} */
