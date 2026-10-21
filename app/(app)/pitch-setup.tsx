@@ -16,7 +16,10 @@ import { validatePitchName } from '@/features/pitches/validation';
 import type { LocationIn, PitchRead } from '@/features/pitches/types';
 import { shouldResolveAttackDirection } from '@/features/sessions/segment-display';
 import { useStartSessionDraftStore } from '@/features/sessions/start-session-draft-store';
-import { bootstrapTrackingSession } from '@/features/sessions/tracking/session-lifecycle';
+import {
+  bootstrapTrackingSession,
+  prepareTrackingForKickoff,
+} from '@/features/sessions/tracking/session-lifecycle';
 import type { StoredPitchCorners } from '@/features/sessions/tracking/types';
 import { useCreateSessionMutation } from '@/features/sessions/use-create-session-mutation';
 import { useStartSessionMutation } from '@/features/sessions/use-start-session-mutation';
@@ -71,6 +74,7 @@ export default function PitchSetupRoute() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [locationBusy, setLocationBusy] = useState(false);
+  const [preparingKickoff, setPreparingKickoff] = useState(false);
   const [dismissedNearby, setDismissedNearby] = useState(false);
   const [pitchName, setPitchName] = useState('');
   const [pitchNameError, setPitchNameError] = useState<string | undefined>();
@@ -294,6 +298,18 @@ export default function PitchSetupRoute() {
       }
     }
 
+    // Permissions and battery settings first — the session (and its clock) starts only after.
+    setPreparingKickoff(true);
+    try {
+      const readiness = await prepareTrackingForKickoff();
+      if (!readiness.ok) {
+        setError('Location permission is required to track a session');
+        return;
+      }
+    } finally {
+      setPreparingKickoff(false);
+    }
+
     try {
       const isHalves = structure === 'halves';
       const session = await createSession.mutateAsync({
@@ -375,6 +391,7 @@ export default function PitchSetupRoute() {
   };
 
   const busy =
+    preparingKickoff ||
     savePitch.isPending ||
     createPitch.isPending ||
     checkSimilar.isPending ||

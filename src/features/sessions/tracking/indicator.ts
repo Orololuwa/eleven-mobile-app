@@ -5,20 +5,10 @@ import { darkColors as colors } from '@/theme';
 import { useAppStore } from '@/stores/app-store';
 import { updateAndroidTrackingNotification } from './android-notification';
 import { ANDROID_FGS_TITLE, INDICATOR_UPDATE_INTERVAL_MS, LOCATION_TASK_NAME } from './constants';
-import {
-  getActiveTrackingSession,
-  getCurrentSegment,
-  getPausesForSegment,
-  getPausesForSession,
-  getSegmentsForSession,
-} from './db';
-import {
-  elapsedSecondsFromPauses,
-  formatDistance,
-  formatElapsedLong,
-  formatSpeed,
-} from './live-metrics';
-import { readLiveReadout } from './live-readout';
+import { getActiveTrackingSession } from './db';
+import { formatDistance, formatElapsedLong, formatSpeed } from './live-metrics';
+import { readFreshLiveSnapshot } from './live-snapshot';
+import { elapsedSecondsAt } from './live-snapshot-model';
 import type { LiveSignal, TrackingSegmentRow, TrackingSessionRow } from './types';
 import { segmentLabelFor } from '../segment-display';
 
@@ -196,12 +186,27 @@ export const updateTrackingIndicator = async ({
   snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
   distanceUnit: 'km' | 'mi';
 }) => {
-  const unit = resolveDistanceUnit(distanceUnit);
-  const fullSnapshot: IndicatorSnapshot = {
-    ...snapshot,
+  await pushTrackingIndicator({
+    liveActivityId,
     segmentLabel: resolveSegmentLabel(session, segment, allSegments),
-    distanceUnit: unit,
-  };
+    snapshot,
+    distanceUnit,
+  });
+};
+
+const pushTrackingIndicator = async ({
+  liveActivityId,
+  segmentLabel,
+  snapshot,
+  distanceUnit,
+}: {
+  liveActivityId: string | null;
+  segmentLabel: string;
+  snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
+  distanceUnit: 'km' | 'mi';
+}) => {
+  const unit = resolveDistanceUnit(distanceUnit);
+  const fullSnapshot: IndicatorSnapshot = { ...snapshot, segmentLabel, distanceUnit: unit };
   const notificationBody = buildNotificationBody(fullSnapshot);
 
   if (Platform.OS === 'ios' && liveActivityId) {
@@ -243,30 +248,21 @@ export const refreshTrackingIndicator = async ({
   const session = await getActiveTrackingSession();
   if (!session || session.ended_at || session.tracking_status === 'ended') return;
 
-  const unit = resolveDistanceUnit(distanceUnit);
-  const segment = await getCurrentSegment(session.id);
-  const allSegments = await getSegmentsForSession(session.id);
-  const segmentId = segment?.id ?? null;
-  const pauses = segmentId
-    ? await getPausesForSegment(segmentId)
-    : (await getPausesForSession(session.id)).filter((pause) => pause.segment_id == null);
-
-  const metrics = await readLiveReadout({ sessionId: session.id, segmentId });
-  const startedAt = segment?.started_at ?? session.started_at;
-  const elapsedSeconds = elapsedSecondsFromPauses({ startedAt, pausedRanges: pauses });
+  // The location task keeps this current; recomputed here only if the task has gone quiet.
+  const live = await readFreshLiveSnapshot(session.id);
+  if (!live) return;
+  const clock = live.segmentId ? live.clock : live.sessionClock;
 
   lastIndicatorPushAt = now;
-  await updateTrackingIndicator({
+  await pushTrackingIndicator({
     liveActivityId: session.live_activity_id,
-    session,
-    segment,
-    allSegments,
+    segmentLabel: live.segmentLabel,
     snapshot: {
-      elapsedSeconds,
-      distanceKm: metrics.distanceKm,
-      topSpeedKmh: metrics.topSpeedKmh,
-      signal: metrics.signal,
+      elapsedSeconds: elapsedSecondsAt(clock, now),
+      distanceKm: live.metrics.distanceKm,
+      topSpeedKmh: live.metrics.topSpeedKmh,
+      signal: live.metrics.signal,
     },
-    distanceUnit: unit,
+    distanceUnit: resolveDistanceUnit(distanceUnit),
   });
 };

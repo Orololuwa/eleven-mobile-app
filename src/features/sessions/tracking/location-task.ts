@@ -16,10 +16,13 @@ import {
   getOpenPause,
   insertPause,
   insertTrackPoint,
+  recordLatestFix,
   updateSessionFields,
 } from './db';
 import { isFixFeedStale } from './fix-feed';
 import { passesContinuityGate } from './fix-gates';
+import { getLatestFix, setLatestFix } from './latest-fix';
+import { refreshLiveSnapshot } from './live-snapshot';
 import { getForegroundPermissionStatus } from './permissions';
 import { needsForcedRenew, shouldWaitForAppActive } from './registration-recovery';
 import { nextTeardownAction } from './registration-teardown';
@@ -28,7 +31,8 @@ import type { LatestFix, PauseReason } from './types';
 let startLock: Promise<void> = Promise.resolve();
 let stopInFlight: Promise<void> | null = null;
 let lastProcessedAt = 0;
-let latestFix: LatestFix | null = null;
+/** Deliveries (task + watch) run one at a time — interleaved fixes raced pauses and DB reads. */
+let processQueue: Promise<void> = Promise.resolve();
 let foregroundWatch: Location.LocationSubscription | null = null;
 let consecutiveNullSessions = 0;
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
@@ -43,7 +47,7 @@ export type RegistrationReason =
   'start' | 'stop' | 'watchdog' | 'foreground' | 'app-state' | 'ended';
 
 /** Newest fix delivered by the OS, stored or not — the GPS label reflects the signal, not storage. */
-export const getLatestFix = () => latestFix;
+export { getLatestFix };
 
 const isForegroundServiceStartNotAllowed = (error: unknown) =>
   error instanceof Error &&
@@ -80,6 +84,7 @@ const startAutoPause = async ({
     tracking_status: 'auto_pause',
     gps_search_started_at: reason === 'gps_loss' ? new Date().toISOString() : null,
   });
+  void refreshLiveSnapshot({ sessionId, force: true }).catch(() => undefined);
 };
 
 const resumeFromAutoPause = async (sessionId: string) => {
@@ -92,6 +97,7 @@ const resumeFromAutoPause = async (sessionId: string) => {
     auto_resume_cooldown_until: new Date(Date.now() + AUTO_RESUME_COOLDOWN_MS).toISOString(),
     gps_search_started_at: null,
   });
+  void refreshLiveSnapshot({ sessionId, force: true }).catch(() => undefined);
 };
 
 type FixContext = { source: 'task' | 'watch'; intervalMs: number | null; batchSize: number };
@@ -101,9 +107,18 @@ type FixContext = { source: 'task' | 'watch'; intervalMs: number | null; batchSi
  * devices; keeping only the newest would leave gaps wider than the bridge window and nothing would
  * be measured even with accurate fixes.
  */
-export const processLocationUpdate = async (
+export const processLocationUpdate = (
   locations: Location.LocationObject[],
   { source = 'task' }: { source?: 'task' | 'watch' } = {},
+) => {
+  const run = processQueue.then(() => processLocationBatch(locations, source));
+  processQueue = run.catch(() => undefined);
+  return run;
+};
+
+const processLocationBatch = async (
+  locations: Location.LocationObject[],
+  source: 'task' | 'watch',
 ) => {
   const fresh = [...locations]
     .sort((a, b) => a.timestamp - b.timestamp)
@@ -113,7 +128,9 @@ export const processLocationUpdate = async (
 
   const previousProcessedAt = lastProcessedAt;
   lastProcessedAt = newest.timestamp;
-  latestFix = { accuracyM: newest.coords.accuracy, atMs: newest.timestamp };
+  const fix: LatestFix = { accuracyM: newest.coords.accuracy, atMs: newest.timestamp };
+  setLatestFix(fix);
+  await recordLatestFix(fix);
 
   for (const [index, location] of fresh.entries()) {
     const previousAt = index === 0 ? previousProcessedAt : (fresh[index - 1]?.timestamp ?? 0);
@@ -124,6 +141,12 @@ export const processLocationUpdate = async (
     });
     if (!shouldContinue) return;
   }
+
+  // The task owns the live numbers: HUD, notification and Live Activity read this snapshot.
+  // Not awaited — a long session's metrics pass must not hold up the next delivery.
+  void refreshLiveSnapshot().catch((error) => {
+    console.warn('[location-task] live snapshot refresh failed', error);
+  });
 };
 
 const processFix = async (
@@ -369,6 +392,7 @@ export const ensureLocationRegistration = async ({
   if (!(await hasLiveSession())) return;
 
   const running = await isLocationTaskRunning();
+  const latestFix = getLatestFix();
   const feedStale = isFixFeedStale({ fix: latestFix, staleMs: LOCATION_FIX_STALE_MS });
   if (!needsForcedRenew({ running, feedStale })) return;
 
@@ -491,7 +515,7 @@ export const stopLocationTracking = async ({
     clearWatchdog();
     stopForegroundWatch();
     lastProcessedAt = 0;
-    latestFix = null;
+    setLatestFix(null);
     consecutiveNullSessions = 0;
     try {
       await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
@@ -547,6 +571,8 @@ export const handleAppForegrounded = async () => {
       await ensureForegroundWatch();
       await ensureLocationRegistration({ reason: 'app-state' });
     }
+    // Back from lock / a freeze: repaint from a fresh pass, not whatever was left before sleep.
+    await refreshLiveSnapshot({ sessionId: session.id, force: true });
   }
 
   const openPause = await getOpenPause(session.id);
@@ -570,6 +596,7 @@ export const startManualPause = async (sessionId: string) => {
     reason: 'manual',
   });
   await updateSessionFields(sessionId, { tracking_status: 'manual_pause' });
+  await refreshLiveSnapshot({ sessionId, force: true });
 };
 
 export const resumeManualPause = async (sessionId: string) => {
@@ -581,4 +608,5 @@ export const resumeManualPause = async (sessionId: string) => {
     await closePause(openPause.id);
   }
   await updateSessionFields(sessionId, { tracking_status: 'live' });
+  await refreshLiveSnapshot({ sessionId, force: true });
 };

@@ -5,9 +5,9 @@ import { resolveAttackDirection, cornersFromSessionRow } from './attack-directio
 import {
   closeOpenPause,
   closeSegment,
+  deleteLiveSnapshot,
   getActiveTrackingSession,
   getCurrentSegment,
-  getPausesForSegment,
   getSegmentsForSession,
   getTrackingSession,
   insertSegment,
@@ -21,7 +21,9 @@ import {
   stopTrackingIndicator,
   updateTrackingIndicator,
 } from './indicator';
-import { elapsedSecondsFromPauses } from './live-metrics';
+import { refreshLiveSnapshot } from './live-snapshot';
+import { elapsedSecondsAt } from './live-snapshot-model';
+import { promptBackgroundPowerIfNeeded } from './background-power';
 import { requestTrackingPermissions } from './permissions';
 import { invalidateHistory } from '../history/history-cache';
 import { computeAndStoreSessionMetrics } from '../summary/run-computation';
@@ -56,6 +58,21 @@ export const bootstrapTrackingSession = async ({
   });
 };
 
+/**
+ * Everything the user must answer before the session clock starts: location, notifications and,
+ * on Android, the battery exemptions (which leave the app). Kickoff calls this before creating the
+ * session so no time is counted while dialogs or Settings are open. iOS "Always" stays on the HUD's
+ * permission screen.
+ */
+export const prepareTrackingForKickoff = async () => {
+  const permissions = await requestTrackingPermissions({ requestBackground: false });
+  if (!permissions.foregroundGranted) {
+    return { ok: false as const, reason: 'foreground_denied' as const };
+  }
+  await promptBackgroundPowerIfNeeded();
+  return { ok: true as const };
+};
+
 export const beginTrackingAfterPermission = async ({
   backgroundPermission,
   distanceUnit,
@@ -69,14 +86,23 @@ export const beginTrackingAfterPermission = async ({
   await updateSessionFields(session.id, { background_permission: backgroundPermission });
 
   const segment = await getCurrentSegment(session.id);
-  await updateSessionFields(session.id, { segment_clock_origin_ms: Date.now() });
 
   await startLocationTracking({ notificationBody: 'Starting session…' });
 
+  // This also runs when the HUD remounts after a kill / freeze — seed the indicator from the real
+  // clock and numbers, never 0:00. Clock anchors come from SQLite (segment start, pauses).
+  const live = await refreshLiveSnapshot({ sessionId: session.id, force: true });
   const activityId = await startTrackingIndicator({
     session,
     segment,
-    snapshot: { elapsedSeconds: 0, distanceKm: null, topSpeedKmh: null, signal: 'settling' },
+    snapshot: live
+      ? {
+          elapsedSeconds: elapsedSecondsAt(live.segmentId ? live.clock : live.sessionClock),
+          distanceKm: live.metrics.distanceKm,
+          topSpeedKmh: live.metrics.topSpeedKmh,
+          signal: live.metrics.signal,
+        }
+      : { elapsedSeconds: 0, distanceKm: null, topSpeedKmh: null, signal: 'settling' },
     distanceUnit,
   });
 
@@ -99,19 +125,6 @@ export const requestAndBeginTracking = async (
 
   await beginTrackingAfterPermission({ backgroundPermission, distanceUnit });
   return { ok: true as const, backgroundPermission };
-};
-
-export const computeSegmentElapsedSeconds = async (sessionId: string, segmentId: string | null) => {
-  if (!segmentId) return 0;
-  const session = await getTrackingSession(sessionId);
-  if (!session) return 0;
-
-  const segments = await getSegmentsForSession(sessionId);
-  const segment = segments.find((row) => row.id === segmentId);
-  const segmentStart = segment?.started_at ?? session.started_at;
-  const pauses = await getPausesForSegment(segmentId);
-
-  return elapsedSecondsFromPauses({ startedAt: segmentStart, pausedRanges: pauses });
 };
 
 export const refreshIndicatorIfNeeded = async ({
@@ -141,6 +154,7 @@ export const endCurrentActivity = async (sessionId: string) => {
     tracking_status: 'live',
     gps_search_started_at: null,
   });
+  await refreshLiveSnapshot({ sessionId, force: true });
 };
 
 export const closeCurrentSegmentForSwitch = async ({
@@ -180,6 +194,7 @@ export const closeCurrentSegmentForSwitch = async ({
       current_segment_id: newSegmentId,
       segment_clock_origin_ms: Date.now(),
     });
+    await refreshLiveSnapshot({ sessionId, force: true });
     return { skippedCompass: true as const, nextIndex, activityKind };
   }
 
@@ -214,6 +229,7 @@ export const completeSegmentSwitch = async ({
     current_segment_id: newSegmentId,
     segment_clock_origin_ms: Date.now(),
   });
+  await refreshLiveSnapshot({ sessionId, force: true });
 
   const updatedSession = await getTrackingSession(sessionId);
   const segment = await getCurrentSegment(sessionId);
@@ -295,6 +311,7 @@ export const endTrackingSession = async ({
   });
 
   await stopLocationTracking({ reason: 'ended' });
+  await deleteLiveSnapshot(sessionId);
   try {
     await stopTrackingIndicator(session.live_activity_id);
   } catch (error) {

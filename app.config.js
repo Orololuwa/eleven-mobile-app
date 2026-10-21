@@ -22,6 +22,9 @@ module.exports = ({ config }) => ({
         'FOREGROUND_SERVICE',
         'FOREGROUND_SERVICE_LOCATION',
         'POST_NOTIFICATIONS',
+        // Session GPS renew loop under lock (with-direct-gps) and the battery-exemption prompt.
+        'WAKE_LOCK',
+        'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
       ]),
     ],
   },
