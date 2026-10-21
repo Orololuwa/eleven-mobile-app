@@ -236,6 +236,8 @@ const processFix = async (
       speedKmh,
       speedAccuracyMps: normalizeSpeedAccuracyMps(coordsWithSpeedAccuracy.speedAccuracy),
       horizontalAccuracyM: accuracy,
+      // Android's foreground watch is Play Services fused; everything else is the chip's own feed.
+      provider: source === 'watch' && Platform.OS === 'android' ? 'fused' : 'gps',
     });
     console.log('[location-task] point', {
       source,

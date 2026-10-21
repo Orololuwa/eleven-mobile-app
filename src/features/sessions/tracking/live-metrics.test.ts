@@ -43,6 +43,13 @@ const input = ({
   computedAt: at(endSec),
 });
 
+/** v3 live is the forward pass only; it learns heading over the first fixes, so it reads a touch low. */
+const expectNear = (actual: number | null, expected: number, relative = 0.03) => {
+  expect(actual).not.toBeNull();
+  expect(Math.abs((actual ?? 0) - expected)).toBeLessThanOrEqual(expected * relative);
+  expect(actual ?? 0).toBeLessThanOrEqual(expected * 1.005);
+};
+
 describe('computeLiveReadout', () => {
   it('shows distance and top speed when the summary would classify the session good', () => {
     const session = input({ endSec: 180, points: steady({ count: 181 }) });
@@ -54,7 +61,7 @@ describe('computeLiveReadout', () => {
     });
     expect(computeSessionMetrics(session).dataQuality).toBe('good');
     expect(readout.signal).toBe('good');
-    expect(readout.distanceKm).toBeCloseTo(0.36, 2);
+    expectNear(readout.distanceKm, 0.36);
     expect(readout.topSpeedKmh).toBeCloseTo(7.2, 1);
   });
 
@@ -81,12 +88,13 @@ describe('computeLiveReadout', () => {
     expect(readout.signal).toBe('good');
   });
 
-  it('counts continuity-grade fixes on the live HUD even when summary quality fails', () => {
+  it('measures live exactly what the summary measures — no looser live gate (v3 C5)', () => {
+    // 30 m fixes: admitted, but too uncertain to place the player, so neither surface claims
+    // distance from them. v2's two-gate split showed 0.36 km live and 0 in the summary.
     const session = input({ endSec: 180, points: steady({ count: 181, horizontalAccuracyM: 30 }) });
-    expect(computeSessionMetrics(session).dataQuality).toBe('insufficient');
+    expect(computeSessionMetrics(session).distanceM).toBe(0);
     const readout = computeLiveReadout({ input: session, segmentId: 's1' });
-    expect(readout.distanceKm).toBeCloseTo(0.36, 2);
-    expect(readout.signal).not.toBe('poor');
+    expect(readout.distanceKm).toBe(0);
   });
 
   it('still ignores fixes beyond the live/continuity gate', () => {
@@ -109,7 +117,7 @@ describe('computeLiveReadout', () => {
     // Summary is still insufficient (< 2 min / 120 fixes) but the live feed is clean.
     expect(computeSessionMetrics(session).dataQuality).toBe('insufficient');
     expect(readout.signal).toBe('good');
-    expect(readout.distanceKm).toBeCloseTo(0.12, 2);
+    expectNear(readout.distanceKm, 0.12, 0.06);
     expect(readout.topSpeedKmh).toBeCloseTo(7.2, 1);
   });
 
@@ -131,7 +139,8 @@ describe('computeLiveReadout', () => {
       latestFix: { accuracyM: 20, atMs: endMs - 500 },
     });
     expect(readout.signal).toBe('estimated');
-    expect(readout.distanceKm).toBeCloseTo(0.18, 2);
+    // 20 m fixes sit near the uncertainty bound: some intervals are not claimed. Never high.
+    expectNear(readout.distanceKm, 0.18, 0.12);
   });
 
   it('does not show poor when a fresh live-quality OS fix is arriving', () => {
@@ -172,7 +181,7 @@ describe('computeLiveReadout', () => {
   });
 
   it('reads a stale OS fix feed as offline, not poor', () => {
-    const session = input({ endSec: 180, points: steady({ count: 181, horizontalAccuracyM: 30 }) });
+    const session = input({ endSec: 180, points: steady({ count: 181 }) });
     const endMs = Date.parse(session.computedAt!);
     const readout = computeLiveReadout({
       input: session,
@@ -180,7 +189,7 @@ describe('computeLiveReadout', () => {
       latestFix: { accuracyM: 8, atMs: endMs - 20_000 },
     });
     expect(readout.signal).toBe('offline');
-    expect(readout.distanceKm).toBeCloseTo(0.36, 2);
+    expectNear(readout.distanceKm, 0.36);
   });
 
   it('reads a fresh weak fix beyond the live gate as poor when not measuring', () => {
@@ -203,7 +212,7 @@ describe('computeLiveReadout', () => {
       latestFix: { accuracyM: 3, atMs: endMs - 20_000 },
     });
     expect(readout.signal).toBe('offline');
-    expect(readout.distanceKm).toBeCloseTo(0.36, 2);
+    expectNear(readout.distanceKm, 0.36);
   });
 
   it('keeps settling on a cold start before any OS fix arrives', () => {

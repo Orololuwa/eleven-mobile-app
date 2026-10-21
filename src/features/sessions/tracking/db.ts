@@ -13,6 +13,7 @@ import type {
   SyncStatus,
   TrackingPauseRow,
   TrackingPointRow,
+  TrackPointProvider,
   TrackingSegmentRow,
   TrackingSessionRow,
   TrackingStatus,
@@ -122,6 +123,25 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await ensureUniqueTrackPointSequence(db);
   await ensureSegmentIdNotNull(db, 'tracking_pauses');
   await ensureSegmentIdNotNull(db, 'tracking_points');
+  // After the rebuild above (it recreates tracking_points with a fixed column list).
+  await addColumnIfMissing(db, 'tracking_points', 'provider', 'TEXT');
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS metrics_comparisons (
+      session_id TEXT PRIMARY KEY NOT NULL,
+      computed_at TEXT NOT NULL,
+      stored_version TEXT NOT NULL,
+      v3_distance_m REAL NOT NULL,
+      v3_live_distance_m REAL NOT NULL,
+      v2_distance_m REAL NOT NULL,
+      doppler_distance_m REAL NOT NULL,
+      v3_top_speed_kmh REAL,
+      v2_top_speed_kmh REAL,
+      v3_data_quality TEXT NOT NULL,
+      v2_data_quality TEXT NOT NULL,
+      v3_accepted_fix_count INTEGER NOT NULL,
+      v2_accepted_fix_count INTEGER NOT NULL
+    );
+  `);
 };
 
 const columnIsNotNull = async (db: SQLite.SQLiteDatabase, table: string, column: string) => {
@@ -684,6 +704,7 @@ export const insertTrackPoint = async ({
   speedKmh,
   speedAccuracyMps,
   horizontalAccuracyM,
+  provider,
 }: {
   sessionId: string;
   segmentId: string;
@@ -693,6 +714,8 @@ export const insertTrackPoint = async ({
   speedKmh: number | null;
   speedAccuracyMps: number | null;
   horizontalAccuracyM: number | null;
+  /** Amendment 03 C4: which feed produced the fix — the filter weights fused fixes down. */
+  provider: TrackPointProvider;
 }) => {
   const id = createTrackingId();
   await withDb(async (db) => {
@@ -708,8 +731,8 @@ export const insertTrackPoint = async ({
       throw new Error('Tracking session not found');
     }
     await db.runAsync(
-      `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m, provider)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         sessionId,
@@ -721,6 +744,7 @@ export const insertTrackPoint = async ({
         speedKmh,
         speedAccuracyMps,
         horizontalAccuracyM,
+        provider,
       ],
     );
   });
@@ -822,6 +846,8 @@ const SESSION_CHILD_TABLES = [
   'tracking_pauses',
   'tracking_segments',
   'pending_renames',
+  'live_snapshots',
+  'metrics_comparisons',
 ] as const;
 
 /**

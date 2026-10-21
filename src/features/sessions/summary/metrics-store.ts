@@ -192,3 +192,47 @@ export {
   toSessionMetricsPayload,
   toSprintEffortPayload,
 } from './metrics-payload';
+
+export type MetricsComparison = {
+  sessionId: string;
+  computedAt: string;
+  storedVersion: string;
+  v3DistanceM: number;
+  v3LiveDistanceM: number;
+  v2DistanceM: number;
+  dopplerDistanceM: number;
+  v3TopSpeedKmh: number | null;
+  v2TopSpeedKmh: number | null;
+  v3DataQuality: string;
+  v2DataQuality: string;
+  v3AcceptedFixCount: number;
+  v2AcceptedFixCount: number;
+};
+
+/** Amendment 03 §4 validation record, one row per session, device-local. */
+export const saveMetricsComparison = async (row: MetricsComparison) => {
+  await withDb((db) =>
+    db.runAsync(
+      `INSERT OR REPLACE INTO metrics_comparisons (
+        session_id, computed_at, stored_version, v3_distance_m, v3_live_distance_m, v2_distance_m,
+        doppler_distance_m, v3_top_speed_kmh, v2_top_speed_kmh, v3_data_quality, v2_data_quality,
+        v3_accepted_fix_count, v2_accepted_fix_count
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.sessionId,
+        row.computedAt,
+        row.storedVersion,
+        row.v3DistanceM,
+        row.v3LiveDistanceM,
+        row.v2DistanceM,
+        row.dopplerDistanceM,
+        row.v3TopSpeedKmh,
+        row.v2TopSpeedKmh,
+        row.v3DataQuality,
+        row.v2DataQuality,
+        row.v3AcceptedFixCount,
+        row.v2AcceptedFixCount,
+      ],
+    ),
+  );
+};

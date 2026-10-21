@@ -15,6 +15,8 @@ export type ComputationPoint = {
   speedKmh: number | null;
   speedAccuracyMps: number | null;
   horizontalAccuracyM: number | null;
+  /** C4 provenance; null (pre-v3 points) is weighted as reported. */
+  provider?: 'gps' | 'fused' | null;
 };
 
 export type ComputationSegment = {
