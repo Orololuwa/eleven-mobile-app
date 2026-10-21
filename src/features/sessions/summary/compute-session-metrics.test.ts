@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scaleAtLatitude } from '../tracking/geodesic';
-import { computeSessionMetrics } from './compute-session-metrics';
+import { computeSessionMetrics, dopplerReferenceDistanceM } from './compute-session-metrics';
 import type { ComputationInput, ComputationPoint, ComputationSegment } from './types';
 
 const scale = scaleAtLatitude(6.45);
@@ -91,9 +91,12 @@ const trail = ({
   });
 };
 
-describe('computeSessionMetrics', () => {
+/** v2 rules — still computed at session end for comparison (Amendment 03 §4). */
+const computeV2 = (input: ComputationInput) => computeSessionMetrics(input, { algorithm: 'v2' });
+
+describe('computeSessionMetrics — v2 (comparison)', () => {
   it('sums segment spans and ignores the break and non-manual pauses', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [
           segment({ id: 'h1', index: 1, start: 0, end: 35 * 60 }),
@@ -121,7 +124,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('bridges short gaps and drops long ones, pauses, and implausible jumps', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 30 })],
         points: [
@@ -140,7 +143,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('does not bridge a manual pause or a segment boundary', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [
           segment({ id: 'h1', index: 1, start: 0, end: 40 }),
@@ -162,7 +165,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('merges a one-sample dip into one sprint and keeps a real gap as two', () => {
-    const merged = computeSessionMetrics(
+    const merged = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 30 })],
         points: trail({
@@ -179,7 +182,7 @@ describe('computeSessionMetrics', () => {
     expect(merged.sprints[0]?.durationS).toBeCloseTo(4, 5);
     expect(merged.sprintCount).toBe(1);
 
-    const split = computeSessionMetrics(
+    const split = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 30 })],
         points: [
@@ -202,7 +205,7 @@ describe('computeSessionMetrics', () => {
       });
     };
 
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 40 })],
         corners: cornersForAxis(58),
@@ -220,22 +223,18 @@ describe('computeSessionMetrics', () => {
   });
 
   it('uses futsal bands on a short pitch and full bands for training or a degenerate axis', () => {
-    const futsal = computeSessionMetrics(
-      baseInput({ corners: cornersForAxis(40), playStructure: 'halves' }),
-    );
-    const training = computeSessionMetrics(
+    const futsal = computeV2(baseInput({ corners: cornersForAxis(40), playStructure: 'halves' }));
+    const training = computeV2(
       baseInput({
         corners: cornersForAxis(40),
         playStructure: 'training_activities',
         pitchId: 'pitch-1',
       }),
     );
-    const degenerate = computeSessionMetrics(
+    const degenerate = computeV2(
       baseInput({ corners: cornersForAxis(5), playStructure: 'halves' }),
     );
-    const noPitch = computeSessionMetrics(
-      baseInput({ corners: cornersForAxis(40), pitchId: null }),
-    );
+    const noPitch = computeV2(baseInput({ corners: cornersForAxis(40), pitchId: null }));
 
     expect(futsal.speedBandBucket).toBe('futsal');
     expect(futsal.speedBandBoundaries.sprint).toBe(15);
@@ -246,7 +245,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('marks a short session insufficient and suppresses speed when none was recorded', () => {
-    const insufficient = computeSessionMetrics(
+    const insufficient = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 40 })],
         points: trail({ segmentId: 's1', startT: 0, speeds: Array.from({ length: 30 }, () => 8) }),
@@ -254,7 +253,7 @@ describe('computeSessionMetrics', () => {
     );
     expect(insufficient.dataQuality).toBe('insufficient');
 
-    const noSpeed = computeSessionMetrics(
+    const noSpeed = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 30 })],
         points: [
@@ -271,7 +270,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('falls back to position delta when OS speed fails the accuracy filter', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         points: [
           fix({
@@ -296,7 +295,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('keeps session totals equal to the sum of the segments', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [
           segment({ id: 'h1', index: 1, start: 0, end: 20 }),
@@ -337,7 +336,7 @@ describe('computeSessionMetrics', () => {
     });
 
   it('stores nothing measurable from steady 30 m fixes and classifies them insufficient', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 180 })],
         points: steady(181, { horizontalAccuracyM: 30 }),
@@ -352,7 +351,7 @@ describe('computeSessionMetrics', () => {
 
   it('measures a fix at the 10 m quality gate and ignores one at 15 m', () => {
     const pair = (horizontalAccuracyM: number) =>
-      computeSessionMetrics(
+      computeV2(
         baseInput({
           points: [
             fix({ segmentId: 's1', t: 0, metresNorth: 0, horizontalAccuracyM }),
@@ -365,7 +364,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('classifies on gap alone: a clean 0.5 Hz session is good', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 300 })],
         points: steady(151, { stepSec: 2 }),
@@ -376,7 +375,7 @@ describe('computeSessionMetrics', () => {
   });
 
   it('marks a session estimated when sub-quality fixes leave a 5–25% gap', () => {
-    const result = computeSessionMetrics(
+    const result = computeV2(
       baseInput({
         segments: [segment({ id: 's1', index: 1, start: 0, end: 200 })],
         points: [
@@ -400,4 +399,174 @@ const cornersForAxis = (metres: number) => ({
   end_a_corner_2: { lat: latFor(0), lng: 3.4001 },
   end_b_corner_1: { lat: latFor(metres), lng: 3.4 },
   end_b_corner_2: { lat: latFor(metres), lng: 3.4001 },
+});
+
+/** Deterministic Gaussian noise so replay numbers are stable. */
+const noise = (seed: number) => {
+  let state = seed;
+  const uniform = () => {
+    state = (state * 16807) % 2147483647;
+    return state / 2147483647;
+  };
+  return () => Math.sqrt(-2 * Math.log(uniform() || 1e-9)) * Math.cos(2 * Math.PI * uniform());
+};
+
+const lngFor = (metresEast: number) => 3.4 + metresEast / scale.mPerDegLng;
+
+/** Straight run north at `speedsKmh`, positions scattered by `scatterM`, Doppler with `speedNoise`. */
+const noisyTrail = ({
+  speedsKmh,
+  scatterM,
+  horizontalAccuracyM = 5,
+  speedAccuracyMps = 0.5,
+  speedNoiseMps = 0.2,
+  provider = 'gps',
+  seed = 7,
+  startT = 0,
+}: {
+  speedsKmh: number[];
+  scatterM: number;
+  horizontalAccuracyM?: number;
+  speedAccuracyMps?: number;
+  speedNoiseMps?: number;
+  provider?: 'gps' | 'fused';
+  seed?: number;
+  startT?: number;
+}) => {
+  const gauss = noise(seed);
+  let metres = 0;
+  const points: ComputationPoint[] = speedsKmh.map((kmh, index) => {
+    if (index > 0) metres += ((speedsKmh[index - 1]! + kmh) / 2 / 3.6) * 1;
+    return {
+      segmentId: 's1',
+      recordedAt: at(startT + index),
+      lat: latFor(metres + gauss() * scatterM),
+      lng: lngFor(gauss() * scatterM),
+      speedKmh: Math.max(0, kmh + gauss() * speedNoiseMps * 3.6),
+      speedAccuracyMps,
+      horizontalAccuracyM,
+      provider,
+    };
+  });
+  return { points, trueMetres: metres };
+};
+
+describe('computeSessionMetrics — v3 (Amendment 03)', () => {
+  it('stores v3 by default', () => {
+    expect(computeSessionMetrics(baseInput()).algorithmVersion).toBe('v3');
+  });
+
+  it('reads a steady jog within 3% of truth where the position sum inflates', () => {
+    const { points, trueMetres } = noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 8),
+      scatterM: 4,
+    });
+    const input = baseInput({ points });
+    const v3 = computeSessionMetrics(input);
+    const v2 = computeSessionMetrics(input, { algorithm: 'v2' });
+    expect(Math.abs(v3.distanceM - trueMetres) / trueMetres).toBeLessThan(0.03);
+    expect(v2.distanceM).toBeGreaterThan(trueMetres * 1.2);
+    expect(v3.speedSource).toBe('os');
+    expect(v3.dataQuality).toBe('good');
+  });
+
+  it('adds almost nothing while standing in position scatter', () => {
+    const { points } = noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 0),
+      scatterM: 5,
+      speedNoiseMps: 0,
+    });
+    const input = baseInput({ points });
+    expect(computeSessionMetrics(input).distanceM).toBeLessThan(15);
+    expect(computeSessionMetrics(input, { algorithm: 'v2' }).distanceM).toBeGreaterThan(500);
+  });
+
+  it('tracks a sprint from standstill without the low-σ_a lag', () => {
+    const speeds = Array.from({ length: 31 }, (_, t) =>
+      t <= 10 ? 0 : t <= 13 ? (t - 10) * 8 : 24,
+    );
+    const { points, trueMetres } = noisyTrail({ speedsKmh: speeds, scatterM: 3 });
+    const result = computeSessionMetrics(baseInput({ points }));
+    expect(Math.abs(result.distanceM - trueMetres) / trueMetres).toBeLessThan(0.05);
+    expect(result.topSpeedKmh).toBeGreaterThan(21);
+    expect(result.topSpeedKmh).toBeLessThan(27);
+  });
+
+  it('stops counting once the position is no longer known through a long gap', () => {
+    const before = noisyTrail({ speedsKmh: Array.from({ length: 30 }, () => 8), scatterM: 3 });
+    const after = noisyTrail({
+      speedsKmh: Array.from({ length: 30 }, () => 8),
+      scatterM: 3,
+      startT: 49,
+      seed: 9,
+    });
+    const result = computeSessionMetrics(
+      baseInput({
+        segments: [segment({ id: 's1', index: 1, start: 0, end: 79 })],
+        points: [...before.points, ...after.points],
+      }),
+    );
+    // 20 s silence: the 20 s interval is not bridged, so roughly 58 s of jogging is measured.
+    expect(result.distanceM).toBeLessThan((58 * 8) / 3.6 + 15);
+    expect(result.gapSeconds).toBeGreaterThanOrEqual(19);
+  });
+
+  it('measures nothing across a manual pause', () => {
+    const { points } = noisyTrail({ speedsKmh: Array.from({ length: 61 }, () => 8), scatterM: 3 });
+    const result = computeSessionMetrics(
+      baseInput({
+        segments: [segment({ id: 's1', index: 1, start: 0, end: 60 })],
+        points,
+        pauses: [{ segmentId: 's1', reason: 'manual', startedAt: at(20), endedAt: at(40) }],
+      }),
+    );
+    const unpaused = computeSessionMetrics(
+      baseInput({ segments: [segment({ id: 's1', index: 1, start: 0, end: 60 })], points }),
+    );
+    expect(result.distanceM).toBeLessThan(unpaused.distanceM * 0.75);
+  });
+
+  it('weights a fused fix by what it is, not what it claims (C4)', () => {
+    const { points } = noisyTrail({
+      speedsKmh: Array.from({ length: 61 }, () => 0),
+      scatterM: 0.5,
+    });
+    // Wi-Fi fallback: 10 m off while claiming 4 m — inside the outlier gate if believed, so only
+    // provenance can weight it down. Play Services' flat 1.5 m/s speed accuracy.
+    const jumped = points.map((point, index) =>
+      index % 10 === 5
+        ? { ...point, lat: latFor(10), speedKmh: 0, speedAccuracyMps: 1.5, horizontalAccuracyM: 4 }
+        : point,
+    );
+    const asGps = computeSessionMetrics(baseInput({ points: jumped }));
+    const asFused = computeSessionMetrics(
+      baseInput({
+        points: jumped.map((point, index) =>
+          index % 10 === 5 ? { ...point, provider: 'fused' as const } : point,
+        ),
+      }),
+    );
+    expect(asFused.distanceM).toBeLessThan(asGps.distanceM);
+    expect(asFused.distanceM).toBeLessThan(5);
+  });
+
+  it('keeps live (forward only) and summary (smoothed) close on a clean jog', () => {
+    const { points } = noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 10),
+      scatterM: 3,
+    });
+    const input = baseInput({ points });
+    const summary = computeSessionMetrics(input);
+    const live = computeSessionMetrics(input, { smooth: false });
+    expect(Math.abs(summary.distanceM - live.distanceM) / summary.distanceM).toBeLessThan(0.03);
+  });
+
+  it('integrates Doppler for the reference distance', () => {
+    const { points, trueMetres } = noisyTrail({
+      speedsKmh: Array.from({ length: 61 }, () => 9),
+      scatterM: 5,
+      speedNoiseMps: 0,
+    });
+    expect(dopplerReferenceDistanceM(baseInput({ points }))).toBeCloseTo(trueMetres, 0);
+  });
 });

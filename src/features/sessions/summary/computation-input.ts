@@ -64,6 +64,7 @@ export const toComputationInput = ({
     speedKmh: point.speed_kmh,
     speedAccuracyMps: point.speed_accuracy_mps,
     horizontalAccuracyM: point.horizontal_accuracy_m,
+    provider: point.provider ?? null,
   })),
   massKg,
   computedAt,

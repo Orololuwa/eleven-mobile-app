@@ -138,7 +138,15 @@ export type TrackingPointRow = {
   speed_kmh: number | null;
   speed_accuracy_mps: number | null;
   horizontal_accuracy_m: number | null;
+  /** Null on points recorded before Amendment 03. Local only — not uploaded. */
+  provider: TrackPointProvider;
 };
+
+/**
+ * `gps`: the direct GPS_PROVIDER task on Android, Core Location on iOS — the chip's own accuracy.
+ * `fused`: Play Services fused (the Android foreground-watch fallback) — accuracy is a guess.
+ */
+export type TrackPointProvider = 'gps' | 'fused' | null;
 
 export type SessionFinalizeSegment = {
   segment_index: number;

@@ -11,7 +11,22 @@ import { determineTopSpeedPeak, passesSpeedConfidence } from '../tracking/speed-
 import {
   ALGORITHM_VERSION,
   CALORIE_KCAL_PER_KG_PER_KM,
+  FILTER_ACCEL_SIGMA_MPS2,
+  FILTER_DIRECTION_MIN_SPEED_MPS,
+  FILTER_HEADING_CONFIDENCE_RATIO,
+  FILTER_FUSED_POSITION_SIGMA_FLOOR_M,
+  FILTER_FUSED_SPEED_SIGMA_FLOOR_MPS,
+  FILTER_GATE_LOCKOUT_FIXES,
+  FILTER_GATE_WARMUP_UPDATES,
+  FILTER_POSITION_INNOVATION_GATE,
+  FILTER_POSITION_SIGMA_FLOOR_M,
+  FILTER_RESET_GAP_SECONDS,
+  FILTER_SPEED_SIGMA_DEFAULT_MPS,
+  FILTER_SPEED_SIGMA_FLOOR_MPS,
+  FILTER_STATIONARY_SPEED_MPS,
   GAP_BRIDGE_MAX_SECONDS,
+  GAP_POSITION_SIGMA_MAX_M,
+  LEGACY_ALGORITHM_VERSION,
   QUALITY_GOOD_GAP,
   QUALITY_INSUFFICIENT_GAP,
   QUALITY_MIN_ACTIVE_SECONDS,
@@ -22,6 +37,15 @@ import {
   SPRINT_MIN_FIXES,
   SPRINT_MIN_SECONDS,
 } from './constants';
+import {
+  filterRun,
+  positionSigmaOf,
+  smoothRun,
+  speedOf,
+  speedSigmaOf,
+  type FilterFix,
+  type FilterTuning,
+} from './motion-filter';
 import { metForSpeed, resolveSpeedBands, zoneForSpeed, type ZoneName } from './speed-bands';
 import type {
   ComputationInput,
@@ -339,12 +363,248 @@ const sumZones = (rows: ZoneSeconds[]): ZoneSeconds =>
     emptyZones(),
   );
 
+export type MetricsAlgorithm = 'v2' | 'v3';
+
+type SpeedSample = {
+  recorded_at: string;
+  lat: number;
+  lng: number;
+  speed_kmh: number | null;
+  speed_accuracy_mps: number | null;
+  horizontal_accuracy_m: number | null;
+};
+
+/** What an algorithm hands the shared tail: spans to measure, and per-segment evidence. */
+type SpanBuild = {
+  spans: BridgedSpan[];
+  acceptedCount: Map<string, number>;
+  /** Fed to the 0.4.2 F1–F4 chain for top speed. */
+  speedSamples: Map<string, SpeedSample[]>;
+};
+
+const FILTER_TUNING: FilterTuning = {
+  accelSigmaMps2: FILTER_ACCEL_SIGMA_MPS2,
+  positionSigmaFloorM: FILTER_POSITION_SIGMA_FLOOR_M,
+  speedSigmaFloorMps: FILTER_SPEED_SIGMA_FLOOR_MPS,
+  speedSigmaDefaultMps: FILTER_SPEED_SIGMA_DEFAULT_MPS,
+  fusedPositionSigmaFloorM: FILTER_FUSED_POSITION_SIGMA_FLOOR_M,
+  fusedSpeedSigmaFloorMps: FILTER_FUSED_SPEED_SIGMA_FLOOR_MPS,
+  positionInnovationGate: FILTER_POSITION_INNOVATION_GATE,
+  gateWarmupUpdates: FILTER_GATE_WARMUP_UPDATES,
+  gateLockoutFixes: FILTER_GATE_LOCKOUT_FIXES,
+  directionMinSpeedMps: FILTER_DIRECTION_MIN_SPEED_MPS,
+  headingConfidenceRatio: FILTER_HEADING_CONFIDENCE_RATIO,
+  stationarySpeedMps: FILTER_STATIONARY_SPEED_MPS,
+};
+
+const toSpeedSample = (fix: AcceptedFix): SpeedSample => ({
+  recorded_at: fix.recordedAt,
+  lat: fix.lat,
+  lng: fix.lng,
+  speed_kmh: fix.speedKmh,
+  speed_accuracy_mps: fix.speedAccuracyMps,
+  horizontal_accuracy_m: fix.horizontalAccuracyM,
+});
+
+/** v2: distance is the sum of bridged position deltas between quality-gated fixes. */
+const buildV2Spans = ({
+  input,
+  segmentIds,
+  scale,
+  passesQuality,
+}: {
+  input: ComputationInput;
+  segmentIds: Set<string>;
+  scale: DegreeScale;
+  passesQuality: (accuracyM: number | null) => boolean;
+}): SpanBuild => {
+  const accepted: AcceptedFix[] = input.points
+    .filter((point) => point.segmentId && passesQuality(point.horizontalAccuracyM))
+    .map((point) => ({
+      ...point,
+      atMs: Date.parse(point.recordedAt),
+      osSpeedKmh: osSpeedKmh(point),
+    }))
+    .sort((a, b) => a.atMs - b.atMs || a.segmentId.localeCompare(b.segmentId));
+
+  const acceptedCount = new Map<string, number>();
+  const speedSamples = new Map<string, SpeedSample[]>();
+  accepted.forEach((fix) => {
+    if (!segmentIds.has(fix.segmentId)) return;
+    acceptedCount.set(fix.segmentId, (acceptedCount.get(fix.segmentId) ?? 0) + 1);
+    speedSamples.set(fix.segmentId, [
+      ...(speedSamples.get(fix.segmentId) ?? []),
+      toSpeedSample(fix),
+    ]);
+  });
+
+  const spans: BridgedSpan[] = [];
+  for (let index = 1; index < accepted.length; index += 1) {
+    const previous = accepted[index - 1];
+    const current = accepted[index];
+    if (!previous || !current) continue;
+    if (previous.segmentId !== current.segmentId) continue;
+    if (!segmentIds.has(previous.segmentId)) continue;
+
+    const dt = (current.atMs - previous.atMs) / 1000;
+    if (dt <= 0) continue;
+
+    const metres = planeMetres(previous, current, scale);
+    const manualOverlap = pauseOverlapSec({
+      startMs: previous.atMs,
+      endMs: current.atMs,
+      pauses: input.pauses.filter((pause) => pause.segmentId === previous.segmentId),
+    });
+    const impliedKmh = (metres / dt) * 3.6;
+    const bridged =
+      manualOverlap === 0 && dt <= GAP_BRIDGE_MAX_SECONDS && impliedKmh < TOP_SPEED_CEILING_KMH;
+    if (!bridged) continue;
+
+    const derived = impliedKmh > 0 && impliedKmh < TOP_SPEED_CEILING_KMH ? impliedKmh : null;
+    spans.push({
+      segmentId: previous.segmentId,
+      startMs: previous.atMs,
+      endMs: current.atMs,
+      metres,
+      speedKmh: previous.osSpeedKmh ?? derived,
+      fromOs: previous.osSpeedKmh != null,
+      from: previous,
+      to: current,
+    });
+  }
+  return { spans, acceptedCount, speedSamples };
+};
+
+/**
+ * v3 (Amendment 03): one Kalman filter per segment fusing position and Doppler speed. Distance is
+ * the integral of filtered speed; an interval counts while the predicted position σ stays under
+ * GAP_POSITION_SIGMA_MAX_M (replaces the 5 s bridge). `smooth` adds the RTS backward pass — the
+ * summary has the whole session, the live HUD does not.
+ */
+const buildV3Spans = ({
+  input,
+  segmentIds,
+  scale,
+  smooth,
+}: {
+  input: ComputationInput;
+  segmentIds: Set<string>;
+  scale: DegreeScale;
+  smooth: boolean;
+}): SpanBuild => {
+  const admitted = input.points
+    .filter(
+      (point) => segmentIds.has(point.segmentId) && passesContinuityGate(point.horizontalAccuracyM),
+    )
+    .map((point) => ({ ...point, atMs: Date.parse(point.recordedAt) }))
+    .sort((a, b) => a.atMs - b.atMs);
+
+  const spans: BridgedSpan[] = [];
+  const acceptedCount = new Map<string, number>();
+  const speedSamples = new Map<string, SpeedSample[]>();
+  const origin = admitted[0];
+  if (!origin) return { spans, acceptedCount, speedSamples };
+
+  const toFix = (point: (typeof admitted)[number]): FilterFix => ({
+    tMs: point.atMs,
+    x: (point.lng - origin.lng) * scale.mPerDegLng,
+    y: (point.lat - origin.lat) * scale.mPerDegLat,
+    horizontalAccuracyM: point.horizontalAccuracyM ?? Number.POSITIVE_INFINITY,
+    speedMps:
+      point.speedKmh != null && point.speedKmh >= 0 && point.speedKmh < TOP_SPEED_CEILING_KMH
+        ? point.speedKmh / 3.6
+        : null,
+    speedAccuracyMps: point.speedAccuracyMps,
+    provider: point.provider ?? null,
+  });
+  const toLatLng = (state: number[]): LatLng => ({
+    lat: origin.lat + state[1]! / scale.mPerDegLat,
+    lng: origin.lng + state[0]! / scale.mPerDegLng,
+  });
+
+  const bySegment = new Map<string, typeof admitted>();
+  admitted.forEach((point) => {
+    bySegment.set(point.segmentId, [...(bySegment.get(point.segmentId) ?? []), point]);
+  });
+
+  bySegment.forEach((points, segmentId) => {
+    const manualPauses = input.pauses.filter(
+      (pause) => pause.segmentId === segmentId && pause.reason === 'manual',
+    );
+    // A long silence or a manual pause starts a fresh run: the old state says nothing about now.
+    const runs: (typeof admitted)[] = [];
+    points.forEach((point, index) => {
+      const previous = points[index - 1];
+      const breaks =
+        !previous ||
+        (point.atMs - previous.atMs) / 1000 > FILTER_RESET_GAP_SECONDS ||
+        pauseOverlapSec({ startMs: previous.atMs, endMs: point.atMs, pauses: manualPauses }) > 0;
+      if (breaks) runs.push([point]);
+      else runs[runs.length - 1]!.push(point);
+    });
+
+    runs.forEach((run) => {
+      const steps = filterRun(run.map(toFix), FILTER_TUNING);
+      const states = smooth
+        ? smoothRun(steps)
+        : steps.map((step) => ({ x: step.xFilt, p: step.pFilt }));
+
+      steps.forEach((step, index) => {
+        const state = states[index]!;
+        if (step.positionAccepted) {
+          acceptedCount.set(segmentId, (acceptedCount.get(segmentId) ?? 0) + 1);
+        }
+        const at = toLatLng(state.x);
+        speedSamples.set(segmentId, [
+          ...(speedSamples.get(segmentId) ?? []),
+          {
+            recorded_at: iso(step.tMs),
+            lat: at.lat,
+            lng: at.lng,
+            speed_kmh: speedOf(state.x) * 3.6,
+            speed_accuracy_mps: speedSigmaOf(state.x, state.p),
+            horizontal_accuracy_m: positionSigmaOf(state.p),
+          },
+        ]);
+
+        const previousStep = steps[index - 1];
+        const previousState = states[index - 1];
+        if (!previousStep || !previousState) return;
+        // Uncertainty bound, not a time bound: stop claiming distance once we no longer know
+        // where the player is.
+        if (positionSigmaOf(step.pPred) > GAP_POSITION_SIGMA_MAX_M) return;
+        const metres = ((speedOf(previousState.x) + speedOf(state.x)) / 2) * step.dt;
+        const meanKmh = (metres / step.dt) * 3.6;
+        if (meanKmh >= TOP_SPEED_CEILING_KMH) return;
+        spans.push({
+          segmentId,
+          startMs: previousStep.tMs,
+          endMs: step.tMs,
+          metres,
+          speedKmh: meanKmh,
+          fromOs: step.speedUsed || previousStep.speedUsed,
+          from: toLatLng(previousState.x),
+          to: at,
+        });
+      });
+    });
+  });
+
+  spans.sort((a, b) => a.startMs - b.startMs);
+  return { spans, acceptedCount, speedSamples };
+};
+
 export const computeSessionMetrics = (
   input: ComputationInput,
   {
+    algorithm = 'v3',
+    smooth = true,
     passesQuality = passesQualityGate,
   }: {
-    /** Defaults to the summary quality gate (≤10 m). Live HUD passes `passesLiveQualityGate`. */
+    algorithm?: MetricsAlgorithm;
+    /** v3 only. Summary: forward + RTS smoother. Live HUD: forward pass only. */
+    smooth?: boolean;
+    /** v2 only. Defaults to the summary quality gate (≤10 m). */
     passesQuality?: (accuracyM: number | null) => boolean;
   } = {},
 ): ComputedSessionMetrics => {
@@ -372,21 +632,15 @@ export const computeSessionMetrics = (
     (point) => segmentIds.has(point.segmentId) && passesContinuityGate(point.horizontalAccuracyM),
   ).length;
 
-  const accepted: AcceptedFix[] = input.points
-    .filter((point) => point.segmentId && passesQuality(point.horizontalAccuracyM))
-    .map((point) => ({
-      ...point,
-      atMs: Date.parse(point.recordedAt),
-      osSpeedKmh: osSpeedKmh(point),
-    }))
-    .sort((a, b) => a.atMs - b.atMs || a.segmentId.localeCompare(b.segmentId));
+  const { spans, acceptedCount, speedSamples } =
+    algorithm === 'v2'
+      ? buildV2Spans({ input, segmentIds, scale, passesQuality })
+      : buildV3Spans({ input, segmentIds, scale, smooth });
 
   const distance = new Map<string, number>();
   const covered = new Map<string, number>();
   const zoneFloat = new Map<string, Record<ZoneName, number>>();
   const calorieFloat = new Map<string, number>();
-  const fixCount = new Map<string, number>();
-  const spans: BridgedSpan[] = [];
   let usedOs = false;
   let usedDerived = false;
 
@@ -395,68 +649,29 @@ export const computeSessionMetrics = (
     covered.set(segment.id, 0);
     zoneFloat.set(segment.id, emptyZones());
     calorieFloat.set(segment.id, 0);
-    fixCount.set(segment.id, 0);
   });
 
-  accepted.forEach((fix) => {
-    if (!fixCount.has(fix.segmentId)) return;
-    fixCount.set(fix.segmentId, (fixCount.get(fix.segmentId) ?? 0) + 1);
-  });
+  spans.forEach((span) => {
+    if (!distance.has(span.segmentId)) return;
+    const dt = (span.endMs - span.startMs) / 1000;
+    distance.set(span.segmentId, (distance.get(span.segmentId) ?? 0) + span.metres);
+    covered.set(span.segmentId, (covered.get(span.segmentId) ?? 0) + dt);
+    if (span.fromOs) usedOs = true;
+    else if (span.speedKmh != null) usedDerived = true;
 
-  for (let index = 1; index < accepted.length; index += 1) {
-    const previous = accepted[index - 1];
-    const current = accepted[index];
-    if (!previous || !current) continue;
-    if (previous.segmentId !== current.segmentId) continue;
-    if (!distance.has(previous.segmentId)) continue;
-
-    const dt = (current.atMs - previous.atMs) / 1000;
-    if (dt <= 0) continue;
-
-    const metres = planeMetres(previous, current, scale);
-    const manualOverlap = pauseOverlapSec({
-      startMs: previous.atMs,
-      endMs: current.atMs,
-      pauses: input.pauses.filter((pause) => pause.segmentId === previous.segmentId),
-    });
-    const impliedKmh = (metres / dt) * 3.6;
-    const bridged =
-      manualOverlap === 0 && dt <= GAP_BRIDGE_MAX_SECONDS && impliedKmh < TOP_SPEED_CEILING_KMH;
-
-    if (!bridged) continue;
-
-    distance.set(previous.segmentId, (distance.get(previous.segmentId) ?? 0) + metres);
-    covered.set(previous.segmentId, (covered.get(previous.segmentId) ?? 0) + dt);
-    const derived = impliedKmh > 0 && impliedKmh < TOP_SPEED_CEILING_KMH ? impliedKmh : null;
-    const speedKmh = previous.osSpeedKmh ?? derived;
-    if (previous.osSpeedKmh != null) usedOs = true;
-    else if (derived != null) usedDerived = true;
-
-    if (speedKmh != null) {
-      const zones = zoneFloat.get(previous.segmentId) ?? emptyZones();
-      const zone = zoneForSpeed(speedKmh, boundaries);
-      zones[zone] += dt;
-      zoneFloat.set(previous.segmentId, zones);
+    if (span.speedKmh != null) {
+      const zones = zoneFloat.get(span.segmentId) ?? emptyZones();
+      zones[zoneForSpeed(span.speedKmh, boundaries)] += dt;
+      zoneFloat.set(span.segmentId, zones);
       if (input.massKg != null) {
         calorieFloat.set(
-          previous.segmentId,
-          (calorieFloat.get(previous.segmentId) ?? 0) +
-            kcalFromTime({ seconds: dt, met: metForSpeed(speedKmh), massKg: input.massKg }),
+          span.segmentId,
+          (calorieFloat.get(span.segmentId) ?? 0) +
+            kcalFromTime({ seconds: dt, met: metForSpeed(span.speedKmh), massKg: input.massKg }),
         );
       }
     }
-
-    spans.push({
-      segmentId: previous.segmentId,
-      startMs: previous.atMs,
-      endMs: current.atMs,
-      metres,
-      speedKmh,
-      fromOs: previous.osSpeedKmh != null,
-      from: previous,
-      to: current,
-    });
-  }
+  });
 
   const speedSource: SpeedSource = usedOs ? 'os' : usedDerived ? 'position_delta' : 'none';
   const suppressSpeed = speedSource === 'none';
@@ -474,19 +689,7 @@ export const computeSessionMetrics = (
       activeDurationSeconds,
       Math.max(0, Math.round(activeDurationSeconds - (covered.get(segment.id) ?? 0))),
     );
-    const points = accepted.filter((fix) => fix.segmentId === segment.id);
-    const peak = suppressSpeed
-      ? null
-      : determineTopSpeedPeak(
-          points.map((fix) => ({
-            recorded_at: fix.recordedAt,
-            lat: fix.lat,
-            lng: fix.lng,
-            speed_kmh: fix.speedKmh,
-            speed_accuracy_mps: fix.speedAccuracyMps,
-            horizontal_accuracy_m: fix.horizontalAccuracyM,
-          })),
-        );
+    const peak = suppressSpeed ? null : determineTopSpeedPeak(speedSamples.get(segment.id) ?? []);
     const derivedPeak = spans
       .filter((span) => span.segmentId === segment.id && span.speedKmh != null && !span.fromOs)
       .reduce<{ kmh: number; lat: number; lng: number } | null>((best, span) => {
@@ -539,7 +742,7 @@ export const computeSessionMetrics = (
   );
   const gapSeconds = segmentRows.reduce((sum, row) => sum + row.gapSeconds, 0);
   const acceptedFixCount = segmentRows.reduce(
-    (sum, row) => sum + (fixCount.get(row.segmentId) ?? 0),
+    (sum, row) => sum + (acceptedCount.get(row.segmentId) ?? 0),
     0,
   );
 
@@ -569,9 +772,37 @@ export const computeSessionMetrics = (
     acceptedFixCount,
     continuityFixCount,
     gapSeconds,
-    algorithmVersion: ALGORITHM_VERSION,
+    algorithmVersion: algorithm === 'v2' ? LEGACY_ALGORITHM_VERSION : ALGORITHM_VERSION,
     computedAt: input.computedAt ?? new Date().toISOString(),
     segments: segmentRows,
     sprints,
   };
+};
+
+/**
+ * Doppler-integrated reference distance (Amendment 03 §2): Σ OS speed × dt between consecutive
+ * continuity-grade fixes ≤ 5 s apart. Independent of position noise; logged, never stored as the
+ * session's distance.
+ */
+export const dopplerReferenceDistanceM = (input: ComputationInput) => {
+  const segmentIds = new Set(input.segments.map((segment) => segment.id));
+  const fixes = input.points
+    .filter(
+      (point) =>
+        segmentIds.has(point.segmentId) &&
+        passesContinuityGate(point.horizontalAccuracyM) &&
+        point.speedKmh != null,
+    )
+    .map((point) => ({ ...point, atMs: Date.parse(point.recordedAt) }))
+    .sort((a, b) => a.atMs - b.atMs);
+  let metres = 0;
+  for (let index = 1; index < fixes.length; index += 1) {
+    const previous = fixes[index - 1]!;
+    const current = fixes[index]!;
+    if (previous.segmentId !== current.segmentId) continue;
+    const dt = (current.atMs - previous.atMs) / 1000;
+    if (dt <= 0 || dt > GAP_BRIDGE_MAX_SECONDS) continue;
+    metres += (((previous.speedKmh ?? 0) + (current.speedKmh ?? 0)) / 2 / 3.6) * dt;
+  }
+  return metres;
 };
