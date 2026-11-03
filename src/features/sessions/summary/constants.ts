@@ -76,6 +76,14 @@ export const ZUPT_SUSTAIN_SECONDS = 3;
  * held still or in a pocket of a standing player reads ~0.001–0.02; walking reads ≥ 0.5.
  */
 export const ZUPT_ACCEL_VARIANCE_MAX = 0.1;
+/**
+ * Moving veto: at or above this the accelerometer says walking, and no ZUPT is applied whatever the
+ * other two vote. Indoors the votes are not independent — the chip reports ~0 km/h and the step
+ * counter can stay flat through stop-start walking (21 Oct party walk: counter silent, variance
+ * 1–6) — so Doppler + steps would otherwise outvote a phone that is plainly moving. It only ever
+ * blocks a ZUPT, never forces one. Walking reads ≥ 1; light handling on the spot ~0.1–0.5.
+ */
+export const ZUPT_ACCEL_MOVING_MIN = 0.5;
 
 /**
  * C3 stride bands (steps / min). Below: walking stride; at or above: running stride. NRC's own
