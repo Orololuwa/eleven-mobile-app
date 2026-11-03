@@ -116,6 +116,8 @@ export type TrackingSegmentRow = {
   activity_kind: ActivityKind | null;
   started_at: string;
   ended_at: string | null;
+  /** Amendment 03 C3.1: steps counted in the segment, manual pauses excluded. Local only. */
+  step_count: number | null;
 };
 
 export type TrackingPauseRow = {
@@ -138,7 +140,22 @@ export type TrackingPointRow = {
   speed_kmh: number | null;
   speed_accuracy_mps: number | null;
   horizontal_accuracy_m: number | null;
+  /** Null on points recorded before Amendment 03. Local only — not uploaded. */
+  provider: TrackPointProvider;
+  /**
+   * Amendment 03 C3: the pedometer's cumulative counter when the fix arrived (Android, read natively
+   * by the location task). Only differences mean anything. Null without a reading. Local only.
+   */
+  step_count: number | null;
+  /** Amendment 03 C2: variance of |acceleration| since the previous fix, (m/s²)². Local only. */
+  accel_variance: number | null;
 };
+
+/**
+ * `gps`: the direct GPS_PROVIDER task on Android, Core Location on iOS — the chip's own accuracy.
+ * `fused`: Play Services fused (the Android foreground-watch fallback) — accuracy is a guess.
+ */
+export type TrackPointProvider = 'gps' | 'fused' | null;
 
 export type SessionFinalizeSegment = {
   segment_index: number;

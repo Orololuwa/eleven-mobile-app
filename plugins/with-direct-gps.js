@@ -7,6 +7,7 @@ const MARKER = 'direct-gps request GPS_PROVIDER';
 const WAKE_LOCK_MARKER = 'direct-gps session wake lock';
 const WAKE_LOCK_SAFE_MARKER = 'direct-gps wake lock unavailable';
 const EVERY_FIX_MARKER = 'direct-gps every chip fix';
+const MOTION_MARKER = 'session-motion shared sensors';
 
 const CONSUMER = [
   'android',
@@ -315,6 +316,224 @@ const EVERY_FIX_LEGACY_BEFORE = `GPS_PROVIDER, 1000L, 0f, intent)`;
 
 const EVERY_FIX_LEGACY_AFTER = `GPS_PROVIDER, 0L, 0f, intent)`;
 
+/*
+ * Stage 5 — Amendment 03 C2 / C3 motion sensors, read natively rather than through expo-sensors so
+ * they keep counting while JS is frozen under lock (the same reason the GPS renew loop lives here).
+ * One shared object, `SessionMotion`, owns the listeners: the step counter (TYPE_STEP_COUNTER, else
+ * a TYPE_STEP_DETECTOR tally) and the accelerometer at 25 Hz. The session task starts and stops
+ * it; *both* fix streams are stamped from it — the direct GPS task on arrival, and the fused
+ * foreground watch as each fix goes to JS (indoors the watch is the only stream: 21 Oct parlour
+ * walk, every fix `source: watch`). Each stream keeps its own accelerometer window, so a fix's
+ * variance covers the time since that stream's previous fix. Both values ride the location bundle
+ * as top-level `steps` / `accelVariance`. Step sensors need ACTIVITY_RECOGNITION on Android 10+ —
+ * without it they never report and the key is absent.
+ */
+const SESSION_MOTION_FILE = [
+  'android',
+  'src',
+  'main',
+  'java',
+  'expo',
+  'modules',
+  'location',
+  'SessionMotion.kt',
+];
+
+const MODULE = [
+  'android',
+  'src',
+  'main',
+  'java',
+  'expo',
+  'modules',
+  'location',
+  'LocationModule.kt',
+];
+
+const SESSION_MOTION_SOURCE = `package expo.modules.location
+
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.location.Location
+import android.os.BaseBundle
+import android.os.Handler
+import android.util.Log
+
+/** ${MOTION_MARKER}: written by plugins/with-direct-gps.js (stage 5) — do not edit in node_modules. */
+object SessionMotion {
+  const val TASK = 0
+  const val WATCH = 1
+  private const val TAG = "SessionMotion"
+  private const val MIN_ACCEL_SAMPLES = 5
+
+  /** Welford accumulator of |a| since the stream's previous fix. */
+  private class Window {
+    var count = 0
+    var mean = 0.0
+    var m2 = 0.0
+    fun add(value: Double) {
+      count += 1
+      val delta = value - mean
+      mean += delta / count
+      m2 += delta * (value - mean)
+    }
+    fun take(): Double {
+      val variance = if (count >= MIN_ACCEL_SAMPLES) m2 / (count - 1) else Double.NaN
+      count = 0
+      mean = 0.0
+      m2 = 0.0
+      return variance
+    }
+  }
+
+  private val lock = Any()
+  private var manager: SensorManager? = null
+  private var stepTotal: Double? = null
+  private var detectorTally = 0.0
+  private val windows = arrayOf(Window(), Window())
+  private val taskStamps = object : LinkedHashMap<Long, DoubleArray>() {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, DoubleArray>?): Boolean =
+      size > 2_000
+  }
+
+  private val listener = object : SensorEventListener {
+    override fun onSensorChanged(event: SensorEvent) {
+      synchronized(lock) {
+        when (event.sensor.type) {
+          Sensor.TYPE_STEP_COUNTER -> stepTotal = event.values[0].toDouble()
+          Sensor.TYPE_STEP_DETECTOR -> {
+            detectorTally += 1.0
+            stepTotal = detectorTally
+          }
+          Sensor.TYPE_ACCELEROMETER -> {
+            val x = event.values[0].toDouble()
+            val y = event.values[1].toDouble()
+            val z = event.values[2].toDouble()
+            val magnitude = Math.sqrt(x * x + y * y + z * z)
+            windows.forEach { it.add(magnitude) }
+          }
+        }
+      }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+  }
+
+  fun start(context: Context, handler: Handler) {
+    synchronized(lock) {
+      if (manager != null) return
+      val sensors = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+      manager = sensors
+      val stepSensor = sensors.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        ?: sensors.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
+      val stepsOn = try {
+        stepSensor != null &&
+          sensors.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL, 0, handler)
+      } catch (e: SecurityException) {
+        Log.w(TAG, "${MOTION_MARKER}: step sensor refused (ACTIVITY_RECOGNITION?)", e)
+        false
+      }
+      val accelerometer = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+      val accelOn = accelerometer != null &&
+        sensors.registerListener(listener, accelerometer, 40_000, handler)
+      Log.i(TAG, "${MOTION_MARKER} started steps=\${if (stepsOn) stepSensor?.name else "off"} accel=$accelOn")
+    }
+  }
+
+  fun stop() {
+    synchronized(lock) {
+      manager?.unregisterListener(listener)
+      manager = null
+      stepTotal = null
+      detectorTally = 0.0
+      windows.forEach { it.take() }
+      taskStamps.clear()
+    }
+  }
+
+  /** Task stream: snapshot as fixes arrive; they may be reported later (deferred / batched). */
+  fun stampTask(locations: List<Location>) {
+    synchronized(lock) {
+      if (manager == null) return
+      val fresh = locations.filter { !taskStamps.containsKey(it.time) }
+      if (fresh.isEmpty()) return
+      val steps = stepTotal ?: Double.NaN
+      val variance = windows[TASK].take()
+      for (location in fresh) taskStamps[location.time] = doubleArrayOf(steps, variance)
+    }
+  }
+
+  fun attachTask(bundle: BaseBundle, location: Location) {
+    val stamp = synchronized(lock) { taskStamps.remove(location.time) } ?: return
+    put(bundle, stamp[0], stamp[1])
+  }
+
+  /** Watch stream: delivered straight to JS, so stamp and attach in one step. */
+  fun attachWatch(bundle: BaseBundle) {
+    val stamp = synchronized(lock) {
+      if (manager == null) return
+      doubleArrayOf(stepTotal ?: Double.NaN, windows[WATCH].take())
+    }
+    put(bundle, stamp[0], stamp[1])
+  }
+
+  private fun put(bundle: BaseBundle, steps: Double, variance: Double) {
+    if (!steps.isNaN()) bundle.putDouble("steps", steps)
+    if (!variance.isNaN()) bundle.putDouble("accelVariance", variance)
+  }
+}
+`;
+
+const MOTION_IMPORT_BEFORE = `import expo.modules.location.LocationHelpers
+`;
+
+const MOTION_IMPORT_AFTER = `import expo.modules.location.LocationHelpers
+import expo.modules.location.SessionMotion
+`;
+
+const MOTION_REGISTER_BEFORE = `    startLocationUpdates()
+    startDirectGpsRenew()
+  }`;
+
+const MOTION_REGISTER_AFTER = `    startLocationUpdates()
+    startDirectGpsRenew()
+    // ${MOTION_MARKER}
+    context?.let { SessionMotion.start(it.applicationContext, directGpsHandler) }
+  }`;
+
+const MOTION_UNREGISTER_BEFORE = `  override fun didUnregister() {
+    stopDirectGpsRenew()`;
+
+const MOTION_UNREGISTER_AFTER = `  override fun didUnregister() {
+    SessionMotion.stop()
+    stopDirectGpsRenew()`;
+
+const MOTION_DEFER_BEFORE = `  private fun deferLocations(locations: List<Location>) {
+`;
+
+const MOTION_DEFER_AFTER = `  private fun deferLocations(locations: List<Location>) {
+    SessionMotion.stampTask(locations)
+`;
+
+const MOTION_REPORT_BEFORE = `        val bundle = LocationResponse(location).toBundle(PersistableBundle::class.java)
+        data.add(bundle)`;
+
+const MOTION_REPORT_AFTER = `        val bundle = LocationResponse(location).toBundle(PersistableBundle::class.java)
+        SessionMotion.attachTask(bundle, location)
+        data.add(bundle)`;
+
+const MOTION_WATCH_BEFORE = `    val responseBundle = bundleOf()
+    responseBundle.putBundle("location", response.toBundle(Bundle::class.java))`;
+
+const MOTION_WATCH_AFTER = `    val responseBundle = bundleOf()
+    // ${MOTION_MARKER}: fused watch fixes carry steps / stillness too (indoors they are all there is).
+    val locationBundle = response.toBundle(Bundle::class.java)
+    SessionMotion.attachWatch(locationBundle)
+    responseBundle.putBundle("location", locationBundle)`;
+
 const replaceOnce = ({ filePath, before, after, label }) => {
   const contents = fs.readFileSync(filePath, 'utf8');
   if (!contents.includes(before)) {
@@ -377,12 +596,42 @@ const patchEveryFix = (filePath) => {
   });
 };
 
+const patchMotionSensors = (packageRoot) => {
+  // Always rewritten: it is ours, not a patch of upstream code.
+  fs.writeFileSync(path.join(packageRoot, ...SESSION_MOTION_FILE), SESSION_MOTION_SOURCE);
+
+  const consumer = path.join(packageRoot, ...CONSUMER);
+  if (!fs.readFileSync(consumer, 'utf8').includes(MOTION_MARKER)) {
+    [
+      [MOTION_IMPORT_BEFORE, MOTION_IMPORT_AFTER, 'motion import'],
+      [MOTION_REGISTER_BEFORE, MOTION_REGISTER_AFTER, 'motion register'],
+      [MOTION_UNREGISTER_BEFORE, MOTION_UNREGISTER_AFTER, 'motion unregister'],
+      [MOTION_DEFER_BEFORE, MOTION_DEFER_AFTER, 'motion stamp'],
+      [MOTION_REPORT_BEFORE, MOTION_REPORT_AFTER, 'motion attach'],
+    ].forEach(([before, after, label]) =>
+      replaceOnce({ filePath: consumer, before, after, label }),
+    );
+  }
+
+  const module = path.join(packageRoot, ...MODULE);
+  if (!fs.readFileSync(module, 'utf8').includes(MOTION_MARKER)) {
+    replaceOnce({
+      filePath: module,
+      before: MOTION_WATCH_BEFORE,
+      after: MOTION_WATCH_AFTER,
+      label: 'motion watch',
+    });
+  }
+};
+
 const patchAndroid = (projectRoot) => {
-  const filePath = path.join(projectRoot, 'node_modules', 'expo-location', ...CONSUMER);
+  const packageRoot = path.join(projectRoot, 'node_modules', 'expo-location');
+  const filePath = path.join(packageRoot, ...CONSUMER);
   patchDirectGps(filePath);
   patchWakeLock(filePath);
   patchWakeLockSafe(filePath);
   patchEveryFix(filePath);
+  patchMotionSensors(packageRoot);
 };
 
 /** @type {import('expo/config-plugins').ConfigPlugin} */

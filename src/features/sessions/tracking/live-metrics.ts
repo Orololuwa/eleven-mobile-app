@@ -124,8 +124,9 @@ const insufficientSignal = ({
 };
 
 /**
- * Live HUD readout over the session so far. Distance / top speed use the live quality gate
- * (continuity-aligned) so stored fixes feed the display; session summary still uses ≤10 m.
+ * Live HUD readout over the session so far: the same v3 filter as the summary over the same
+ * admitted (continuity-grade) fixes, forward pass only. One admitted set, one computation
+ * (Amendment 03 C5) — the summary may only refine it with the backward smoother.
  */
 export const computeLiveReadout = ({
   input,
@@ -137,7 +138,8 @@ export const computeLiveReadout = ({
   /** Newest OS fix. When stale, signal is `offline` even if earlier metrics look fine. */
   latestFix?: LatestFix | null;
 }): LiveMetrics => {
-  const computed = computeSessionMetrics(input, { passesQuality: passesLiveQualityGate });
+  // v3 forward pass only — the summary adds the RTS smoother (Amendment 03 C5).
+  const computed = computeSessionMetrics(input, { smooth: false });
   const segment = segmentId
     ? computed.segments.find((row) => row.segmentId === segmentId)
     : undefined;
