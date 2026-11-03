@@ -78,7 +78,7 @@ export const LOCATION_WATCHDOG_INTERVAL_MS = 10_000;
  */
 export const WATCH_YIELDS_TO_TASK_MS = 3_000;
 
-/** No OS fix delivered for this long → treat as registration dropout (re-register / offline). */
+/** No fix reached JS for this long → `offline` on the HUD, and the watchdog re-registers. */
 export const LOCATION_FIX_STALE_MS = 15_000;
 
 export const ANDROID_FGS_TITLE = 'Eleven — tracking your session';

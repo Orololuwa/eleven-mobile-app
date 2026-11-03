@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import type { ActivityKind, AttackDirection, SessionStartOut } from '../types';
 import { normalizePlayStructure, shouldResolveAttackDirection } from '../segment-display';
@@ -73,6 +74,37 @@ export const prepareTrackingForKickoff = async () => {
   if (!stepsGranted) console.warn('[tracking] no step counter — distance from GPS only');
   await promptBackgroundPowerIfNeeded();
   return { ok: true as const };
+};
+
+/**
+ * Kickoff with a session still open (left through Android back, or an app reload before it was
+ * ended): ask whether to go back to it or end it first. Starting anyway used to leave the old one
+ * `live` with no end — and the app reopens into whichever open session is newest.
+ */
+export const resolveOpenSessionBeforeKickoff = async ({
+  massKg,
+}: {
+  massKg: number | null;
+}): Promise<{ action: 'start' } | { action: 'resume'; sessionId: string; sessionType: string }> => {
+  const open = await getActiveTrackingSession();
+  if (!open) return { action: 'start' };
+
+  const choice = await new Promise<'resume' | 'end'>((resolve) => {
+    Alert.alert(
+      'A session is still running',
+      'Go back to it, or end it and start this one? Ending keeps everything it recorded.',
+      [
+        { text: 'Go back to it', style: 'cancel', onPress: () => resolve('resume') },
+        { text: 'End it and start', style: 'destructive', onPress: () => resolve('end') },
+      ],
+      { cancelable: true, onDismiss: () => resolve('resume') },
+    );
+  });
+  if (choice === 'resume') {
+    return { action: 'resume', sessionId: open.id, sessionType: open.session_type };
+  }
+  await endTrackingSession({ sessionId: open.id, massKg });
+  return { action: 'start' };
 };
 
 export const beginTrackingAfterPermission = async ({

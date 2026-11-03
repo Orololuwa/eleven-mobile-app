@@ -53,6 +53,7 @@ import {
   speedOf,
   speedSigmaOf,
   type FilterFix,
+  type FilterStep,
   type FilterTuning,
 } from './motion-filter';
 import { metForSpeed, resolveSpeedBands, zoneForSpeed, type ZoneName } from './speed-bands';
@@ -73,7 +74,7 @@ import type {
 
 type AcceptedFix = ComputationPoint & { atMs: number; osSpeedKmh: number | null };
 
-type BridgedSpan = {
+export type BridgedSpan = {
   segmentId: string;
   startMs: number;
   endMs: number;
@@ -99,6 +100,13 @@ const emptyZones = (): ZoneSeconds => ({
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
+/** Append in place — rebuilding the array per fix made long sessions quadratic. */
+const pushTo = <T>(map: Map<string, T[]>, key: string, value: T) => {
+  const list = map.get(key);
+  if (list) list.push(value);
+  else map.set(key, [value]);
+};
+
 const osSpeedKmh = (point: ComputationPoint) => {
   if (point.speedKmh == null || point.speedKmh <= 0) return null;
   if (
@@ -112,7 +120,7 @@ const osSpeedKmh = (point: ComputationPoint) => {
   return point.speedKmh;
 };
 
-const pauseOverlapSec = ({
+export const pauseOverlapSec = ({
   startMs,
   endMs,
   pauses,
@@ -129,7 +137,7 @@ const pauseOverlapSec = ({
     return sum + Math.max(0, overlap) / 1000;
   }, 0);
 
-const activeSecondsForSegment = ({
+export const activeSecondsForSegment = ({
   segment,
   pauses,
 }: {
@@ -157,8 +165,8 @@ const longAxisMetres = (corners: NonNullable<ComputationInput['corners']>, scale
   );
 };
 
-/** 0.5 §3.9. The live HUD reads this through `computeSessionMetrics` too — never a second copy. */
-const classifyQuality = ({
+/** 0.5 §3.9. The live HUD (live-tracker) classifies with this too — never a second copy. */
+export const classifyQuality = ({
   gapSeconds,
   activeSeconds,
   acceptedFixCount,
@@ -383,7 +391,7 @@ const sumZones = (rows: ZoneSeconds[]): ZoneSeconds =>
 /** `filter`: the Kalman pipeline (v3, plus motion sensors in v3.1). `v2`: the legacy position sum. */
 export type MetricsAlgorithm = 'v2' | 'filter';
 
-type SpeedSample = {
+export type SpeedSample = {
   recorded_at: string;
   lat: number;
   lng: number;
@@ -404,7 +412,7 @@ type SpanBuild = {
   strideSamples: StrideSample[];
 };
 
-const FILTER_TUNING: FilterTuning = {
+export const FILTER_TUNING: FilterTuning = {
   accelSigmaMps2: FILTER_ACCEL_SIGMA_MPS2,
   positionSigmaFloorM: FILTER_POSITION_SIGMA_FLOOR_M,
   speedSigmaFloorMps: FILTER_SPEED_SIGMA_FLOOR_MPS,
@@ -455,10 +463,7 @@ const buildV2Spans = ({
   accepted.forEach((fix) => {
     if (!segmentIds.has(fix.segmentId)) return;
     acceptedCount.set(fix.segmentId, (acceptedCount.get(fix.segmentId) ?? 0) + 1);
-    speedSamples.set(fix.segmentId, [
-      ...(speedSamples.get(fix.segmentId) ?? []),
-      toSpeedSample(fix),
-    ]);
+    pushTo(speedSamples, fix.segmentId, toSpeedSample(fix));
   });
 
   const spans: BridgedSpan[] = [];
@@ -519,44 +524,203 @@ type StillnessPoint = {
  * displacement gate that cut a clean jog from 5.04 km to 1.90 km (Amendment 01 §5) — and an
  * accelerometer that says walking vetoes it outright (ZUPT_ACCEL_MOVING_MIN).
  */
-export const zeroVelocityFlags = (points: StillnessPoint[]): boolean[] => {
+export const zeroVelocityFlags = (points: StillnessPoint[]): boolean[] =>
+  points.map((_, index) => zeroVelocityAt(points, index));
+
+/** The ZUPT vote for `points[index]`. Looks only backward, so live can call it as each fix lands. */
+export const zeroVelocityAt = (points: StillnessPoint[], index: number): boolean => {
   const windowMs = ZUPT_SUSTAIN_SECONDS * 1000;
-  return points.map((point, index) => {
-    // Moving veto: an accelerometer in walking range blocks a ZUPT, however the others vote.
-    if (point.accelVariance != null && point.accelVariance >= ZUPT_ACCEL_MOVING_MIN) return false;
+  const point = points[index]!;
+  // Moving veto: an accelerometer in walking range blocks a ZUPT, however the others vote.
+  if (point.accelVariance != null && point.accelVariance >= ZUPT_ACCEL_MOVING_MIN) return false;
 
-    let firstInWindow = index;
-    let dopplerQuiet = true;
-    for (let j = index; j >= 0; j -= 1) {
-      const earlier = points[j]!;
-      if (point.atMs - earlier.atMs > windowMs) break;
-      firstInWindow = j;
-      if (earlier.speedKmh == null || earlier.speedKmh / 3.6 > ZUPT_DOPPLER_MAX_MPS) {
-        dopplerQuiet = false;
-        break;
-      }
-    }
-    // Sustained: the quiet readings span most of the window, not one fix.
-    const dopplerVote = dopplerQuiet && point.atMs - points[firstInWindow]!.atMs >= windowMs - 1000;
-
-    let stepVote = false;
-    for (let j = index - 1; j >= 0; j -= 1) {
-      const earlier = points[j]!;
-      if (point.atMs - earlier.atMs < windowMs) continue;
-      stepVote =
-        stepDelta({
-          fromCount: earlier.stepCount,
-          fromMs: earlier.atMs,
-          toCount: point.stepCount,
-          toMs: point.atMs,
-        }) === 0;
+  let firstInWindow = index;
+  let dopplerQuiet = true;
+  for (let j = index; j >= 0; j -= 1) {
+    const earlier = points[j]!;
+    if (point.atMs - earlier.atMs > windowMs) break;
+    firstInWindow = j;
+    if (earlier.speedKmh == null || earlier.speedKmh / 3.6 > ZUPT_DOPPLER_MAX_MPS) {
+      dopplerQuiet = false;
       break;
     }
+  }
+  // Sustained: the quiet readings span most of the window, not one fix.
+  const dopplerVote = dopplerQuiet && point.atMs - points[firstInWindow]!.atMs >= windowMs - 1000;
 
-    const accelVote = point.accelVariance != null && point.accelVariance <= ZUPT_ACCEL_VARIANCE_MAX;
+  let stepVote = false;
+  for (let j = index - 1; j >= 0; j -= 1) {
+    const earlier = points[j]!;
+    if (point.atMs - earlier.atMs < windowMs) continue;
+    stepVote =
+      stepDelta({
+        fromCount: earlier.stepCount,
+        fromMs: earlier.atMs,
+        toCount: point.stepCount,
+        toMs: point.atMs,
+      }) === 0;
+    break;
+  }
 
-    return [dopplerVote, stepVote, accelVote].filter(Boolean).length >= ZUPT_MIN_VOTES;
+  const accelVote = point.accelVariance != null && point.accelVariance <= ZUPT_ACCEL_VARIANCE_MAX;
+
+  return [dopplerVote, stepVote, accelVote].filter(Boolean).length >= ZUPT_MIN_VOTES;
+};
+
+/** A stored fix as v3 sees it: continuity-grade, in a known segment, with its time parsed. */
+export type AdmittedPoint = ComputationPoint & { atMs: number };
+
+export const admitPoint = (
+  point: ComputationPoint,
+  segmentIds: Set<string>,
+): AdmittedPoint | null =>
+  segmentIds.has(point.segmentId) && passesContinuityGate(point.horizontalAccuracyM)
+    ? { ...point, atMs: Date.parse(point.recordedAt) }
+    : null;
+
+const admittedPoints = (points: ComputationPoint[], segmentIds: Set<string>) =>
+  points.flatMap((point) => admitPoint(point, segmentIds) ?? []);
+
+/** Plane frame of the session: metres east / north of its first admitted fix. */
+export type PlaneFrame = { origin: LatLng | null; scale: DegreeScale };
+
+export const filterFixOf = (point: AdmittedPoint, frame: PlaneFrame, zupt: boolean): FilterFix => ({
+  tMs: point.atMs,
+  x: (point.lng - (frame.origin?.lng ?? 0)) * frame.scale.mPerDegLng,
+  y: (point.lat - (frame.origin?.lat ?? 0)) * frame.scale.mPerDegLat,
+  horizontalAccuracyM: point.horizontalAccuracyM ?? Number.POSITIVE_INFINITY,
+  speedMps:
+    point.speedKmh != null && point.speedKmh >= 0 && point.speedKmh < TOP_SPEED_CEILING_KMH
+      ? point.speedKmh / 3.6
+      : null,
+  speedAccuracyMps: point.speedAccuracyMps,
+  provider: point.provider ?? null,
+  zupt,
+});
+
+const latLngOf = (state: number[], frame: PlaneFrame): LatLng => ({
+  lat: (frame.origin?.lat ?? 0) + state[1]! / frame.scale.mPerDegLat,
+  lng: (frame.origin?.lng ?? 0) + state[0]! / frame.scale.mPerDegLng,
+});
+
+type FilterState = { x: number[]; p: number[][] };
+
+/** The filter's estimate at a step, as a top-speed sample (F1–F4 read state, not raw Doppler). */
+export const speedSampleOf = (tMs: number, state: FilterState, frame: PlaneFrame): SpeedSample => {
+  const at = latLngOf(state.x, frame);
+  return {
+    recorded_at: iso(tMs),
+    lat: at.lat,
+    lng: at.lng,
+    speed_kmh: speedOf(state.x) * 3.6,
+    speed_accuracy_mps: speedSigmaOf(state.x, state.p),
+    horizontal_accuracy_m: positionSigmaOf(state.p),
+  };
+};
+
+/**
+ * The interval between two filter steps, or null when it does not count. Uncertainty bound, not a
+ * time bound: stop claiming distance once we no longer know where the player is.
+ */
+export const filterSpanOf = ({
+  segmentId,
+  previousStep,
+  previousState,
+  step,
+  state,
+  frame,
+}: {
+  segmentId: string;
+  previousStep: FilterStep;
+  previousState: FilterState;
+  step: FilterStep;
+  state: FilterState;
+  frame: PlaneFrame;
+}): BridgedSpan | null => {
+  if (positionSigmaOf(step.pPred) > GAP_POSITION_SIGMA_MAX_M) return null;
+  const metres = ((speedOf(previousState.x) + speedOf(state.x)) / 2) * step.dt;
+  const meanKmh = (metres / step.dt) * 3.6;
+  if (meanKmh >= TOP_SPEED_CEILING_KMH) return null;
+  return {
+    segmentId,
+    startMs: previousStep.tMs,
+    endMs: step.tMs,
+    metres,
+    speedKmh: meanKmh,
+    fromOs: step.speedUsed || previousStep.speedUsed,
+    from: latLngOf(previousState.x, frame),
+    to: latLngOf(state.x, frame),
+  };
+};
+
+/**
+ * C3.4 for one fix-to-fix interval: the steps counted across it (null when there is no reading),
+ * and — when the filter did not measure it — the step-bridged span. 0 steps is a measured 0 (§3.5:
+ * standing still); a missing reading is no evidence.
+ */
+export const stepBridgeOf = ({
+  segmentId,
+  previous,
+  point,
+  measured,
+  crossesManualPause,
+  stride,
+}: {
+  segmentId: string;
+  previous: AdmittedPoint;
+  point: AdmittedPoint;
+  measured: boolean;
+  crossesManualPause: boolean;
+  stride: StrideEstimate;
+}): { steps: number | null; span: BridgedSpan | null } => {
+  if (point.atMs <= previous.atMs || crossesManualPause) return { steps: null, span: null };
+  const steps = stepDelta({
+    fromCount: previous.stepCount,
+    fromMs: previous.atMs,
+    toCount: point.stepCount,
+    toMs: point.atMs,
   });
+  if (steps == null || measured) return { steps, span: null };
+  const seconds = (point.atMs - previous.atMs) / 1000;
+  const metres = stepMetres({ steps, seconds, stride });
+  if (metres <= 0) return { steps, span: null };
+  return {
+    steps,
+    span: {
+      segmentId,
+      startMs: previous.atMs,
+      endMs: point.atMs,
+      metres,
+      speedKmh: (metres / seconds) * 3.6,
+      fromOs: false,
+      fromSteps: true,
+      from: previous,
+      to: point,
+    },
+  };
+};
+
+/** A long silence or a manual pause starts a fresh run: the old state says nothing about now. */
+export const startsNewRun = ({
+  previous,
+  point,
+  crossesManualPause,
+}: {
+  previous: AdmittedPoint | undefined;
+  point: AdmittedPoint;
+  crossesManualPause: (fromMs: number, toMs: number) => boolean;
+}) =>
+  !previous ||
+  (point.atMs - previous.atMs) / 1000 > FILTER_RESET_GAP_SECONDS ||
+  crossesManualPause(previous.atMs, point.atMs);
+
+/** Manual pauses of one segment, as the run-break / step-bridge test. */
+export const manualPauseCrossing = (pauses: ComputationPause[], segmentId: string) => {
+  const manual = pauses.filter(
+    (pause) => pause.segmentId === segmentId && pause.reason === 'manual',
+  );
+  return (fromMs: number, toMs: number) =>
+    pauseOverlapSec({ startMs: fromMs, endMs: toMs, pauses: manual }) > 0;
 };
 
 /**
@@ -584,12 +748,7 @@ const buildV3Spans = ({
   sensors: boolean;
 }): SpanBuild => {
   const stride: StrideEstimate = input.stride ?? DEFAULT_STRIDE;
-  const admitted = input.points
-    .filter(
-      (point) => segmentIds.has(point.segmentId) && passesContinuityGate(point.horizontalAccuracyM),
-    )
-    .map((point) => ({ ...point, atMs: Date.parse(point.recordedAt) }))
-    .sort((a, b) => a.atMs - b.atMs);
+  const admitted = admittedPoints(input.points, segmentIds).sort((a, b) => a.atMs - b.atMs);
 
   const spans: BridgedSpan[] = [];
   const acceptedCount = new Map<string, number>();
@@ -598,49 +757,23 @@ const buildV3Spans = ({
   const strideTotals = new Map<StrideSample['band'], { metres: number; steps: number }>();
   let zuptFixCount = 0;
 
-  const origin = admitted[0];
-  const toFix = (point: (typeof admitted)[number], zupt: boolean): FilterFix => ({
-    tMs: point.atMs,
-    x: (point.lng - (origin?.lng ?? 0)) * scale.mPerDegLng,
-    y: (point.lat - (origin?.lat ?? 0)) * scale.mPerDegLat,
-    horizontalAccuracyM: point.horizontalAccuracyM ?? Number.POSITIVE_INFINITY,
-    speedMps:
-      point.speedKmh != null && point.speedKmh >= 0 && point.speedKmh < TOP_SPEED_CEILING_KMH
-        ? point.speedKmh / 3.6
-        : null,
-    speedAccuracyMps: point.speedAccuracyMps,
-    provider: point.provider ?? null,
-    zupt,
-  });
-  const toLatLng = (state: number[]): LatLng => ({
-    lat: (origin?.lat ?? 0) + state[1]! / scale.mPerDegLat,
-    lng: (origin?.lng ?? 0) + state[0]! / scale.mPerDegLng,
-  });
+  const frame: PlaneFrame = { origin: admitted[0] ?? null, scale };
 
-  const bySegment = new Map<string, typeof admitted>();
-  admitted.forEach((point) => {
-    bySegment.set(point.segmentId, [...(bySegment.get(point.segmentId) ?? []), point]);
-  });
+  const bySegment = new Map<string, AdmittedPoint[]>();
+  admitted.forEach((point) => pushTo(bySegment, point.segmentId, point));
 
   bySegment.forEach((points, segmentId) => {
-    const manualPauses = input.pauses.filter(
-      (pause) => pause.segmentId === segmentId && pause.reason === 'manual',
-    );
-    const crossesManualPause = (fromMs: number, toMs: number) =>
-      pauseOverlapSec({ startMs: fromMs, endMs: toMs, pauses: manualPauses }) > 0;
+    const crossesManualPause = manualPauseCrossing(input.pauses, segmentId);
     const zupt = sensors ? zeroVelocityFlags(points) : points.map(() => false);
 
-    // A long silence or a manual pause starts a fresh run: the old state says nothing about now.
-    const runs: { point: (typeof admitted)[number]; zupt: boolean }[][] = [];
+    const runs: { point: AdmittedPoint; zupt: boolean }[][] = [];
     points.forEach((point, index) => {
-      const previous = points[index - 1];
-      const breaks =
-        !previous ||
-        (point.atMs - previous.atMs) / 1000 > FILTER_RESET_GAP_SECONDS ||
-        crossesManualPause(previous.atMs, point.atMs);
       const entry = { point, zupt: zupt[index]! };
-      if (breaks) runs.push([entry]);
-      else runs[runs.length - 1]!.push(entry);
+      if (startsNewRun({ previous: points[index - 1], point, crossesManualPause })) {
+        runs.push([entry]);
+      } else {
+        runs[runs.length - 1]!.push(entry);
+      }
     });
 
     /** End time of every fix-to-fix interval the filter measured. */
@@ -649,7 +782,7 @@ const buildV3Spans = ({
 
     runs.forEach((run) => {
       const steps = filterRun(
-        run.map((entry) => toFix(entry.point, entry.zupt)),
+        run.map((entry) => filterFixOf(entry.point, frame, entry.zupt)),
         FILTER_TUNING,
       );
       const states = smooth
@@ -662,73 +795,35 @@ const buildV3Spans = ({
           acceptedCount.set(segmentId, (acceptedCount.get(segmentId) ?? 0) + 1);
         }
         if (step.zupt) zuptFixCount += 1;
-        const at = toLatLng(state.x);
-        speedSamples.set(segmentId, [
-          ...(speedSamples.get(segmentId) ?? []),
-          {
-            recorded_at: iso(step.tMs),
-            lat: at.lat,
-            lng: at.lng,
-            speed_kmh: speedOf(state.x) * 3.6,
-            speed_accuracy_mps: speedSigmaOf(state.x, state.p),
-            horizontal_accuracy_m: positionSigmaOf(state.p),
-          },
-        ]);
+        pushTo(speedSamples, segmentId, speedSampleOf(step.tMs, state, frame));
 
         const previousStep = steps[index - 1];
         const previousState = states[index - 1];
         if (!previousStep || !previousState) return;
-        // Uncertainty bound, not a time bound: stop claiming distance once we no longer know
-        // where the player is.
-        if (positionSigmaOf(step.pPred) > GAP_POSITION_SIGMA_MAX_M) return;
-        const metres = ((speedOf(previousState.x) + speedOf(state.x)) / 2) * step.dt;
-        const meanKmh = (metres / step.dt) * 3.6;
-        if (meanKmh >= TOP_SPEED_CEILING_KMH) return;
+        const span = filterSpanOf({ segmentId, previousStep, previousState, step, state, frame });
+        if (!span) return;
         measuredEnds.add(step.tMs);
-        segmentSpans.push({
-          segmentId,
-          startMs: previousStep.tMs,
-          endMs: step.tMs,
-          metres,
-          speedKmh: meanKmh,
-          fromOs: step.speedUsed || previousStep.speedUsed,
-          from: toLatLng(previousState.x),
-          to: at,
-        });
+        segmentSpans.push(span);
       });
     });
 
     if (sensors) {
       // C3.4: where GPS measured nothing between two fixes, the step counter says how far — not
-      // where. 0 steps is a measured 0 (§3.5: standing still); a missing reading is no evidence.
+      // where.
       let stepsBetweenFixes = 0;
       points.forEach((point, index) => {
         const previous = points[index - 1];
-        if (!previous || point.atMs <= previous.atMs) return;
-        if (crossesManualPause(previous.atMs, point.atMs)) return;
-        const steps = stepDelta({
-          fromCount: previous.stepCount,
-          fromMs: previous.atMs,
-          toCount: point.stepCount,
-          toMs: point.atMs,
-        });
-        if (steps == null) return;
-        stepsBetweenFixes += steps;
-        if (measuredEnds.has(point.atMs)) return;
-        const seconds = (point.atMs - previous.atMs) / 1000;
-        const metres = stepMetres({ steps, seconds, stride });
-        if (metres <= 0) return;
-        segmentSpans.push({
+        if (!previous) return;
+        const bridge = stepBridgeOf({
           segmentId,
-          startMs: previous.atMs,
-          endMs: point.atMs,
-          metres,
-          speedKmh: (metres / seconds) * 3.6,
-          fromOs: false,
-          fromSteps: true,
-          from: previous,
-          to: point,
+          previous,
+          point,
+          measured: measuredEnds.has(point.atMs),
+          crossesManualPause: crossesManualPause(previous.atMs, point.atMs),
+          stride,
         });
+        stepsBetweenFixes += bridge.steps ?? 0;
+        if (bridge.span) segmentSpans.push(bridge.span);
       });
 
       const segment = input.segments.find((row) => row.id === segmentId);
@@ -777,7 +872,7 @@ const buildV3Spans = ({
  * Steps the segment counted that no fix-to-fix interval accounts for — before the first fix, after
  * the last, or all of them when GPS supplied nothing — as metres at the player's stride.
  */
-const residualStepMetres = ({
+export const residualStepMetres = ({
   segment,
   pauses,
   stepsBetweenFixes,
