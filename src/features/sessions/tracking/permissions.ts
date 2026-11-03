@@ -23,6 +23,26 @@ const requestAndroidNotificationPermission = async () => {
   }
 };
 
+/**
+ * Amendment 03 C3: Android 10+ gates the step counter behind ACTIVITY_RECOGNITION. The location task
+ * reads it natively; without the grant it never reports and sessions measure from GPS alone, so a
+ * refusal is not a reason to stop the session.
+ */
+export const requestActivityRecognitionPermission = async () => {
+  if (Platform.OS !== 'android') return true;
+  if (typeof Platform.Version === 'number' && Platform.Version < 29) return true;
+
+  try {
+    const permission = PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION;
+    if (await PermissionsAndroid.check(permission)) return true;
+    const result = await PermissionsAndroid.request(permission);
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  } catch (error) {
+    console.warn('[permissions] activity recognition request failed', error);
+    return false;
+  }
+};
+
 export const requestTrackingPermissions = async ({
   requestBackground = true,
 }: { requestBackground?: boolean } = {}): Promise<TrackingPermissionResult> => {

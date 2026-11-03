@@ -4,6 +4,9 @@
  *
  * Pure: no React Native, no SQLite — the summary, the live snapshot and the replay tests all run
  * the same code. The summary adds the backward RTS pass (`smoothRun`); live uses the forward pass.
+ *
+ * C2: a fix flagged `zupt` (motion sensors agree the player is standing) observes v = (0, 0) with
+ * near-zero noise instead of its Doppler reading. Deciding *when* is the caller's job.
  */
 
 type Vec = number[];
@@ -40,6 +43,8 @@ export type FilterTuning = {
    * speed to exactly 0 when it decides the receiver is static (21 Oct trace).
    */
   stationarySpeedMps: number;
+  /** C2 ZUPT: σ of the v = 0 observation (m/s). Tiny — the filter takes it as near-certain. */
+  zuptSpeedSigmaMps: number;
 };
 
 export type FilterFix = {
@@ -52,6 +57,8 @@ export type FilterFix = {
   speedMps: number | null;
   speedAccuracyMps: number | null;
   provider: 'gps' | 'fused' | null;
+  /** C2: independent sensors agree the player is not moving — observe v = 0, near-certain. */
+  zupt?: boolean;
 };
 
 export type FilterStep = {
@@ -65,6 +72,8 @@ export type FilterStep = {
   pFilt: Mat;
   positionAccepted: boolean;
   speedUsed: boolean;
+  /** A zero-velocity update was applied at this fix. */
+  zupt: boolean;
 };
 
 const zeros = (rows: number, cols: number): Mat =>
@@ -246,7 +255,24 @@ const applyFix = ({
   if (positioned) state = positioned;
 
   let speedUsed = false;
-  if (fix.speedMps != null && fix.speedMps >= 0) {
+  if (fix.zupt) {
+    const sz = tuning.zuptSpeedSigmaMps;
+    state = update({
+      x: state.x,
+      p: state.p,
+      h: [
+        [0, 0, 1, 0],
+        [0, 0, 0, 1],
+      ],
+      z: [0, 0],
+      r: [
+        [sz * sz, 0],
+        [0, sz * sz],
+      ],
+      gate: null,
+    })!;
+    speedUsed = true;
+  } else if (fix.speedMps != null && fix.speedMps >= 0) {
     const ss = speedSigma(fix, tuning);
     if (fix.speedMps <= tuning.stationarySpeedMps) {
       // "Not moving" carries no heading, so it constrains both velocity components.
@@ -303,11 +329,13 @@ const inflateForManeuver = ({
   dt: number;
   tuning: FilterTuning;
 }): Mat => {
-  if (fix.speedMps == null) return pPred;
+  // A ZUPT is a speed reading of exactly 0 — a stop breaks the model just as a start does.
+  const observed = fix.zupt ? 0 : fix.speedMps;
+  if (observed == null) return pPred;
   const predicted = Math.hypot(xPred[2]!, xPred[3]!);
-  const ss = speedSigma(fix, tuning);
+  const ss = fix.zupt ? tuning.zuptSpeedSigmaMps : speedSigma(fix, tuning);
   const spread = Math.sqrt(Math.max(0, (pPred[2]![2]! + pPred[3]![3]!) / 2));
-  const miss = fix.speedMps - predicted;
+  const miss = observed - predicted;
   if (Math.abs(miss) <= 3 * Math.hypot(ss, spread)) return pPred;
   const velocityVar = (miss * miss) / 2;
   const positionVar = ((miss * dt) / 2) ** 2 / 2;
@@ -318,8 +346,10 @@ const inflateForManeuver = ({
 
 const initialState = (fix: FilterFix, tuning: FilterTuning) => {
   const sp = positionSigma(fix, tuning);
-  const speed = fix.speedMps ?? 0;
-  const velocityVar = speed * speed + speedSigma(fix, tuning) ** 2;
+  const speed = fix.zupt ? 0 : (fix.speedMps ?? 0);
+  const velocityVar = fix.zupt
+    ? tuning.zuptSpeedSigmaMps ** 2
+    : speed * speed + speedSigma(fix, tuning) ** 2;
   return {
     x: [fix.x, fix.y, 0, 0],
     p: [
@@ -355,7 +385,8 @@ export const filterRun = (fixes: FilterFix[], tuning: FilterTuning): FilterStep[
         xFilt: x,
         pFilt: p,
         positionAccepted: true,
-        speedUsed: false,
+        speedUsed: fix.zupt === true,
+        zupt: fix.zupt === true,
       });
       updates = 1;
       continue;
@@ -396,6 +427,7 @@ export const filterRun = (fixes: FilterFix[], tuning: FilterTuning): FilterStep[
       pFilt: p,
       positionAccepted: next.positionAccepted,
       speedUsed: next.speedUsed,
+      zupt: fix.zupt === true,
     });
   }
   return steps;

@@ -5,7 +5,11 @@ import type {
 } from '../tracking/types';
 import type { SpeedBandBoundaries } from './speed-bands';
 import type { SpeedSource } from './types';
-import type { StoredSegmentMetrics, StoredSessionMetrics, StoredSprintEffort } from './metrics-store';
+import type {
+  StoredSegmentMetrics,
+  StoredSessionMetrics,
+  StoredSprintEffort,
+} from './metrics-store';
 
 const locationOf = (lat: number | null, lng: number | null) =>
   lat == null || lng == null ? null : { lat, lng };

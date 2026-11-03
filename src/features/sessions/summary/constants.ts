@@ -1,8 +1,11 @@
 /** Bump when the same trace would store different numbers. See spec §6.2. */
-export const ALGORITHM_VERSION = 'v3';
+export const ALGORITHM_VERSION = 'v3.1';
 
 /** The previous pipeline, still computed alongside v3 for comparison (Amendment 03 §4). */
 export const LEGACY_ALGORITHM_VERSION = 'v2';
+
+/** The filter without motion sensors (Amendment 03 phase 1) — `{ sensors: false }`, comparison only. */
+export const FILTER_ONLY_ALGORITHM_VERSION = 'v3';
 
 /**
  * Amendment 03 §4 flag: at session end also compute v2 and the Doppler-integrated reference, store
@@ -55,6 +58,50 @@ export const GAP_POSITION_SIGMA_MAX_M = 12;
 
 /** Longer than this between fixes starts a fresh filter run — the old state means nothing now. */
 export const FILTER_RESET_GAP_SECONDS = 30;
+
+// --- v3.1 motion sensors (Amendment 03 C2 / C3) ---------------------------------------------
+
+/**
+ * C2 ZUPT: v = 0 observed with this σ (m/s) — near-certain, so velocity and distance stop. Only
+ * applied when at least ZUPT_MIN_VOTES of the three stillness signals below agree.
+ */
+export const ZUPT_SPEED_SIGMA_MPS = 0.05;
+export const ZUPT_MIN_VOTES = 2;
+/** Doppler vote: every fix in the trailing window at or below this (m/s). Walking is ~1.2–1.5. */
+export const ZUPT_DOPPLER_MAX_MPS = 0.5;
+/** Window the Doppler and step votes look back over (s) — "sustained", not one quiet reading. */
+export const ZUPT_SUSTAIN_SECONDS = 3;
+/**
+ * Accelerometer vote: variance of |a| over the interval since the previous fix, (m/s²)². Phone
+ * held still or in a pocket of a standing player reads ~0.001–0.02; walking reads ≥ 0.5.
+ */
+export const ZUPT_ACCEL_VARIANCE_MAX = 0.1;
+
+/**
+ * C3 stride bands (steps / min). Below: walking stride; at or above: running stride. NRC's own
+ * figures (0.92 m at 147 spm, 0.98 m at 134 spm) sit in the run band.
+ */
+export const STRIDE_RUN_CADENCE_SPM = 120;
+/** Population defaults until the player has STRIDE_MIN_SESSION_STEPS of clean sessions (§5). */
+export const STRIDE_DEFAULT_WALK_M = 0.7;
+export const STRIDE_DEFAULT_RUN_M = 0.95;
+/** Learned stride is clamped here — anything outside is a measurement problem, not a gait. */
+export const STRIDE_MIN_M = 0.4;
+export const STRIDE_MAX_M = 1.8;
+/** C3.3: a band needs this many steps in one clean session before it teaches a stride. */
+export const STRIDE_MIN_SESSION_STEPS = 150;
+/** Steps in the band across learned sessions before the learned stride replaces the default. */
+export const STRIDE_MIN_LEARNED_STEPS = 300;
+/** Learned stride averages this many of the player's most recent clean sessions per band. */
+export const STRIDE_LEARN_SESSIONS = 10;
+/** Calibration chunks: contiguous GPS-measured time is cut into windows this long (s). */
+export const STRIDE_CHUNK_SECONDS = 10;
+/** Faster than this between two readings is a counter fault or reset, not running (steps / s). */
+export const STEP_MAX_RATE_PER_S = 5;
+/** Steps outside fix coverage below this are counter latency, not movement. */
+export const STEP_RESIDUAL_MIN_STEPS = 10;
+/** C3.2: step-implied distance this far from GPS distance (either way) flags the session. */
+export const STEP_CROSSCHECK_MAX_DIVERGENCE = 0.25;
 export const SPRINT_MIN_SECONDS = 1;
 export const SPRINT_MIN_FIXES = 2;
 export const SPRINT_MIN_DISPLACEMENT_M = 5;

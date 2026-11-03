@@ -1,5 +1,6 @@
 import { AppState } from 'react-native';
 import { toComputationInput } from '../summary/computation-input';
+import { getStrideEstimate } from '../summary/stride-store';
 import { plannedMinutesForSegment, segmentLabelFor } from '../segment-display';
 import {
   LIVE_SNAPSHOT_ACTIVE_INTERVAL_MS,
@@ -43,6 +44,7 @@ export const computeLiveSnapshot = async (
     getPointsForSession(sessionId),
   ]);
   if (!session || session.ended_at || session.tracking_status === 'ended') return null;
+  const stride = await getStrideEstimate(session.user_id ?? null);
 
   const segment =
     segments.filter((row) => !row.ended_at).sort((a, b) => b.segment_index - a.segment_index)[0] ??
@@ -55,6 +57,7 @@ export const computeLiveSnapshot = async (
       segments,
       pauses,
       points,
+      stride,
       openEndsAt: nowIso,
       computedAt: nowIso,
     }),

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { scaleAtLatitude } from '../tracking/geodesic';
-import { computeSessionMetrics, dopplerReferenceDistanceM } from './compute-session-metrics';
+import {
+  computeSessionMetrics,
+  dopplerReferenceDistanceM,
+  zeroVelocityFlags,
+} from './compute-session-metrics';
+import { strideFromSamples, type StrideEstimate } from './steps';
 import type { ComputationInput, ComputationPoint, ComputationSegment } from './types';
 
 const scale = scaleAtLatitude(6.45);
@@ -452,8 +457,9 @@ const noisyTrail = ({
 };
 
 describe('computeSessionMetrics — v3 (Amendment 03)', () => {
-  it('stores v3 by default', () => {
-    expect(computeSessionMetrics(baseInput()).algorithmVersion).toBe('v3');
+  it('stores v3.1 by default and reproduces v3 with sensors off', () => {
+    expect(computeSessionMetrics(baseInput()).algorithmVersion).toBe('v3.1');
+    expect(computeSessionMetrics(baseInput(), { sensors: false }).algorithmVersion).toBe('v3');
   });
 
   it('reads a steady jog within 3% of truth where the position sum inflates', () => {
@@ -568,5 +574,259 @@ describe('computeSessionMetrics — v3 (Amendment 03)', () => {
       speedNoiseMps: 0,
     });
     expect(dopplerReferenceDistanceM(baseInput({ points }))).toBeCloseTo(trueMetres, 0);
+  });
+});
+
+/** Attach a pedometer reading (cumulative, from a since-boot base) and accel variance to each fix. */
+const withSensors = (
+  points: ComputationPoint[],
+  {
+    stepsPerSecond,
+    accelVariance,
+    base = 41_000,
+  }: {
+    stepsPerSecond: number | ((secondsIn: number) => number);
+    accelVariance: number | null;
+    base?: number;
+  },
+): ComputationPoint[] => {
+  const rate = typeof stepsPerSecond === 'number' ? () => stepsPerSecond : stepsPerSecond;
+  let steps = base;
+  let lastT = Date.parse(points[0]!.recordedAt);
+  return points.map((point) => {
+    const t = Date.parse(point.recordedAt);
+    for (let s = lastT; s < t; s += 1000) steps += rate((s - origin) / 1000);
+    lastT = t;
+    return { ...point, stepCount: Math.floor(steps), accelVariance };
+  });
+};
+
+const stride: StrideEstimate = { walkM: 0.7, runM: 1, walkLearned: true, runLearned: true };
+
+describe('computeSessionMetrics — v3.1 motion sensors (Amendment 03 C2 / C3)', () => {
+  const still = (overrides: Partial<{ speedNoiseMps: number; seed: number }> = {}) =>
+    noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 0),
+      scatterM: 5,
+      // The chip does not always pin 0 — a noisy Doppler that reads up to ~1 m/s at rest.
+      speedNoiseMps: overrides.speedNoiseMps ?? 0.4,
+      seed: overrides.seed ?? 11,
+    }).points;
+
+  it('votes stillness only when two of Doppler, steps and accelerometer agree', () => {
+    const base: {
+      speedKmh: number | null;
+      stepCount: number | null;
+      accelVariance: number | null;
+    } = { speedKmh: 0, stepCount: 100, accelVariance: 0.01 };
+    const series = (patch: Partial<typeof base>) =>
+      Array.from({ length: 6 }, (_, t) => ({ atMs: t * 1000, ...base, ...patch }));
+    expect(zeroVelocityFlags(series({})).slice(3)).toEqual([true, true, true]);
+    // Doppler + accel (no pedometer): two votes.
+    expect(zeroVelocityFlags(series({ stepCount: null })).at(-1)).toBe(true);
+    // Steps + accel while Doppler reads walking pace: still two.
+    expect(zeroVelocityFlags(series({ speedKmh: 4 })).at(-1)).toBe(true);
+    // Accelerometer alone: never.
+    expect(zeroVelocityFlags(series({ speedKmh: 4, stepCount: null })).at(-1)).toBe(false);
+    // Doppler alone: never.
+    expect(zeroVelocityFlags(series({ accelVariance: 2, stepCount: null })).at(-1)).toBe(false);
+    // Doppler quiet for one fix is not sustained.
+    const blip = series({ accelVariance: 2, stepCount: null }).map((point, t) => ({
+      ...point,
+      speedKmh: t === 5 ? 0 : 6,
+    }));
+    expect(zeroVelocityFlags(blip).at(-1)).toBe(false);
+  });
+
+  it('ZUPT removes the phantom distance of standing in scatter', () => {
+    const points = withSensors(still(), { stepsPerSecond: 0, accelVariance: 0.005 });
+    const input = baseInput({ points });
+    const v31 = computeSessionMetrics(input);
+    const v3 = computeSessionMetrics(input, { sensors: false });
+    const live = computeSessionMetrics(input, { smooth: false });
+    expect(v31.zuptFixCount).toBeGreaterThan(110);
+    expect(v31.distanceM).toBeLessThan(1);
+    expect(live.distanceM).toBeLessThan(1);
+    expect(v3.distanceM).toBeGreaterThan(v31.distanceM + 5);
+  });
+
+  it('never applies ZUPT on one signal: a jog with a quiet accelerometer is unchanged', () => {
+    const { points, trueMetres } = noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 8),
+      scatterM: 4,
+    });
+    // Armband phone: accelerometer reads quiet, but Doppler and steps both say moving.
+    const input = baseInput({
+      points: withSensors(points, { stepsPerSecond: 2.5, accelVariance: 0.01 }),
+    });
+    const v31 = computeSessionMetrics(input);
+    expect(v31.zuptFixCount).toBe(0);
+    expect(v31.distanceM).toBeCloseTo(
+      computeSessionMetrics(input, { sensors: false }).distanceM,
+      6,
+    );
+    expect(Math.abs(v31.distanceM - trueMetres) / trueMetres).toBeLessThan(0.03);
+  });
+
+  it('stops dead at a stoppage and picks the jog back up after it', () => {
+    const speeds = Array.from({ length: 151 }, (_, t) => (t < 50 || t >= 110 ? 8 : 0));
+    const { points, trueMetres } = noisyTrail({ speedsKmh: speeds, scatterM: 4, seed: 5 });
+    const input = baseInput({
+      segments: [segment({ id: 's1', index: 1, start: 0, end: 150 })],
+      points: withSensors(points, {
+        stepsPerSecond: (t) => (t < 50 || t >= 110 ? 2.5 : 0),
+        accelVariance: null,
+      }).map((point) => {
+        const t = (Date.parse(point.recordedAt) - origin) / 1000;
+        return { ...point, accelVariance: t < 50 || t >= 110 ? 3 : 0.005 };
+      }),
+    });
+    const v31 = computeSessionMetrics(input);
+    const v3 = computeSessionMetrics(input, { sensors: false });
+    expect(v31.zuptFixCount).toBeGreaterThan(50);
+    expect(Math.abs(v31.distanceM - trueMetres) / trueMetres).toBeLessThan(0.04);
+    expect(v31.distanceM).toBeLessThanOrEqual(v3.distanceM + 1);
+  });
+
+  it('bridges a GPS gap with steps × stride — distance only, never coverage', () => {
+    const before = noisyTrail({ speedsKmh: Array.from({ length: 30 }, () => 9), scatterM: 3 });
+    const after = noisyTrail({
+      speedsKmh: Array.from({ length: 30 }, () => 9),
+      scatterM: 3,
+      startT: 69,
+      seed: 9,
+    });
+    // 40 s with no fix at all (> the 30 s filter reset): 2.6 steps/s = 104 steps at 156 spm.
+    const points = withSensors([...before.points, ...after.points], {
+      stepsPerSecond: 2.6,
+      accelVariance: 3,
+    });
+    const input = baseInput({
+      segments: [segment({ id: 's1', index: 1, start: 0, end: 98 })],
+      points,
+      stride,
+    });
+    const v31 = computeSessionMetrics(input);
+    const v3 = computeSessionMetrics(input, { sensors: false });
+    const gapSteps = points[30]!.stepCount! - points[29]!.stepCount!;
+    expect(gapSteps).toBe(104);
+    expect(v31.stepBridgedDistanceM).toBeCloseTo(gapSteps * stride.runM, 6);
+    expect(v31.distanceM).toBeCloseTo(v3.distanceM + v31.stepBridgedDistanceM, 6);
+    // Truth: 98 s at 2.5 m/s. Coverage (gap) still reports GPS honestly.
+    expect(Math.abs(v31.distanceM - 98 * 2.5) / (98 * 2.5)).toBeLessThan(0.08);
+    expect(v31.gapSeconds).toBe(v3.gapSeconds);
+    expect(v31.sprintCount).toBe(0);
+  });
+
+  it('bridges nothing across a gap with no steps (standing) or across a manual pause', () => {
+    const before = noisyTrail({ speedsKmh: Array.from({ length: 30 }, () => 9), scatterM: 3 });
+    const after = noisyTrail({
+      speedsKmh: Array.from({ length: 30 }, () => 9),
+      scatterM: 3,
+      startT: 69,
+      seed: 9,
+    });
+    const gapRate = (t: number) => (t >= 29 && t < 69 ? 0 : 2.6);
+    const standing = baseInput({
+      segments: [segment({ id: 's1', index: 1, start: 0, end: 98 })],
+      points: withSensors([...before.points, ...after.points], {
+        stepsPerSecond: gapRate,
+        accelVariance: 3,
+      }),
+      stride,
+    });
+    expect(computeSessionMetrics(standing).stepBridgedDistanceM).toBe(0);
+
+    const paused = baseInput({
+      segments: [segment({ id: 's1', index: 1, start: 0, end: 98 })],
+      points: withSensors([...before.points, ...after.points], {
+        stepsPerSecond: 2.6,
+        accelVariance: 3,
+      }),
+      pauses: [{ segmentId: 's1', reason: 'manual', startedAt: at(35), endedAt: at(60) }],
+      stride,
+    });
+    expect(computeSessionMetrics(paused).stepBridgedDistanceM).toBe(0);
+  });
+
+  it('measures a segment GPS never covered from its step count alone (C3.4)', () => {
+    const input = baseInput({
+      segments: [{ ...segment({ id: 's1', index: 1, start: 0, end: 600 }), stepCount: 1500 }],
+      points: [],
+      stride,
+    });
+    const result = computeSessionMetrics(input);
+    // 150 spm → run stride.
+    expect(result.distanceM).toBeCloseTo(1500 * stride.runM, 6);
+    expect(result.stepBridgedDistanceM).toBe(result.distanceM);
+    expect(result.stepCount).toBe(1500);
+    expect(result.dataQuality).toBe('insufficient');
+    expect(result.topSpeedKmh).toBeNull();
+    expect(computeSessionMetrics(input, { sensors: false }).distanceM).toBe(0);
+  });
+
+  it('uses the population default stride until the player has one', () => {
+    const input = baseInput({
+      segments: [{ ...segment({ id: 's1', index: 1, start: 0, end: 600 }), stepCount: 600 }],
+    });
+    // 60 spm → walk band, default 0.7 m.
+    expect(computeSessionMetrics(input).distanceM).toBeCloseTo(600 * 0.7, 6);
+  });
+
+  it('learns metres per step from GPS-measured stretches (C3.3)', () => {
+    const { points } = noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 8),
+      scatterM: 4,
+    });
+    const result = computeSessionMetrics(
+      baseInput({ points: withSensors(points, { stepsPerSecond: 2.5, accelVariance: 3 }) }),
+    );
+    const run = result.strideSamples.find((sample) => sample.band === 'run');
+    expect(run).toBeDefined();
+    expect(run!.steps).toBeGreaterThan(250);
+    // 8 km/h at 2.5 steps/s = 0.889 m per step.
+    expect(Math.abs(run!.metres / run!.steps - 8 / 3.6 / 2.5)).toBeLessThan(0.04);
+    expect(result.strideSamples.find((sample) => sample.band === 'walk')).toBeUndefined();
+  });
+
+  it('ignores a counter that went backwards (reboot) instead of bridging with it', () => {
+    const before = noisyTrail({ speedsKmh: Array.from({ length: 30 }, () => 9), scatterM: 3 });
+    const after = noisyTrail({
+      speedsKmh: Array.from({ length: 30 }, () => 9),
+      scatterM: 3,
+      startT: 69,
+      seed: 9,
+    });
+    const points = [
+      ...withSensors(before.points, { stepsPerSecond: 2.6, accelVariance: 3 }),
+      ...withSensors(after.points, { stepsPerSecond: 2.6, accelVariance: 3, base: 10 }),
+    ];
+    const input = baseInput({
+      segments: [segment({ id: 's1', index: 1, start: 0, end: 98 })],
+      points,
+      stride,
+    });
+    expect(computeSessionMetrics(input).stepBridgedDistanceM).toBe(0);
+  });
+});
+
+describe('strideFromSamples (C3.3)', () => {
+  it('keeps the population default until a band has enough steps behind it', () => {
+    const stride = strideFromSamples([{ band: 'run', metres: 180, steps: 200 }]);
+    expect(stride.runLearned).toBe(false);
+    expect(stride.runM).toBe(0.95);
+    expect(stride.walkM).toBe(0.7);
+  });
+
+  it('pools sessions per band and clamps an implausible stride', () => {
+    const stride = strideFromSamples([
+      { band: 'run', metres: 450, steps: 500 },
+      { band: 'run', metres: 470, steps: 500 },
+      { band: 'walk', metres: 2000, steps: 400 },
+    ]);
+    expect(stride.runLearned).toBe(true);
+    expect(stride.runM).toBeCloseTo(0.92, 6);
+    expect(stride.walkLearned).toBe(true);
+    expect(stride.walkM).toBe(1.8);
   });
 });

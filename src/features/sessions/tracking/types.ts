@@ -116,6 +116,8 @@ export type TrackingSegmentRow = {
   activity_kind: ActivityKind | null;
   started_at: string;
   ended_at: string | null;
+  /** Amendment 03 C3.1: steps counted in the segment, manual pauses excluded. Local only. */
+  step_count: number | null;
 };
 
 export type TrackingPauseRow = {
@@ -140,6 +142,13 @@ export type TrackingPointRow = {
   horizontal_accuracy_m: number | null;
   /** Null on points recorded before Amendment 03. Local only — not uploaded. */
   provider: TrackPointProvider;
+  /**
+   * Amendment 03 C3: the pedometer's cumulative counter when the fix arrived (Android, read natively
+   * by the location task). Only differences mean anything. Null without a reading. Local only.
+   */
+  step_count: number | null;
+  /** Amendment 03 C2: variance of |acceleration| since the previous fix, (m/s²)². Local only. */
+  accel_variance: number | null;
 };
 
 /**

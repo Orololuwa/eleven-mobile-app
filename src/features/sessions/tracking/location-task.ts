@@ -9,13 +9,17 @@ import {
   LOCATION_TASK_NAME,
   LOCATION_WATCHDOG_INTERVAL_MS,
 } from './constants';
+import { stepDelta } from '../summary/steps';
 import {
+  addSegmentSteps,
   closeOpenPause,
   closePause,
   getActiveTrackingSession,
+  getLatestPointStepCount,
   getOpenPause,
   insertPause,
   insertTrackPoint,
+  markSegmentStepsCounted,
   recordLatestFix,
   updateSessionFields,
 } from './db';
@@ -42,6 +46,12 @@ let lastNotificationBody = 'Tracking session…';
 /** Cleared at the first line of stop; set when start succeeds. Leftover fixes with no session stop. */
 let trackingDesired = false;
 let lastNullSessionWarnAtMs = 0;
+/**
+ * Amendment 03 C3.1: the last pedometer reading seen, and the segment it was counted toward (null
+ * while paused or between segments, so those steps never land in a segment).
+ */
+let stepBaseline: { segmentId: string | null; count: number; atMs: number } | null = null;
+const stepCountedSegments = new Set<string>();
 
 export type { LatestFix };
 
@@ -68,6 +78,65 @@ const speedMsToKmh = (speedMs: number | null) =>
 
 const normalizeSpeedAccuracyMps = (value: number | null | undefined) =>
   value != null && value >= 0 ? value : null;
+
+/**
+ * Amendment 03 C2 / C3: on Android every fix — direct GPS task and fused foreground watch alike — is
+ * stamped natively (with-direct-gps stage 5, `SessionMotion`) with the pedometer's cumulative count
+ * and the accelerometer variance since that stream's previous fix, so both keep counting while JS
+ * is frozen. Absent on iOS, and before the session task has registered.
+ */
+type MotionStamp = { steps?: unknown; accelVariance?: unknown };
+
+const finiteOrNull = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+
+const motionOf = (location: Location.LocationObject) => {
+  const stamp = location as Location.LocationObject & MotionStamp;
+  const steps = finiteOrNull(stamp.steps);
+  return {
+    stepCount: steps == null ? null : Math.round(steps),
+    accelVariance: finiteOrNull(stamp.accelVariance),
+  };
+};
+
+/**
+ * C3.1: add the steps since the last reading to the current segment. Counted whether or not the
+ * fix itself is usable — the step counter is what measures a GPS gap — but never during a manual
+ * pause or between segments.
+ */
+const recordSegmentSteps = async ({
+  segmentId,
+  stepCount,
+  atMs,
+}: {
+  segmentId: string | null;
+  stepCount: number | null;
+  atMs: number;
+}) => {
+  if (stepCount == null) return;
+  let baseline = stepBaseline;
+  if (!baseline && segmentId) {
+    // JS restarted mid-segment: resume from the newest reading stored on this segment's points.
+    const stored = await getLatestPointStepCount(segmentId);
+    if (stored && stored.atMs < atMs) {
+      baseline = { segmentId, count: stored.stepCount, atMs: stored.atMs };
+    }
+  }
+  stepBaseline = { segmentId, count: stepCount, atMs };
+  if (!segmentId) return;
+  if (!stepCountedSegments.has(segmentId)) {
+    stepCountedSegments.add(segmentId);
+    await markSegmentStepsCounted(segmentId);
+  }
+  if (!baseline || baseline.segmentId !== segmentId) return;
+  const steps = stepDelta({
+    fromCount: baseline.count,
+    fromMs: baseline.atMs,
+    toCount: stepCount,
+    toMs: atMs,
+  });
+  if (steps) await addSegmentSteps(segmentId, steps);
+};
 
 const startAutoPause = async ({
   sessionId,
@@ -203,6 +272,13 @@ const processFix = async (
   const inManualPause = session.tracking_status === 'manual_pause';
   const inAutoPause = session.tracking_status === 'auto_pause';
   const inActivity = session.current_segment_id != null;
+  const motion = motionOf(location);
+
+  await recordSegmentSteps({
+    segmentId: inActivity && !inManualPause ? session.current_segment_id : null,
+    stepCount: motion.stepCount,
+    atMs: timestamp,
+  });
 
   if (hasCoords && isAlive) {
     await updateSessionFields(session.id, {
@@ -238,6 +314,8 @@ const processFix = async (
       horizontalAccuracyM: accuracy,
       // Android's foreground watch is Play Services fused; everything else is the chip's own feed.
       provider: source === 'watch' && Platform.OS === 'android' ? 'fused' : 'gps',
+      stepCount: motion.stepCount,
+      accelVariance: motion.accelVariance,
     });
     console.log('[location-task] point', {
       source,
@@ -248,6 +326,8 @@ const processFix = async (
       lat: coords.latitude,
       lng: coords.longitude,
       speedKmh,
+      steps: motion.stepCount,
+      accelVariance: motion.accelVariance,
       // Raw value from expo-location: absent (`'absent'`) means the native layer sent no key —
       // either the OS fix had no speed accuracy or the with-speed-accuracy patch is missing.
       speedAccuracy:
