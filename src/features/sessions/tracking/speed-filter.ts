@@ -20,7 +20,9 @@ type WindowSample = { kmh: number; lat: number; lng: number };
 type WindowState = {
   anchorKmh: number;
   startedAtMs: number;
-  samples: WindowSample[];
+  count: number;
+  /** Fastest sample so far — the earliest one on a tie. */
+  peak: WindowSample;
 };
 
 export type TopSpeedPeak = { kmh: number; lat: number; lng: number };
@@ -66,24 +68,26 @@ const passesF3 = ({
 const withinBand = ({ readingKmh, anchorKmh }: { readingKmh: number; anchorKmh: number }) =>
   Math.abs(readingKmh - anchorKmh) / anchorKmh <= TOP_SPEED_BAND_RATIO;
 
-const windowPeak = (window: WindowState) =>
-  window.samples.reduce((best, sample) => (sample.kmh > best.kmh ? sample : best));
-
 const isConfirmed = (window: WindowState, atMs: number) =>
-  window.samples.length >= TOP_SPEED_MIN_FIXES &&
-  atMs - window.startedAtMs >= TOP_SPEED_SUSTAINED_MS;
+  window.count >= TOP_SPEED_MIN_FIXES && atMs - window.startedAtMs >= TOP_SPEED_SUSTAINED_MS;
+
+export type TopSpeedScanner = {
+  push: (point: SpeedPoint) => void;
+  peak: () => TopSpeedPeak | null;
+};
 
 /**
- * F1–F4 over stored fixes. Returns the confirmed peak and the fix that set it.
- * Live HUD uses the number; the summary copies the location before the trace is deleted.
+ * F1–F4 as a running scan: push fixes in time order, read the confirmed peak at any point. The
+ * live HUD keeps one per segment; `determineTopSpeedPeak` runs one over a whole list.
  */
-export const determineTopSpeedPeak = (points: SpeedPoint[]): TopSpeedPeak | null => {
-  const scale = scaleAtLatitude(points[0]?.lat ?? 0);
+export const createTopSpeedScanner = (): TopSpeedScanner => {
+  let scale: DegreeScale | null = null;
   let top: TopSpeedPeak | null = null;
   let openWindow: WindowState | null = null;
   let prev: SpeedPoint | null = null;
 
-  for (const point of points) {
+  const push = (point: SpeedPoint) => {
+    scale ??= scaleAtLatitude(point.lat);
     const speedKmh = point.speed_kmh;
     const isCandidate =
       speedKmh != null &&
@@ -96,28 +100,31 @@ export const determineTopSpeedPeak = (points: SpeedPoint[]): TopSpeedPeak | null
       const recordedAtMs = new Date(point.recorded_at).getTime();
       const sample = { kmh: speedKmh, lat: point.lat, lng: point.lng };
 
-      if (!openWindow) {
-        openWindow = { anchorKmh: speedKmh, startedAtMs: recordedAtMs, samples: [sample] };
-      } else if (withinBand({ readingKmh: speedKmh, anchorKmh: openWindow.anchorKmh })) {
-        const nextWindow: WindowState = {
-          anchorKmh: openWindow.anchorKmh,
-          startedAtMs: openWindow.startedAtMs,
-          samples: [...openWindow.samples, sample],
-        };
-        openWindow = nextWindow;
-        if (isConfirmed(nextWindow, recordedAtMs)) {
-          const peak = windowPeak(nextWindow);
-          if (!top || peak.kmh > top.kmh) top = peak;
+      if (openWindow && withinBand({ readingKmh: speedKmh, anchorKmh: openWindow.anchorKmh })) {
+        openWindow.count += 1;
+        if (sample.kmh > openWindow.peak.kmh) openWindow.peak = sample;
+        if (isConfirmed(openWindow, recordedAtMs) && (!top || openWindow.peak.kmh > top.kmh)) {
+          top = openWindow.peak;
         }
       } else {
-        openWindow = { anchorKmh: speedKmh, startedAtMs: recordedAtMs, samples: [sample] };
+        openWindow = { anchorKmh: speedKmh, startedAtMs: recordedAtMs, count: 1, peak: sample };
       }
     }
 
     prev = point;
-  }
+  };
 
-  return top;
+  return { push, peak: () => top };
+};
+
+/**
+ * F1–F4 over stored fixes. Returns the confirmed peak and the fix that set it.
+ * Live HUD uses the number; the summary copies the location before the trace is deleted.
+ */
+export const determineTopSpeedPeak = (points: SpeedPoint[]): TopSpeedPeak | null => {
+  const scanner = createTopSpeedScanner();
+  points.forEach(scanner.push);
+  return scanner.peak();
 };
 
 export const determineTopSpeedKmh = (points: SpeedPoint[]): number =>

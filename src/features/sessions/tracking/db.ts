@@ -568,6 +568,18 @@ export const getPointsForSession = async (sessionId: string): Promise<TrackingPo
     ),
   );
 
+/** Points stored after `afterSequenceIndex`, in insert order — the live tracker's catch-up read. */
+export const getPointsForSessionAfter = async (
+  sessionId: string,
+  afterSequenceIndex: number,
+): Promise<TrackingPointRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingPointRow>(
+      `SELECT * FROM tracking_points WHERE session_id = ? AND sequence_index > ? ORDER BY sequence_index ASC`,
+      [sessionId, afterSequenceIndex],
+    ),
+  );
+
 export const getPointsForSegment = async (segmentId: string): Promise<TrackingPointRow[]> =>
   withDb((db) =>
     db.getAllAsync<TrackingPointRow>(

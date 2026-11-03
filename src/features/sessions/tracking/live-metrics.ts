@@ -4,7 +4,7 @@ import {
   QUALITY_INSUFFICIENT_GAP,
   QUALITY_MIN_ACTIVE_SECONDS,
 } from '../summary/constants';
-import type { ComputationInput, ComputedSessionMetrics } from '../summary/types';
+import type { ComputationInput, DataQuality } from '../summary/types';
 import { LIVE_SIGNAL_SETTLE_SECONDS } from './constants';
 import { isFixFeedStale } from './fix-feed';
 import { passesContinuityGate, passesLiveQualityGate, passesQualityGate } from './fix-gates';
@@ -28,18 +28,37 @@ export const elapsedSecondsFromPauses = ({
   return Math.max(0, Math.floor((nowMs - startMs - pausedMs) / 1000));
 };
 
-const msOf = (point: { recordedAt: string }) => Date.parse(point.recordedAt);
+/**
+ * What the live readout is decided from: the numbers so far plus the newest fixes. Built by the
+ * full pass (`computeLiveReadout`) or the incremental one (live-tracker) — same decisions either way.
+ */
+export type LiveReadoutBasis = {
+  /** The open segment's (or, between segments, the session's) distance and top speed. */
+  distanceM: number;
+  topSpeedKmh: number | null;
+  /** Session-level, as the summary would classify it now. */
+  activeDurationSeconds: number;
+  gapSeconds: number;
+  dataQuality: DataQuality;
+  /** Stored fixes within the live gate. */
+  liveQualityFixCount: number;
+  /** Recorded times (ms) of the newest two of them, oldest first. */
+  recentFixTimesMs: number[];
+};
+
+/** Newest two of `timesMs`, oldest first — what `isMeasuringNow` needs from the trace. */
+export const newestTwo = (timesMs: number[]) => [...timesMs].sort((a, b) => a - b).slice(-2);
 
 /**
  * True when the latest two live-quality fixes are fresh and close enough to bridge (0.5 §3.3).
  * Uses the live gate (continuity-aligned), not the stricter summary quality gate.
  */
 export const isMeasuringNow = ({
-  points,
+  recentFixTimesMs,
   nowMs = Date.now(),
   latestFix,
 }: {
-  points: ComputationInput['points'];
+  recentFixTimesMs: number[];
   nowMs?: number;
   /** When the OS feed is fresh and live-quality, treat as measuring even if DB is one tick behind. */
   latestFix?: LatestFix | null;
@@ -53,11 +72,7 @@ export const isMeasuringNow = ({
     return true;
   }
 
-  const [previous, latest] = points
-    .filter((point) => passesLiveQualityGate(point.horizontalAccuracyM))
-    .map(msOf)
-    .sort((a, b) => a - b)
-    .slice(-2);
+  const [previous, latest] = newestTwo(recentFixTimesMs);
   return (
     previous != null &&
     latest != null &&
@@ -79,20 +94,18 @@ export const currentFixAccuracyM = ({
 };
 
 const insufficientSignal = ({
-  input,
-  computed,
+  basis,
+  nowMs,
   latestFix,
 }: {
-  input: ComputationInput;
-  computed: ComputedSessionMetrics;
+  basis: LiveReadoutBasis;
+  nowMs: number;
   /** `undefined` skips the feed check (unit tests). `null` means no fix has arrived. */
   latestFix?: LatestFix | null;
 }): LiveSignal => {
-  const { activeDurationSeconds, gapSeconds } = computed;
-  const nowMs = input.computedAt ? Date.parse(input.computedAt) : Date.now();
+  const { activeDurationSeconds, gapSeconds } = basis;
   const isLockingOn =
-    activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS &&
-    input.points.filter((point) => passesLiveQualityGate(point.horizontalAccuracyM)).length < 2;
+    activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS && basis.liveQualityFixCount < 2;
 
   if (latestFix !== undefined && isFixFeedStale({ fix: latestFix, nowMs })) {
     // Cold start before the first OS delivery still reads as settling, not offline.
@@ -103,7 +116,9 @@ const insufficientSignal = ({
   }
 
   if (isLockingOn) return 'settling';
-  if (!isMeasuringNow({ points: input.points, nowMs, latestFix })) return 'poor';
+  if (!isMeasuringNow({ recentFixTimesMs: basis.recentFixTimesMs, nowMs, latestFix })) {
+    return 'poor';
+  }
 
   // Summary floors (2 min / 120 fixes) keep dataQuality `insufficient` — that must not keep the
   // HUD on "early estimates" for minutes while a clean feed is already measuring.
@@ -123,10 +138,49 @@ const insufficientSignal = ({
   return 'good';
 };
 
+/** Live HUD readout from a basis — the feed check, then the summary's quality classification. */
+export const readoutFromBasis = ({
+  basis,
+  nowMs,
+  latestFix,
+}: {
+  basis: LiveReadoutBasis;
+  nowMs: number;
+  /** Newest OS fix. When stale, signal is `offline` even if earlier metrics look fine. */
+  latestFix?: LatestFix | null;
+}): LiveMetrics => {
+  const distanceKm = basis.distanceM / 1000;
+  const topSpeedKmh = basis.topSpeedKmh ?? 0;
+
+  if (latestFix !== undefined && isFixFeedStale({ fix: latestFix, nowMs })) {
+    const coldStart = latestFix == null && basis.activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS;
+    if (!coldStart) {
+      return { distanceKm, topSpeedKmh, signal: 'offline' };
+    }
+  }
+
+  // Session-level `estimated` is about cumulative gap — do not show SIGNAL WEAK while a fresh
+  // summary-quality fix is arriving (e.g. ±3–5 m).
+  let signal: LiveSignal;
+  if (basis.dataQuality === 'insufficient') {
+    signal = insufficientSignal({ basis, nowMs, latestFix });
+  } else if (
+    isMeasuringNow({ recentFixTimesMs: basis.recentFixTimesMs, nowMs, latestFix }) &&
+    latestFix != null &&
+    passesQualityGate(latestFix.accuracyM)
+  ) {
+    signal = 'good';
+  } else {
+    signal = basis.dataQuality;
+  }
+
+  return { distanceKm, topSpeedKmh, signal };
+};
+
 /**
- * Live HUD readout over the session so far: the same v3 filter as the summary over the same
- * admitted (continuity-grade) fixes, forward pass only. One admitted set, one computation
- * (Amendment 03 C5) — the summary may only refine it with the backward smoother.
+ * Live HUD readout over the session so far, as one full pass: the same v3 filter as the summary
+ * over the same admitted (continuity-grade) fixes, forward pass only (Amendment 03 C5). The HUD
+ * runs the incremental equivalent (live-tracker); this is its reference.
  */
 export const computeLiveReadout = ({
   input,
@@ -143,34 +197,22 @@ export const computeLiveReadout = ({
   const segment = segmentId
     ? computed.segments.find((row) => row.segmentId === segmentId)
     : undefined;
-  const distanceKm = (segment ? segment.distanceM : computed.distanceM) / 1000;
-  const topSpeedKmh = (segment ? segment.topSpeedKmh : computed.topSpeedKmh) ?? 0;
-  const nowMs = input.computedAt ? Date.parse(input.computedAt) : Date.now();
-
-  if (latestFix !== undefined && isFixFeedStale({ fix: latestFix, nowMs })) {
-    const coldStart =
-      latestFix == null && computed.activeDurationSeconds < LIVE_SIGNAL_SETTLE_SECONDS;
-    if (!coldStart) {
-      return { distanceKm, topSpeedKmh, signal: 'offline' };
-    }
-  }
-
-  // Session-level `estimated` is about cumulative gap — do not show SIGNAL WEAK while a fresh
-  // summary-quality fix is arriving (e.g. ±3–5 m).
-  let signal: LiveSignal;
-  if (computed.dataQuality === 'insufficient') {
-    signal = insufficientSignal({ input, computed, latestFix });
-  } else if (
-    isMeasuringNow({ points: input.points, nowMs, latestFix }) &&
-    latestFix != null &&
-    passesQualityGate(latestFix.accuracyM)
-  ) {
-    signal = 'good';
-  } else {
-    signal = computed.dataQuality;
-  }
-
-  return { distanceKm, topSpeedKmh, signal };
+  const liveQualityTimes = input.points
+    .filter((point) => passesLiveQualityGate(point.horizontalAccuracyM))
+    .map((point) => Date.parse(point.recordedAt));
+  return readoutFromBasis({
+    basis: {
+      distanceM: segment ? segment.distanceM : computed.distanceM,
+      topSpeedKmh: segment ? segment.topSpeedKmh : computed.topSpeedKmh,
+      activeDurationSeconds: computed.activeDurationSeconds,
+      gapSeconds: computed.gapSeconds,
+      dataQuality: computed.dataQuality,
+      liveQualityFixCount: liveQualityTimes.length,
+      recentFixTimesMs: newestTwo(liveQualityTimes),
+    },
+    nowMs: input.computedAt ? Date.parse(input.computedAt) : Date.now(),
+    latestFix,
+  });
 };
 
 export const formatDistance = ({ km, unit }: { km: number; unit: 'km' | 'mi' }) => {

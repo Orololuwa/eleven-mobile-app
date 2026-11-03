@@ -263,7 +263,8 @@ export type LatestFix = { accuracyM: number | null; atMs: number };
  * `settling` — measuring now, session too young to report;
  * `recovering` — measuring now, but too much earlier time went unmeasured;
  * `poor` — fixes are arriving, but not measuring now (no fresh, bridgeable quality fixes);
- * `offline` — no fix feed (unsubscribed or OS not delivering); not a sky/signal problem.
+ * `offline` — no fix has reached the app for `LOCATION_FIX_STALE_MS`: the chip has no fix, or the
+ *   registration dropped (the watchdog renews it). Judged on arrival, so a busy JS queue is not it.
  */
 export type LiveSignal = 'good' | 'estimated' | 'settling' | 'recovering' | 'poor' | 'offline';
 
