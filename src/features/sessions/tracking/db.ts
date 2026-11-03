@@ -781,6 +781,17 @@ export const insertTrackPoint = async ({
   });
 };
 
+/** Steps counted so far in a session: the sum of its segments (paused / between-segment steps excluded). */
+export const getSessionStepCount = async (sessionId: string): Promise<number> => {
+  const row = await withDb((db) =>
+    db.getFirstAsync<{ steps: number | null }>(
+      `SELECT SUM(step_count) AS steps FROM tracking_segments WHERE session_id = ?`,
+      [sessionId],
+    ),
+  );
+  return row?.steps ?? 0;
+};
+
 /** C3.1: add steps to a segment's running total. */
 export const addSegmentSteps = async (segmentId: string, steps: number) => {
   if (steps <= 0) return;

@@ -16,6 +16,7 @@ import {
   closePause,
   getActiveTrackingSession,
   getLatestPointStepCount,
+  getSessionStepCount,
   getOpenPause,
   insertPause,
   insertTrackPoint,
@@ -102,7 +103,7 @@ const motionOf = (location: Location.LocationObject) => {
 /**
  * C3.1: add the steps since the last reading to the current segment. Counted whether or not the
  * fix itself is usable — the step counter is what measures a GPS gap — but never during a manual
- * pause or between segments.
+ * pause or between segments. Returns the steps added (0 when none).
  */
 const recordSegmentSteps = async ({
   segmentId,
@@ -112,8 +113,8 @@ const recordSegmentSteps = async ({
   segmentId: string | null;
   stepCount: number | null;
   atMs: number;
-}) => {
-  if (stepCount == null) return;
+}): Promise<number> => {
+  if (stepCount == null) return 0;
   let baseline = stepBaseline;
   if (!baseline && segmentId) {
     // JS restarted mid-segment: resume from the newest reading stored on this segment's points.
@@ -123,12 +124,12 @@ const recordSegmentSteps = async ({
     }
   }
   stepBaseline = { segmentId, count: stepCount, atMs };
-  if (!segmentId) return;
+  if (!segmentId) return 0;
   if (!stepCountedSegments.has(segmentId)) {
     stepCountedSegments.add(segmentId);
     await markSegmentStepsCounted(segmentId);
   }
-  if (!baseline || baseline.segmentId !== segmentId) return;
+  if (!baseline || baseline.segmentId !== segmentId) return 0;
   const steps = stepDelta({
     fromCount: baseline.count,
     fromMs: baseline.atMs,
@@ -136,6 +137,7 @@ const recordSegmentSteps = async ({
     toMs: atMs,
   });
   if (steps) await addSegmentSteps(segmentId, steps);
+  return steps ?? 0;
 };
 
 const startAutoPause = async ({
@@ -274,7 +276,7 @@ const processFix = async (
   const inActivity = session.current_segment_id != null;
   const motion = motionOf(location);
 
-  await recordSegmentSteps({
+  const stepsAdded = await recordSegmentSteps({
     segmentId: inActivity && !inManualPause ? session.current_segment_id : null,
     stepCount: motion.stepCount,
     atMs: timestamp,
@@ -326,7 +328,10 @@ const processFix = async (
       lat: coords.latitude,
       lng: coords.longitude,
       speedKmh,
+      // Phone's step total since boot; `stepsAdded` / `sessionSteps` are what this session counted.
       steps: motion.stepCount,
+      stepsAdded,
+      sessionSteps: await getSessionStepCount(session.id),
       accelVariance: motion.accelVariance,
       // Raw value from expo-location: absent (`'absent'`) means the native layer sent no key —
       // either the OS fix had no speed accuracy or the with-speed-accuracy patch is missing.
