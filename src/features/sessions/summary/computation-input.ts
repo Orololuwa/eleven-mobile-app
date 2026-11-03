@@ -6,6 +6,7 @@ import type {
   TrackingSessionRow,
 } from '../tracking/types';
 import { normalizePlayStructure } from '../segment-display';
+import type { StrideEstimate } from './steps';
 import type { ComputationInput } from './types';
 
 /**
@@ -18,6 +19,7 @@ export const toComputationInput = ({
   pauses,
   points,
   massKg = null,
+  stride = null,
   openEndsAt = null,
   computedAt,
 }: {
@@ -26,6 +28,7 @@ export const toComputationInput = ({
   pauses: TrackingPauseRow[];
   points: TrackingPointRow[];
   massKg?: number | null;
+  stride?: StrideEstimate | null;
   openEndsAt?: string | null;
   computedAt?: string;
 }): ComputationInput => ({
@@ -41,6 +44,7 @@ export const toComputationInput = ({
         segmentIndex: segment.segment_index,
         startedAt: segment.started_at,
         endedAt,
+        stepCount: segment.step_count ?? null,
       },
     ];
   }),
@@ -65,7 +69,10 @@ export const toComputationInput = ({
     speedAccuracyMps: point.speed_accuracy_mps,
     horizontalAccuracyM: point.horizontal_accuracy_m,
     provider: point.provider ?? null,
+    stepCount: point.step_count ?? null,
+    accelVariance: point.accel_variance ?? null,
   })),
   massKg,
+  stride,
   computedAt,
 });

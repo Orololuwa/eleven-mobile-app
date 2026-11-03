@@ -25,6 +25,8 @@ module.exports = ({ config }) => ({
         // Session GPS renew loop under lock (with-direct-gps) and the battery-exemption prompt.
         'WAKE_LOCK',
         'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+        // Amendment 03 C3: step counter / detector, read natively in the location task (Android 10+).
+        'ACTIVITY_RECOGNITION',
       ]),
     ],
   },

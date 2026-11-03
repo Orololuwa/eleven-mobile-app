@@ -125,6 +125,10 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
   await ensureSegmentIdNotNull(db, 'tracking_points');
   // After the rebuild above (it recreates tracking_points with a fixed column list).
   await addColumnIfMissing(db, 'tracking_points', 'provider', 'TEXT');
+  // Amendment 03 C2 / C3 motion sensors — device-local, never uploaded.
+  await addColumnIfMissing(db, 'tracking_points', 'step_count', 'INTEGER');
+  await addColumnIfMissing(db, 'tracking_points', 'accel_variance', 'REAL');
+  await addColumnIfMissing(db, 'tracking_segments', 'step_count', 'INTEGER');
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS metrics_comparisons (
       session_id TEXT PRIMARY KEY NOT NULL,
@@ -141,7 +145,26 @@ const migrateTrackingSchema = async (db: SQLite.SQLiteDatabase) => {
       v3_accepted_fix_count INTEGER NOT NULL,
       v2_accepted_fix_count INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS stride_samples (
+      session_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      band TEXT NOT NULL,
+      metres REAL NOT NULL,
+      steps INTEGER NOT NULL,
+      recorded_at TEXT NOT NULL,
+      PRIMARY KEY (session_id, band)
+    );
+    CREATE INDEX IF NOT EXISTS idx_stride_samples_user ON stride_samples(user_id, band, recorded_at);
   `);
+  // Amendment 03 phase 2 comparison columns. `v3_*` columns hold the stored (current) filter.
+  await addColumnIfMissing(db, 'metrics_comparisons', 'v3_no_sensors_distance_m', 'REAL');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'step_count', 'INTEGER');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'step_distance_m', 'REAL');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'step_bridged_distance_m', 'REAL');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'stride_walk_m', 'REAL');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'stride_run_m', 'REAL');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'step_divergence', 'REAL');
+  await addColumnIfMissing(db, 'metrics_comparisons', 'zupt_fix_count', 'INTEGER');
 };
 
 const columnIsNotNull = async (db: SQLite.SQLiteDatabase, table: string, column: string) => {
@@ -705,6 +728,8 @@ export const insertTrackPoint = async ({
   speedAccuracyMps,
   horizontalAccuracyM,
   provider,
+  stepCount = null,
+  accelVariance = null,
 }: {
   sessionId: string;
   segmentId: string;
@@ -716,6 +741,10 @@ export const insertTrackPoint = async ({
   horizontalAccuracyM: number | null;
   /** Amendment 03 C4: which feed produced the fix — the filter weights fused fixes down. */
   provider: TrackPointProvider;
+  /** Amendment 03 C3: pedometer cumulative counter stamped natively with the fix. */
+  stepCount?: number | null;
+  /** Amendment 03 C2: accelerometer variance since the previous fix. */
+  accelVariance?: number | null;
 }) => {
   const id = createTrackingId();
   await withDb(async (db) => {
@@ -731,8 +760,8 @@ export const insertTrackPoint = async ({
       throw new Error('Tracking session not found');
     }
     await db.runAsync(
-      `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m, provider)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tracking_points (id, session_id, segment_id, sequence_index, recorded_at, lat, lng, speed_kmh, speed_accuracy_mps, horizontal_accuracy_m, provider, step_count, accel_variance)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         sessionId,
@@ -745,9 +774,46 @@ export const insertTrackPoint = async ({
         speedAccuracyMps,
         horizontalAccuracyM,
         provider,
+        stepCount,
+        accelVariance,
       ],
     );
   });
+};
+
+/** C3.1: add steps to a segment's running total. */
+export const addSegmentSteps = async (segmentId: string, steps: number) => {
+  if (steps <= 0) return;
+  await withDb((db) =>
+    db.runAsync(
+      `UPDATE tracking_segments SET step_count = COALESCE(step_count, 0) + ? WHERE id = ?`,
+      [steps, segmentId],
+    ),
+  );
+};
+
+/** C3.1: start a segment's total at 0 once a pedometer reading exists (0 steps ≠ no pedometer). */
+export const markSegmentStepsCounted = async (segmentId: string) => {
+  await withDb((db) =>
+    db.runAsync(`UPDATE tracking_segments SET step_count = 0 WHERE id = ? AND step_count IS NULL`, [
+      segmentId,
+    ]),
+  );
+};
+
+/** The newest pedometer reading stored on a segment's points — recovers the baseline after a JS restart. */
+export const getLatestPointStepCount = async (
+  segmentId: string,
+): Promise<{ stepCount: number; atMs: number } | null> => {
+  const row = await withDb((db) =>
+    db.getFirstAsync<{ step_count: number; recorded_at: string }>(
+      `SELECT step_count, recorded_at FROM tracking_points
+       WHERE segment_id = ? AND step_count IS NOT NULL
+       ORDER BY recorded_at DESC, id DESC LIMIT 1`,
+      [segmentId],
+    ),
+  );
+  return row ? { stepCount: row.step_count, atMs: Date.parse(row.recorded_at) } : null;
 };
 
 export const deletePointsForSession = async (sessionId: string) => {

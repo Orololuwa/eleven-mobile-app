@@ -207,6 +207,18 @@ export type MetricsComparison = {
   v2DataQuality: string;
   v3AcceptedFixCount: number;
   v2AcceptedFixCount: number;
+  /** Phase 2: the stored filter with motion sensors off (= v3), to isolate what C2 / C3 changed. */
+  v3NoSensorsDistanceM: number;
+  stepCount: number | null;
+  /** C3.2: steps × stride, independent of GPS. */
+  stepDistanceM: number | null;
+  /** C3.4: part of the stored distance that came from steps. */
+  stepBridgedDistanceM: number;
+  strideWalkM: number;
+  strideRunM: number;
+  /** (stored − step-implied) ÷ step-implied. Positive: GPS reads above the pedometer. */
+  stepDivergence: number | null;
+  zuptFixCount: number;
 };
 
 /** Amendment 03 §4 validation record, one row per session, device-local. */
@@ -216,8 +228,10 @@ export const saveMetricsComparison = async (row: MetricsComparison) => {
       `INSERT OR REPLACE INTO metrics_comparisons (
         session_id, computed_at, stored_version, v3_distance_m, v3_live_distance_m, v2_distance_m,
         doppler_distance_m, v3_top_speed_kmh, v2_top_speed_kmh, v3_data_quality, v2_data_quality,
-        v3_accepted_fix_count, v2_accepted_fix_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        v3_accepted_fix_count, v2_accepted_fix_count, v3_no_sensors_distance_m, step_count,
+        step_distance_m, step_bridged_distance_m, stride_walk_m, stride_run_m, step_divergence,
+        zupt_fix_count
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.sessionId,
         row.computedAt,
@@ -232,6 +246,14 @@ export const saveMetricsComparison = async (row: MetricsComparison) => {
         row.v2DataQuality,
         row.v3AcceptedFixCount,
         row.v2AcceptedFixCount,
+        row.v3NoSensorsDistanceM,
+        row.stepCount,
+        row.stepDistanceM,
+        row.stepBridgedDistanceM,
+        row.strideWalkM,
+        row.strideRunM,
+        row.stepDivergence,
+        row.zuptFixCount,
       ],
     ),
   );

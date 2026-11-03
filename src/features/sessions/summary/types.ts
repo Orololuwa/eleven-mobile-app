@@ -2,6 +2,7 @@ import type { PlayStructure } from '../types';
 import type { PauseReason } from '../tracking/types';
 import type { LatLng } from '../tracking/geodesic';
 import type { SpeedBandBoundaries, SpeedBandBucket, ZoneName } from './speed-bands';
+import type { StrideBand, StrideEstimate } from './steps';
 
 export type SpeedSource = 'os' | 'position_delta' | 'none';
 
@@ -17,6 +18,10 @@ export type ComputationPoint = {
   horizontalAccuracyM: number | null;
   /** C4 provenance; null (pre-v3 points) is weighted as reported. */
   provider?: 'gps' | 'fused' | null;
+  /** C3: cumulative step counter when the fix arrived (Android native). Only deltas mean anything. */
+  stepCount?: number | null;
+  /** C2: variance of |acceleration| since the previous fix, (m/s²)². Null without the sensor. */
+  accelVariance?: number | null;
 };
 
 export type ComputationSegment = {
@@ -24,6 +29,8 @@ export type ComputationSegment = {
   segmentIndex: number;
   startedAt: string;
   endedAt: string;
+  /** C3.1: steps counted during the segment (manual pauses excluded). Null without a pedometer. */
+  stepCount?: number | null;
 };
 
 export type ComputationPause = {
@@ -46,8 +53,13 @@ export type ComputationInput = {
   pauses: ComputationPause[];
   points: ComputationPoint[];
   massKg: number | null;
+  /** C3.3: the player's learned stride; population defaults when absent. */
+  stride?: StrideEstimate | null;
   computedAt?: string;
 };
+
+/** C3.3: GPS-measured metres and the steps taken over them, for one session and cadence band. */
+export type StrideSample = { band: StrideBand; metres: number; steps: number };
 
 export type ZoneSeconds = Record<ZoneName, number>;
 
@@ -99,6 +111,17 @@ export type ComputedSessionMetrics = {
   /** Fixes that passed the continuity gate. Non-binding sampling signal; not used to classify. */
   continuityFixCount: number;
   gapSeconds: number;
+  /** C3.1: Σ segment step counts; null when no segment had a pedometer reading. */
+  stepCount: number | null;
+  /**
+   * C3.4: the part of `distanceM` that came from steps × stride (GPS gaps and segments GPS never
+   * covered), so a step-derived figure is never silently mixed into the GPS one.
+   */
+  stepBridgedDistanceM: number;
+  /** C2: fixes at which the filter applied a zero-velocity update. */
+  zuptFixCount: number;
+  /** C3.3: calibration evidence for the player's stride. Not stored on the session. */
+  strideSamples: StrideSample[];
   algorithmVersion: string;
   computedAt: string;
   segments: ComputedSegmentMetrics[];

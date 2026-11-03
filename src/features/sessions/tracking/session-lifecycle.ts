@@ -23,7 +23,7 @@ import {
 import { refreshLiveSnapshot } from './live-snapshot';
 import { chronometerBaseMs, elapsedSecondsAt } from './live-snapshot-model';
 import { promptBackgroundPowerIfNeeded } from './background-power';
-import { requestTrackingPermissions } from './permissions';
+import { requestActivityRecognitionPermission, requestTrackingPermissions } from './permissions';
 import { invalidateHistory } from '../history/history-cache';
 import { computeAndStoreSessionMetrics } from '../summary/run-computation';
 import { enqueueSessionSync } from './sync';
@@ -68,6 +68,9 @@ export const prepareTrackingForKickoff = async () => {
   if (!permissions.foregroundGranted) {
     return { ok: false as const, reason: 'foreground_denied' as const };
   }
+  // Before the task registers: the native step listener subscribes once, at registration.
+  const stepsGranted = await requestActivityRecognitionPermission();
+  if (!stepsGranted) console.warn('[tracking] no step counter — distance from GPS only');
   await promptBackgroundPowerIfNeeded();
   return { ok: true as const };
 };
