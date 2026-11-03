@@ -626,6 +626,8 @@ describe('computeSessionMetrics — v3.1 motion sensors (Amendment 03 C2 / C3)',
     expect(zeroVelocityFlags(series({ stepCount: null })).at(-1)).toBe(true);
     // Steps + accel while Doppler reads walking pace: still two.
     expect(zeroVelocityFlags(series({ speedKmh: 4 })).at(-1)).toBe(true);
+    // Doppler + steps with a mid-range accelerometer (no vote, no veto): two votes.
+    expect(zeroVelocityFlags(series({ accelVariance: 0.3 })).at(-1)).toBe(true);
     // Accelerometer alone: never.
     expect(zeroVelocityFlags(series({ speedKmh: 4, stepCount: null })).at(-1)).toBe(false);
     // Doppler alone: never.
@@ -636,6 +638,44 @@ describe('computeSessionMetrics — v3.1 motion sensors (Amendment 03 C2 / C3)',
       speedKmh: t === 5 ? 0 : 6,
     }));
     expect(zeroVelocityFlags(blip).at(-1)).toBe(false);
+  });
+
+  it('never applies ZUPT while the accelerometer says walking, even when Doppler and steps say still', () => {
+    // Indoor walk (21 Oct party trace): the chip reads ~0 km/h, the step counter stays silent,
+    // but the accelerometer reads walking. Without the veto that is two votes for "standing".
+    const { points: walk } = noisyTrail({
+      speedsKmh: Array.from({ length: 121 }, () => 4.5),
+      scatterM: 3,
+      seed: 21,
+    });
+    const indoor = walk.map((point) => ({ ...point, speedKmh: 0.1, speedAccuracyMps: 1.5 }));
+    const walking = baseInput({
+      points: withSensors(indoor, { stepsPerSecond: 0, accelVariance: 2 }),
+    });
+    const vetoed = computeSessionMetrics(walking);
+    expect(vetoed.zuptFixCount).toBe(0);
+    expect(vetoed.distanceM).toBeCloseTo(
+      computeSessionMetrics(walking, { sensors: false }).distanceM,
+      6,
+    );
+
+    // Same trace with a quiet accelerometer: now all three agree, and it is a stop.
+    const still = computeSessionMetrics(
+      baseInput({ points: withSensors(indoor, { stepsPerSecond: 0, accelVariance: 0.01 }) }),
+    );
+    expect(still.zuptFixCount).toBeGreaterThan(110);
+    expect(vetoed.distanceM).toBeGreaterThan(still.distanceM + 20);
+
+    expect(
+      zeroVelocityFlags(
+        Array.from({ length: 6 }, (_, t) => ({
+          atMs: t * 1000,
+          speedKmh: 0,
+          stepCount: 100,
+          accelVariance: 0.5,
+        })),
+      ).at(-1),
+    ).toBe(false);
   });
 
   it('ZUPT removes the phantom distance of standing in scatter', () => {
