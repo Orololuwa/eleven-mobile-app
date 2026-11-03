@@ -39,6 +39,7 @@ import {
   SPRINT_MIN_SECONDS,
   STEP_RESIDUAL_MIN_STEPS,
   STRIDE_CHUNK_SECONDS,
+  ZUPT_ACCEL_MOVING_MIN,
   ZUPT_ACCEL_VARIANCE_MAX,
   ZUPT_DOPPLER_MAX_MPS,
   ZUPT_MIN_VOTES,
@@ -515,11 +516,15 @@ type StillnessPoint = {
  * C2: which fixes are zero-velocity updates. Three independent witnesses each vote "standing":
  * Doppler ≤ walking threshold for the whole trailing window, no step counted over it, and the
  * accelerometer quiet since the last fix. At least two must agree — one signal alone is the naive
- * displacement gate that cut a clean jog from 5.04 km to 1.90 km (Amendment 01 §5).
+ * displacement gate that cut a clean jog from 5.04 km to 1.90 km (Amendment 01 §5) — and an
+ * accelerometer that says walking vetoes it outright (ZUPT_ACCEL_MOVING_MIN).
  */
 export const zeroVelocityFlags = (points: StillnessPoint[]): boolean[] => {
   const windowMs = ZUPT_SUSTAIN_SECONDS * 1000;
   return points.map((point, index) => {
+    // Moving veto: an accelerometer in walking range blocks a ZUPT, however the others vote.
+    if (point.accelVariance != null && point.accelVariance >= ZUPT_ACCEL_MOVING_MIN) return false;
+
     let firstInWindow = index;
     let dopplerQuiet = true;
     for (let j = index; j >= 0; j -= 1) {
