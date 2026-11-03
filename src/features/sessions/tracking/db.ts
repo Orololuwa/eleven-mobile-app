@@ -624,9 +624,12 @@ export const recordLatestFix = async ({
   atMs: number;
   accuracyM: number | null;
 }) => {
+  // The active session only (same rule as getActiveTrackingSession). Stamping every open row kept
+  // an abandoned session looking fed long after its last fix (3 Nov run).
   await withDb((db) =>
     db.runAsync(
-      `UPDATE tracking_sessions SET last_fix_at_ms = ?, last_fix_accuracy_m = ? WHERE ended_at IS NULL`,
+      `UPDATE tracking_sessions SET last_fix_at_ms = ?, last_fix_accuracy_m = ?
+       WHERE id = (SELECT id FROM tracking_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1)`,
       [atMs, accuracyM],
     ),
   );
