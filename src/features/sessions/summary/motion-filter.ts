@@ -361,74 +361,93 @@ const initialState = (fix: FilterFix, tuning: FilterTuning) => {
   };
 };
 
+export type RunFilter = {
+  /** The step for this fix, or null for a duplicate (same timestamp as the previous step). */
+  push: (fix: FilterFix) => FilterStep | null;
+};
+
 /**
- * Forward pass over one continuous run of fixes (one segment, no reset gap inside). Fixes must be
- * in time order; duplicates (same timestamp) are skipped.
+ * Resumable forward pass over one continuous run (one segment, no reset gap inside). Fixes must be
+ * pushed in time order. The live HUD keeps one open per segment and feeds it each new fix once.
  */
-export const filterRun = (fixes: FilterFix[], tuning: FilterTuning): FilterStep[] => {
-  const steps: FilterStep[] = [];
+export const createRunFilter = (tuning: FilterTuning): RunFilter => {
+  let previous: FilterStep | null = null;
   let x: Vec = [];
   let p: Mat = [];
   let updates = 0;
   let rejectedInARow = 0;
-  for (const fix of fixes) {
-    const previous = steps[steps.length - 1];
-    if (!previous) {
-      const init = initialState(fix, tuning);
-      x = init.x;
-      p = init.p;
-      steps.push({
+  return {
+    push: (fix) => {
+      if (!previous) {
+        const init = initialState(fix, tuning);
+        x = init.x;
+        p = init.p;
+        updates = 1;
+        previous = {
+          tMs: fix.tMs,
+          dt: 0,
+          xPred: x,
+          pPred: p,
+          xFilt: x,
+          pFilt: p,
+          positionAccepted: true,
+          speedUsed: fix.zupt === true,
+          zupt: fix.zupt === true,
+        };
+        return previous;
+      }
+      const dt = (fix.tMs - previous.tMs) / 1000;
+      if (dt <= 0) return null;
+      const f = transition(dt);
+      const xPred = mulVec(f, x);
+      const pPred = inflateForManeuver({
+        xPred,
+        pPred: symmetrize(
+          add(mul(mul(f, p), transpose(f)), processNoise(dt, tuning.accelSigmaMps2)),
+        ),
+        fix,
+        dt,
+        tuning,
+      });
+      const next = applyFix({
+        x: xPred,
+        p: pPred,
+        fix,
+        updates,
+        forceAccept: rejectedInARow >= tuning.gateLockoutFixes,
+        tuning,
+      });
+      x = next.x;
+      p = next.p;
+      if (next.positionAccepted) {
+        updates += 1;
+        rejectedInARow = 0;
+      } else {
+        rejectedInARow += 1;
+      }
+      previous = {
         tMs: fix.tMs,
-        dt: 0,
-        xPred: x,
-        pPred: p,
+        dt,
+        xPred,
+        pPred,
         xFilt: x,
         pFilt: p,
-        positionAccepted: true,
-        speedUsed: fix.zupt === true,
+        positionAccepted: next.positionAccepted,
+        speedUsed: next.speedUsed,
         zupt: fix.zupt === true,
-      });
-      updates = 1;
-      continue;
-    }
-    const dt = (fix.tMs - previous.tMs) / 1000;
-    if (dt <= 0) continue;
-    const f = transition(dt);
-    const xPred = mulVec(f, x);
-    const pPred = inflateForManeuver({
-      xPred,
-      pPred: symmetrize(add(mul(mul(f, p), transpose(f)), processNoise(dt, tuning.accelSigmaMps2))),
-      fix,
-      dt,
-      tuning,
-    });
-    const next = applyFix({
-      x: xPred,
-      p: pPred,
-      fix,
-      updates,
-      forceAccept: rejectedInARow >= tuning.gateLockoutFixes,
-      tuning,
-    });
-    x = next.x;
-    p = next.p;
-    if (next.positionAccepted) {
-      updates += 1;
-      rejectedInARow = 0;
-    } else {
-      rejectedInARow += 1;
-    }
-    steps.push({
-      tMs: fix.tMs,
-      dt,
-      xPred,
-      pPred,
-      xFilt: x,
-      pFilt: p,
-      positionAccepted: next.positionAccepted,
-      speedUsed: next.speedUsed,
-      zupt: fix.zupt === true,
-    });
+      };
+      return previous;
+    },
+  };
+};
+
+/** Forward pass over one whole run; duplicates (same timestamp) are skipped. */
+export const filterRun = (fixes: FilterFix[], tuning: FilterTuning): FilterStep[] => {
+  const filter = createRunFilter(tuning);
+  const steps: FilterStep[] = [];
+  for (const fix of fixes) {
+    const step = filter.push(fix);
+    if (step) steps.push(step);
   }
   return steps;
 };

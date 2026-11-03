@@ -1,8 +1,13 @@
-import { useEffect } from 'react';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useCallback, useEffect } from 'react';
+import { BackHandler } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { ActiveSessionScreen } from '@/screens';
 import { useMyProfileQuery } from '@/features/profile/use-profile-query';
-import { getActiveTrackingSession, initTrackingDb } from '@/features/sessions/tracking/db';
+import {
+  getActiveTrackingSession,
+  getTrackingSession,
+  initTrackingDb,
+} from '@/features/sessions/tracking/db';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ActiveSessionRoute() {
@@ -19,6 +24,19 @@ export default function ActiveSessionRoute() {
   useEffect(() => {
     navigation.setOptions({ gestureEnabled: false });
   }, [navigation]);
+
+  // Android back would pop the HUD with the session still running — and the next kickoff left it
+  // open for good (3 Nov run). While it is unfinished, back stays here; End is the way out.
+  useFocusEffect(
+    useCallback(() => {
+      let unfinished = true;
+      void getTrackingSession(sessionId).then((row) => {
+        unfinished = row != null && row.ended_at == null;
+      });
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => unfinished);
+      return () => sub.remove();
+    }, [sessionId]),
+  );
 
   useEffect(() => {
     void (async () => {

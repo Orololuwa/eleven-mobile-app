@@ -19,6 +19,7 @@ import { useStartSessionDraftStore } from '@/features/sessions/start-session-dra
 import {
   bootstrapTrackingSession,
   prepareTrackingForKickoff,
+  resolveOpenSessionBeforeKickoff,
 } from '@/features/sessions/tracking/session-lifecycle';
 import type { StoredPitchCorners } from '@/features/sessions/tracking/types';
 import { useCreateSessionMutation } from '@/features/sessions/use-create-session-mutation';
@@ -301,6 +302,16 @@ export default function PitchSetupRoute() {
     // Permissions and battery settings first — the session (and its clock) starts only after.
     setPreparingKickoff(true);
     try {
+      const open = await resolveOpenSessionBeforeKickoff({
+        massKg: profileQuery.data?.weight_kg ?? null,
+      });
+      if (open.action === 'resume') {
+        router.replace({
+          pathname: '/(app)/active-session',
+          params: { sessionType: open.sessionType, sessionId: open.sessionId },
+        });
+        return;
+      }
       const readiness = await prepareTrackingForKickoff();
       if (!readiness.ok) {
         setError('Location permission is required to track a session');

@@ -24,7 +24,7 @@ import {
   recordLatestFix,
   updateSessionFields,
 } from './db';
-import { isFixFeedStale, watchShouldYieldToTask } from './fix-feed';
+import { isDeliveryStale, watchShouldYieldToTask } from './fix-feed';
 import { passesContinuityGate } from './fix-gates';
 import { getLatestFix, setLatestFix } from './latest-fix';
 import { refreshLiveSnapshot } from './live-snapshot';
@@ -38,7 +38,11 @@ let stopInFlight: Promise<void> | null = null;
 let lastProcessedAt = 0;
 /** Deliveries (task + watch) run one at a time — interleaved fixes raced pauses and DB reads. */
 let processQueue: Promise<void> = Promise.resolve();
-/** Wall time of the last direct-GPS (task) delivery; the fused watch yields while it is recent. */
+/**
+ * Wall time the last direct-GPS (task) delivery reached JS — before it waits in `processQueue`. The
+ * fused watch yields while it is recent, and the watchdog renews only when it is old: a queue that
+ * is behind is not a dropped registration.
+ */
 let lastTaskDeliveryAtMs: number | null = null;
 let foregroundWatch: Location.LocationSubscription | null = null;
 let consecutiveNullSessions = 0;
@@ -180,7 +184,27 @@ const refreshIndicatorNow = async (sessionId: string) => {
   await refreshTrackingIndicator({ force: true });
 };
 
-type FixContext = { source: 'task' | 'watch'; intervalMs: number | null; batchSize: number };
+type FixContext = {
+  source: 'task' | 'watch';
+  intervalMs: number | null;
+  batchSize: number;
+  /** Wall time the delivery reached JS, and when its processing started (after the queue). */
+  arrivedAtMs: number;
+  startedAtMs: number;
+};
+
+/** A delivery that waited this long in `processQueue` is logged — the HUD is that far behind. */
+const QUEUE_BEHIND_WARN_MS = 2_000;
+
+/** Delivery timing for the logs: native → JS, time in the queue, and the fix's age when handled. */
+const timingOf = (
+  location: Location.LocationObject,
+  { arrivedAtMs, startedAtMs }: Pick<FixContext, 'arrivedAtMs' | 'startedAtMs'>,
+) => ({
+  deliveryLagMs: arrivedAtMs - location.timestamp,
+  queuedMs: startedAtMs - arrivedAtMs,
+  ageMs: startedAtMs - location.timestamp,
+});
 
 /**
  * Every fix in a delivery is processed, oldest first. Android batches fixes on battery-managed
@@ -191,33 +215,57 @@ export const processLocationUpdate = (
   locations: Location.LocationObject[],
   { source = 'task' }: { source?: 'task' | 'watch' } = {},
 ) => {
-  const run = processQueue.then(() => processLocationBatch(locations, source));
+  const arrivedAtMs = Date.now();
+  // Direct GPS is the session's source of truth; the fused watch only fills in when it is quiet.
+  if (source === 'task') {
+    lastTaskDeliveryAtMs = arrivedAtMs;
+  } else if (watchShouldYieldToTask({ lastTaskDeliveryAtMs, nowMs: arrivedAtMs })) {
+    return Promise.resolve();
+  }
+  noteArrivedFix(locations);
+  const run = processQueue.then(() => processLocationBatch(locations, source, arrivedAtMs));
   processQueue = run.catch(() => undefined);
   return run;
+};
+
+/**
+ * The HUD's feed state follows arrivals, not processing: a fix that reached JS proves GPS is
+ * delivering even while it waits its turn. Persisted (for a JS restart) once processed.
+ */
+const noteArrivedFix = (locations: Location.LocationObject[]) => {
+  const newest = locations.reduce<Location.LocationObject | null>(
+    (best, location) => (!best || location.timestamp > best.timestamp ? location : best),
+    null,
+  );
+  const current = getLatestFix();
+  if (newest && (!current || newest.timestamp > current.atMs)) {
+    setLatestFix({ accuracyM: newest.coords.accuracy, atMs: newest.timestamp });
+  }
 };
 
 const processLocationBatch = async (
   locations: Location.LocationObject[],
   source: 'task' | 'watch',
+  arrivedAtMs: number,
 ) => {
-  // Direct GPS is the session's source of truth; the fused watch only fills in when it is quiet.
-  if (source === 'task') {
-    lastTaskDeliveryAtMs = Date.now();
-  } else if (watchShouldYieldToTask({ lastTaskDeliveryAtMs })) {
-    return;
-  }
-
+  const startedAtMs = Date.now();
   const fresh = [...locations]
     .sort((a, b) => a.timestamp - b.timestamp)
     .filter((location) => location.timestamp > lastProcessedAt);
   const newest = fresh[fresh.length - 1];
   if (!newest) return;
 
+  if (startedAtMs - arrivedAtMs > QUEUE_BEHIND_WARN_MS) {
+    console.warn('[location-task] behind', {
+      source,
+      batchSize: fresh.length,
+      ...timingOf(fresh[0]!, { arrivedAtMs, startedAtMs }),
+    });
+  }
+
   const previousProcessedAt = lastProcessedAt;
   lastProcessedAt = newest.timestamp;
-  const fix: LatestFix = { accuracyM: newest.coords.accuracy, atMs: newest.timestamp };
-  setLatestFix(fix);
-  await recordLatestFix(fix);
+  await recordLatestFix({ accuracyM: newest.coords.accuracy, atMs: newest.timestamp });
 
   for (const [index, location] of fresh.entries()) {
     const previousAt = index === 0 ? previousProcessedAt : (fresh[index - 1]?.timestamp ?? 0);
@@ -225,6 +273,8 @@ const processLocationBatch = async (
       source,
       intervalMs: previousAt > 0 ? location.timestamp - previousAt : null,
       batchSize: fresh.length,
+      arrivedAtMs,
+      startedAtMs,
     });
     if (!shouldContinue) return;
   }
@@ -238,7 +288,7 @@ const processLocationBatch = async (
 
 const processFix = async (
   location: Location.LocationObject,
-  { source, intervalMs, batchSize }: FixContext,
+  { source, intervalMs, batchSize, ...timing }: FixContext,
 ): Promise<boolean> => {
   const session = await getActiveTrackingSession();
   const teardown = nextTeardownAction({
@@ -325,6 +375,7 @@ const processFix = async (
       accuracy,
       intervalMs,
       batchSize,
+      ...timingOf(location, timing),
       lat: coords.latitude,
       lng: coords.longitude,
       speedKmh,
@@ -358,6 +409,7 @@ const processFix = async (
               : 'unknown',
     accuracy,
     trackingStatus: session.tracking_status,
+    ...timingOf(location, timing),
   });
 
   if (!hasCoords || inManualPause || !inActivity) return true;
@@ -492,9 +544,10 @@ const startLocationUpdates = async (notificationBody: string) => {
 };
 
 /**
- * While a session is live, assert that the location task is registered and a fix arrived recently.
- * Forces a renew when the feed is stale even if Expo still reports the task as started (GMS can
- * drop the fused→GPS request while hasStartedLocationUpdatesAsync stays true).
+ * While a session is live, assert that the location task is registered and delivered recently.
+ * Forces a renew when deliveries stopped even if Expo still reports the task as started (GMS can
+ * drop the fused→GPS request while hasStartedLocationUpdatesAsync stays true). Judged on arrival:
+ * renewing because JS is behind on fixes that did arrive only adds work.
  */
 export const ensureLocationRegistration = async ({
   reason,
@@ -504,8 +557,10 @@ export const ensureLocationRegistration = async ({
   if (!(await hasLiveSession())) return;
 
   const running = await isLocationTaskRunning();
-  const latestFix = getLatestFix();
-  const feedStale = isFixFeedStale({ fix: latestFix, staleMs: LOCATION_FIX_STALE_MS });
+  const feedStale = isDeliveryStale({
+    lastArrivalAtMs: lastTaskDeliveryAtMs,
+    staleMs: LOCATION_FIX_STALE_MS,
+  });
   if (!needsForcedRenew({ running, feedStale })) return;
 
   console.log('[location-task] registration re-register', {
@@ -513,7 +568,8 @@ export const ensureLocationRegistration = async ({
     running,
     feedStale,
     forceRenew: true,
-    latestFixAtMs: latestFix?.atMs ?? null,
+    lastTaskDeliveryAtMs,
+    latestFixAtMs: getLatestFix()?.atMs ?? null,
   });
 
   try {

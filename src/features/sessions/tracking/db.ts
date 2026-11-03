@@ -568,6 +568,18 @@ export const getPointsForSession = async (sessionId: string): Promise<TrackingPo
     ),
   );
 
+/** Points stored after `afterSequenceIndex`, in insert order — the live tracker's catch-up read. */
+export const getPointsForSessionAfter = async (
+  sessionId: string,
+  afterSequenceIndex: number,
+): Promise<TrackingPointRow[]> =>
+  withDb((db) =>
+    db.getAllAsync<TrackingPointRow>(
+      `SELECT * FROM tracking_points WHERE session_id = ? AND sequence_index > ? ORDER BY sequence_index ASC`,
+      [sessionId, afterSequenceIndex],
+    ),
+  );
+
 export const getPointsForSegment = async (segmentId: string): Promise<TrackingPointRow[]> =>
   withDb((db) =>
     db.getAllAsync<TrackingPointRow>(
@@ -612,9 +624,12 @@ export const recordLatestFix = async ({
   atMs: number;
   accuracyM: number | null;
 }) => {
+  // The active session only (same rule as getActiveTrackingSession). Stamping every open row kept
+  // an abandoned session looking fed long after its last fix (3 Nov run).
   await withDb((db) =>
     db.runAsync(
-      `UPDATE tracking_sessions SET last_fix_at_ms = ?, last_fix_accuracy_m = ? WHERE ended_at IS NULL`,
+      `UPDATE tracking_sessions SET last_fix_at_ms = ?, last_fix_accuracy_m = ?
+       WHERE id = (SELECT id FROM tracking_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1)`,
       [atMs, accuracyM],
     ),
   );

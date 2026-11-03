@@ -11,6 +11,17 @@ export const isFixFeedStale = ({
   staleMs?: number;
 }) => !fix || nowMs - fix.atMs > staleMs;
 
+/** True when no delivery has reached JS recently (`lastArrivalAtMs` is wall time, not fix time). */
+export const isDeliveryStale = ({
+  lastArrivalAtMs,
+  nowMs = Date.now(),
+  staleMs = LOCATION_FIX_STALE_MS,
+}: {
+  lastArrivalAtMs: number | null;
+  nowMs?: number;
+  staleMs?: number;
+}) => lastArrivalAtMs == null || nowMs - lastArrivalAtMs > staleMs;
+
 /** True when a foreground-watch fix should be ignored because the direct GPS task is live. */
 export const watchShouldYieldToTask = ({
   lastTaskDeliveryAtMs,

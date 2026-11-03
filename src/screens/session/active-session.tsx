@@ -68,8 +68,8 @@ const SIGNAL_NOTICE: Record<Exclude<LiveSignal, 'good'>, { title: string | null;
     sub: 'MOVE INTO OPEN SKY · LIVE NUMBERS MAY FREEZE',
   },
   offline: {
-    title: 'Lost GPS connection — reconnecting.',
-    sub: 'NOT A SIGNAL PROBLEM · WAITING FOR FIXES',
+    title: 'No GPS fixes — reconnecting.',
+    sub: 'MOVE INTO OPEN SKY · DISTANCE RESUMES WITH FIXES',
   },
 };
 
