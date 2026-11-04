@@ -27,7 +27,6 @@ import {
 } from './indicator';
 import { refreshLiveSnapshot } from './live-snapshot';
 import { chronometerBaseMs, elapsedSecondsAt } from './live-snapshot-model';
-import { promptBackgroundPowerIfNeeded } from './background-power';
 import { requestActivityRecognitionPermission, requestTrackingPermissions } from './permissions';
 import { invalidateHistory } from '../history/history-cache';
 import { computeAndStoreSessionMetrics } from '../summary/run-computation';
@@ -63,10 +62,10 @@ export const bootstrapTrackingSession = async ({
 };
 
 /**
- * Everything the user must answer before the session clock starts: location, notifications and,
- * on Android, the battery exemptions (which leave the app). Kickoff calls this before creating the
- * session so no time is counted while dialogs or Settings are open. iOS "Always" stays on the HUD's
- * permission screen.
+ * Everything the user must answer before the session clock starts: location, notifications and
+ * activity recognition. Kickoff calls this before creating the session so no time is counted while
+ * dialogs are open. iOS "Always" stays on the HUD's permission screen. No battery-exemption prompt:
+ * fixes reach JS without JobScheduler (stage 7 of with-direct-gps), so Doze has nothing to defer.
  */
 export const prepareTrackingForKickoff = async () => {
   const permissions = await requestTrackingPermissions({ requestBackground: false });
@@ -76,7 +75,6 @@ export const prepareTrackingForKickoff = async () => {
   // Before the task registers: the native step listener subscribes once, at registration.
   const stepsGranted = await requestActivityRecognitionPermission();
   if (!stepsGranted) console.warn('[tracking] no step counter — distance from GPS only');
-  await promptBackgroundPowerIfNeeded();
   return { ok: true as const };
 };
 

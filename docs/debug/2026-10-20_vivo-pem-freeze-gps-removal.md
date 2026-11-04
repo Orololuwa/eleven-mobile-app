@@ -66,8 +66,8 @@ After the thaw, the first fixes were poor, `last_accepted_fix_at` was 2 min old,
 | `beginTrackingAfterPermission` | No longer resets `segment_clock_origin_ms`; seeds the indicator from the real snapshot, never 0:00. |
 | `last_fix_at_ms` / `last_fix_accuracy_m` | Newest OS fix persisted on the session row. Snapshot uses the newer of memory and row. |
 | `processLocationUpdate` | Deliveries (task + watch) are serialised. |
-| `tracking-indicator` module + `background-power.ts` | Before kickoff on Android: asks once per install for the stock battery-optimisation exemption when Android reports it missing. A Vivo high-background-power prompt was tried and removed — Eleven is not listed on that screen. |
-| `app.config.js` | `WAKE_LOCK`, `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. |
+| `tracking-indicator` module + `background-power.ts` | Before kickoff on Android: asked once per install for the stock battery-optimisation exemption when Android reported it missing. A Vivo high-background-power prompt was tried and removed — Eleven is not listed on that screen. **Removed 4 Nov** with the permission: on Vivo the dialog leads to a Settings screen with nothing to set, and stage 7 makes the exemption unnecessary. |
+| `app.config.js` | `WAKE_LOCK` (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` removed 4 Nov). |
 
 Requires `npm run android` (or an EAS build). A Metro reload ships the JS half only.
 
