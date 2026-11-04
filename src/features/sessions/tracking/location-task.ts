@@ -193,6 +193,12 @@ type FixContext = {
   startedAtMs: number;
 };
 
+/**
+ * Fixes older than the session's start by more than this are not the session's: a delivery queued
+ * by an earlier run (JobScheduler held it, then the app restarted) must not land in this one.
+ */
+const PRE_SESSION_FIX_TOLERANCE_MS = 60_000;
+
 /** A delivery that waited this long in `processQueue` is logged — the HUD is that far behind. */
 const QUEUE_BEHIND_WARN_MS = 2_000;
 
@@ -316,6 +322,14 @@ const processFix = async (
   }
 
   const { coords, timestamp } = location;
+  if (timestamp < Date.parse(session.started_at) - PRE_SESSION_FIX_TOLERANCE_MS) {
+    console.warn('[location-task] skip fix — older than the session', {
+      source,
+      fixAt: new Date(timestamp).toISOString(),
+      sessionStartedAt: session.started_at,
+    });
+    return true;
+  }
   const accuracy = coords.accuracy;
   const hasCoords = coords.latitude != null && coords.longitude != null;
   const isAlive = passesContinuityGate(accuracy);

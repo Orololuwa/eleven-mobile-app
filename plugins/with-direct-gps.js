@@ -9,6 +9,7 @@ const WAKE_LOCK_SAFE_MARKER = 'direct-gps wake lock unavailable';
 const EVERY_FIX_MARKER = 'direct-gps every chip fix';
 const MOTION_MARKER = 'session-motion shared sensors';
 const SERVICE_STOP_MARKER = 'direct-gps service stop unbinds';
+const DIRECT_DELIVERY_MARKER = 'direct-gps delivers without JobScheduler';
 
 const CONSUMER = [
   'android',
@@ -595,6 +596,30 @@ const SERVICE_STOP_AFTER = `  private fun stopForegroundService() {
     runCatching { appContext.stopService(Intent(appContext, LocationTaskService::class.java)) }
   }`;
 
+/*
+ * Stage 7 — upstream hands every fix to JS through JobScheduler: each delivery cancels the pending
+ * job and reschedules it with all its earlier fixes plus the new one. When Android holds the job
+ * back (an app off the battery whitelist), that bundle grows by a fix a second and every delivery
+ * unparcels and re-parcels it on the main thread. On 4 Nov the main thread was inside
+ * `TaskManagerUtils.updateOrScheduleJob` when Android raised "No response to onStartJob" and killed
+ * the app — twice in one run. The session's foreground service keeps the process alive, so deliver
+ * straight to the task instead (`Task.execute` runs it now, or loads the app headless and queues).
+ */
+const DIRECT_DELIVERY_BEFORE = `      // Schedule new job.
+      taskManagerUtils.scheduleJob(context, mTask, data)`;
+
+const DIRECT_DELIVERY_AFTER = `      // ${DIRECT_DELIVERY_MARKER}: O(1) per fix, nothing piles up when jobs are deferred.
+      val locationBundles = ArrayList<Bundle>()
+      for (persistable in data) {
+        val coordsBundle = Bundle()
+        persistable.getPersistableBundle("coords")?.let { coordsBundle.putAll(it) }
+        val locationBundle = Bundle()
+        locationBundle.putAll(persistable)
+        locationBundle.putBundle("coords", coordsBundle)
+        locationBundles.add(locationBundle)
+      }
+      executeTaskWithLocationBundles(locationBundles) { }`;
+
 const replaceOnce = ({ filePath, before, after, label }) => {
   const contents = fs.readFileSync(filePath, 'utf8');
   if (!contents.includes(before)) {
@@ -695,6 +720,16 @@ const patchServiceStop = (filePath) => {
   ].forEach(([before, after, label]) => replaceOnce({ filePath, before, after, label }));
 };
 
+const patchDirectDelivery = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(DIRECT_DELIVERY_MARKER)) return;
+  replaceOnce({
+    filePath,
+    before: DIRECT_DELIVERY_BEFORE,
+    after: DIRECT_DELIVERY_AFTER,
+    label: 'direct delivery',
+  });
+};
+
 const patchAndroid = (projectRoot) => {
   const packageRoot = path.join(projectRoot, 'node_modules', 'expo-location');
   const filePath = path.join(packageRoot, ...CONSUMER);
@@ -704,6 +739,7 @@ const patchAndroid = (projectRoot) => {
   patchEveryFix(filePath);
   patchMotionSensors(packageRoot);
   patchServiceStop(filePath);
+  patchDirectDelivery(filePath);
 };
 
 /** @type {import('expo/config-plugins').ConfigPlugin} */
