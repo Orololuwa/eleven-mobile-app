@@ -15,7 +15,11 @@ import {
   seedTrackingSession,
   updateSessionFields,
 } from './db';
-import { startLocationTracking, stopLocationTracking } from './location-task';
+import {
+  isLocationTaskRunning,
+  startLocationTracking,
+  stopLocationTracking,
+} from './location-task';
 import {
   refreshTrackingIndicator,
   startTrackingIndicator,
@@ -335,6 +339,11 @@ export const endTrackingSession = async ({
   });
 
   await stopLocationTracking({ reason: 'ended' });
+  if (await isLocationTaskRunning()) {
+    // A renew racing the stop can re-register the task — and with it the foreground service.
+    console.warn('[tracking] location task still registered after end — stopping again');
+    await stopLocationTracking({ reason: 'ended' });
+  }
   await deleteLiveSnapshot(sessionId);
   try {
     await stopTrackingIndicator(session.live_activity_id);

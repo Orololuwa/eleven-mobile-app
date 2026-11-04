@@ -3,7 +3,10 @@ import * as LiveActivity from 'expo-live-activity';
 import * as Location from 'expo-location';
 import { darkColors as colors } from '@/theme';
 import { useAppStore } from '@/stores/app-store';
-import { updateAndroidTrackingNotification } from './android-notification';
+import {
+  dismissAndroidTrackingNotification,
+  updateAndroidTrackingNotification,
+} from './android-notification';
 import { ANDROID_FGS_TITLE, INDICATOR_UPDATE_INTERVAL_MS, LOCATION_TASK_NAME } from './constants';
 import { getActiveTrackingSession } from './db';
 import { formatDistance, formatElapsedLong, formatSpeed } from './live-metrics';
@@ -16,6 +19,14 @@ import { segmentLabelFor } from '../segment-display';
 let lastAndroidNotificationKey: string | null = null;
 let lastDistanceUnit: 'km' | 'mi' = 'km';
 let lastIndicatorPushAt = 0;
+/**
+ * Bumped when the session's indicator stops. A refresh that began earlier (it waits on SQLite for
+ * the snapshot) must not post afterwards: that re-created the notification, frozen, after the
+ * session ended (4 Nov run), and its fallback could restart location updates.
+ */
+let indicatorGeneration = 0;
+/** Android update currently talking to the native module — the stop waits for it. */
+let androidPushInFlight: Promise<void> | null = null;
 
 type IndicatorSnapshot = {
   elapsedSeconds: number;
@@ -128,37 +139,54 @@ const androidLocationOptions = (notificationBody: string): Location.LocationTask
   },
 });
 
-const updateAndroidIndicator = async (
-  notificationBody: string,
-  chronometerBase: number | null = null,
-) => {
+const updateAndroidIndicator = async ({
+  notificationBody,
+  chronometerBase = null,
+  generation,
+}: {
+  notificationBody: string;
+  chronometerBase?: number | null;
+  generation: number;
+}) => {
+  if (generation !== indicatorGeneration) return;
   const key = `${notificationBody}|${chronometerBase ?? ''}`;
   if (key === lastAndroidNotificationKey) return;
   lastAndroidNotificationKey = key;
 
-  const updatedInPlace = await updateAndroidTrackingNotification({
-    title: ANDROID_FGS_TITLE,
-    body: notificationBody,
-    color: colors.brand.fill,
-    chronometerBaseMs: chronometerBase,
-  });
-  if (updatedInPlace) return;
+  const run = (async () => {
+    const updatedInPlace = await updateAndroidTrackingNotification({
+      title: ANDROID_FGS_TITLE,
+      body: notificationBody,
+      color: colors.brand.fill,
+      chronometerBaseMs: chronometerBase,
+    });
+    if (updatedInPlace) return;
 
-  if (AppState.currentState !== 'active') {
+    if (AppState.currentState !== 'active') {
+      lastAndroidNotificationKey = null;
+      return;
+    }
+
+    // No notification to update. Rebuild it by re-registering — only for a session still live.
+    const session = await getActiveTrackingSession();
+    if (generation !== indicatorGeneration || !session || session.ended_at) return;
+    try {
+      await Location.startLocationUpdatesAsync(
+        LOCATION_TASK_NAME,
+        androidLocationOptions(notificationBody),
+      );
+    } catch {
+      // fall through — the next refresh retries
+    }
+    // Expo rebuilt the notification from options (no chronometer); post ours again next refresh.
     lastAndroidNotificationKey = null;
-    return;
-  }
-
+  })();
+  androidPushInFlight = run;
   try {
-    await Location.startLocationUpdatesAsync(
-      LOCATION_TASK_NAME,
-      androidLocationOptions(notificationBody),
-    );
-  } catch {
-    // fall through — the next refresh retries
+    await run;
+  } finally {
+    if (androidPushInFlight === run) androidPushInFlight = null;
   }
-  // Expo rebuilt the notification from options (no chronometer); post ours again next refresh.
-  lastAndroidNotificationKey = null;
 };
 
 /**
@@ -198,7 +226,11 @@ export const startTrackingIndicator = async ({
     return activityId ?? null;
   }
 
-  await updateAndroidIndicator(notificationBody, fullSnapshot.chronometerBaseMs ?? null);
+  await updateAndroidIndicator({
+    notificationBody,
+    chronometerBase: fullSnapshot.chronometerBaseMs ?? null,
+    generation: indicatorGeneration,
+  });
   return null;
 };
 
@@ -207,11 +239,13 @@ const pushTrackingIndicator = async ({
   segmentLabel,
   snapshot,
   distanceUnit,
+  generation,
 }: {
   liveActivityId: string | null;
   segmentLabel: string;
   snapshot: Omit<IndicatorSnapshot, 'segmentLabel' | 'distanceUnit'>;
   distanceUnit: 'km' | 'mi';
+  generation: number;
 }) => {
   const unit = resolveDistanceUnit(distanceUnit);
   const fullSnapshot: IndicatorSnapshot = { ...snapshot, segmentLabel, distanceUnit: unit };
@@ -227,7 +261,11 @@ const pushTrackingIndicator = async ({
   }
 
   if (Platform.OS === 'android') {
-    await updateAndroidIndicator(notificationBody, fullSnapshot.chronometerBaseMs ?? null);
+    await updateAndroidIndicator({
+      notificationBody,
+      chronometerBase: fullSnapshot.chronometerBaseMs ?? null,
+      generation,
+    });
   }
 };
 
@@ -241,6 +279,19 @@ export const stopTrackingIndicator = async (liveActivityId: string | null) => {
   }
   lastAndroidNotificationKey = null;
   lastIndicatorPushAt = 0;
+  indicatorGeneration += 1;
+  if (Platform.OS === 'android') {
+    // Let an update already in the native call land, then clear whatever it left.
+    await androidPushInFlight?.catch(() => undefined);
+    await dismissAndroidTrackingNotification();
+  }
+};
+
+/** App start with no live session: clear a notification an older build left behind. */
+export const clearStaleTrackingIndicator = async () => {
+  if (Platform.OS !== 'android') return;
+  const session = await getActiveTrackingSession();
+  if (!session) await dismissAndroidTrackingNotification();
 };
 
 export const refreshTrackingIndicator = async ({
@@ -252,13 +303,14 @@ export const refreshTrackingIndicator = async ({
 } = {}) => {
   const now = Date.now();
   if (!force && now - lastIndicatorPushAt < INDICATOR_UPDATE_INTERVAL_MS) return;
+  const generation = indicatorGeneration;
 
   const session = await getActiveTrackingSession();
   if (!session || session.ended_at || session.tracking_status === 'ended') return;
 
   // The location task keeps this current; recomputed here only if the task has gone quiet.
   const live = await readFreshLiveSnapshot(session.id);
-  if (!live) return;
+  if (!live || generation !== indicatorGeneration) return;
   const clock = live.segmentId ? live.clock : live.sessionClock;
 
   lastIndicatorPushAt = now;
@@ -273,5 +325,6 @@ export const refreshTrackingIndicator = async ({
       chronometerBaseMs: chronometerBaseMs(clock),
     },
     distanceUnit: resolveDistanceUnit(distanceUnit),
+    generation,
   });
 };

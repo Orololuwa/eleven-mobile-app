@@ -94,3 +94,29 @@ New install (uid 10328), `adb shell dumpsys deviceidle whitelist +com.eleven.app
 2. If PEM still freezes the app, the wake lock does not help (a frozen process cannot run). The remaining lever is the OEM allow-list. Nike Run Club stays registered on the same phone, which suggests it is on it.
 3. The thaw-time `gps_loss` auto-pause stops the clock while GPS re-acquires after a freeze. That follows the existing rule, but the frozen gap itself still counts as active time with no points.
 4. Indoors, the renew still churns `-registration` / `+registration` every 10 s (from 19 Oct). With the wake lock this now also runs while locked.
+
+## 4 Nov — the real mechanism: expo-task-manager's JobScheduler hop
+
+**Run.** Preview build, fresh install 06:06:50 (uid 10340, so off the Doze whitelist), 45 min outdoors beside NRC (7.56 km). Eleven's HUD and notification froze at 5.84 km with *"No GPS fixes"*; the summary read 6.5 km, quality estimated, with an impossible 24 km/h top speed and 4 sprints. The notification and the location FGS stayed up for hours after End.
+
+**Evidence.**
+
+| Source | What it showed |
+|---|---|
+| `dumpsys location` | Eleven's GPS registration held 06:09:34 → 06:54:40, **2,708 fixes delivered** (≈ 1 Hz). Only renews at 06:48:32 and 06:54:24 |
+| `dumpsys dropbox data_app_anr` | Eleven ANRs at **06:48:32, 06:54:24, 06:54:48, 06:55:10** — all *"No response to onStartJob"* |
+| `dumpsys jobscheduler` | `com.eleven.app::anr` **30 in the 6 h window** (quota 3) |
+| ANR main thread | `LocationTaskConsumer.didReceiveBroadcast → maybeReportDeferredLocations → TaskManagerUtils.scheduleJob → updateOrScheduleJob → isJobInfoRelatedToTask → PersistableBundle.unparcel` |
+| `ps` | Eleven's process started **06:54:23** — the one that ended the session was a restart |
+| `dumpsys activity services` | `LocationTaskService` still foreground at 10:17, no GPS registration (bound, never unbound — Amendment 03 stage 6) |
+
+**Mechanism.** expo-location delivers each fix to JS through JobScheduler. `updateOrScheduleJob` cancels the pending job and reschedules it with *all its fixes plus the new one*. Off the whitelist, Doze defers that job while the screen is off, so (1) JS receives nothing — HUD and notification freeze although GPS is fine — and (2) the pending bundle grows a fix a second, unparcelled and re-parcelled on the main thread at every delivery. When the job finally starts, the main thread cannot answer `onStartJob`: ANR, process killed, restarted by the FGS, repeat. The fixes that did reach JS came in the restarted processes' giant catch-up batches.
+
+**This revises 20–21 Oct.** The Doze whitelist "fixed" the dropouts because whitelisted apps' jobs are not deferred — not because it stopped PEM. NRC never routes fixes through JobScheduler, which is why it is unaffected without the whitelist. Vivo offers no user-facing way onto the whitelist (the stock exemption dialog leads to a Settings screen with nothing to set), so a fix that depends on it does not ship.
+
+**Fix (`plugins/with-direct-gps.js`).**
+- **Stage 7** — `maybeReportDeferredLocations` calls `Task.execute` directly (what the job would have done) instead of `scheduleJob`: O(1) main-thread work per fix, nothing to defer or pile up. The location FGS keeps the process alive; `Task.execute` loads the app headless and queues if JS is not up.
+- **Stage 6** — stopping unbinds and stops `LocationTaskService`, so it cannot be re-promoted to the foreground after End.
+- `location-task.ts` drops fixes older than the session's start (−60 s), so a backlog queued by an older build cannot land in a new session.
+
+**To confirm.** Preview build *without* the whitelist, screen locked for 30+ min outdoors: `dumpsys dropbox` shows no Eleven ANR, `dumpsys jobscheduler` no Eleven jobs, HUD current on unlock, distance near NRC.
