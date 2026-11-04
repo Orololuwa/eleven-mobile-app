@@ -8,6 +8,7 @@ import {
   getActiveTrackingSession,
   initTrackingDb,
 } from '@/features/sessions/tracking/db';
+import { clearStaleTrackingIndicator } from '@/features/sessions/tracking/indicator';
 import { startSyncListeners } from '@/features/sessions/tracking/sync';
 
 export default function AppLayout() {
@@ -23,6 +24,7 @@ export default function AppLayout() {
       await claimUnownedSessions(userId);
       startSyncListeners();
       const active = await getActiveTrackingSession();
+      if (!active) void clearStaleTrackingIndicator();
       if (active) {
         router.replace({
           pathname: '/(app)/active-session',

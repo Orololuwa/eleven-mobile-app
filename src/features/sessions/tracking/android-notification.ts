@@ -7,6 +7,8 @@ type TrackingIndicatorNative = {
     color: string,
     chronometerBaseMs: number | null,
   ) => Promise<boolean>;
+  /** Absent on binaries built before 4 Nov 2026. */
+  dismissNotification?: () => Promise<number>;
 };
 
 const TrackingIndicator = requireOptionalNativeModule<TrackingIndicatorNative>('TrackingIndicator');
@@ -29,5 +31,15 @@ export const updateAndroidTrackingNotification = async ({
     return await TrackingIndicator.updateNotification(title, body, color, chronometerBaseMs);
   } catch {
     return false;
+  }
+};
+
+/** Clears any tracking notification left behind after the FGS stopped. Returns how many. */
+export const dismissAndroidTrackingNotification = async () => {
+  if (!TrackingIndicator?.dismissNotification) return 0;
+  try {
+    return await TrackingIndicator.dismissNotification();
+  } catch {
+    return 0;
   }
 };
