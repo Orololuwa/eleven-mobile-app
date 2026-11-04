@@ -8,6 +8,7 @@ const WAKE_LOCK_MARKER = 'direct-gps session wake lock';
 const WAKE_LOCK_SAFE_MARKER = 'direct-gps wake lock unavailable';
 const EVERY_FIX_MARKER = 'direct-gps every chip fix';
 const MOTION_MARKER = 'session-motion shared sensors';
+const SERVICE_STOP_MARKER = 'direct-gps service stop unbinds';
 
 const CONSUMER = [
   'android',
@@ -534,6 +535,66 @@ const MOTION_WATCH_AFTER = `    val responseBundle = bundleOf()
     SessionMotion.attachWatch(locationBundle)
     responseBundle.putBundle("location", locationBundle)`;
 
+/*
+ * Stage 6 — the location service outlived the session (4 Nov run: foreground, notification up,
+ * no GPS, three hours after End). The consumer binds to the service and never unbinds, and
+ * `stopSelf()` does not destroy a bound service. When Android later recreated it, the open binding
+ * fired `onServiceConnected` again and promoted it back to the foreground. Stop now unbinds and
+ * stops the service outright, and a connection that lands after unregister stops instead.
+ */
+const SERVICE_FIELD_BEFORE = `  private var mService: LocationTaskService? = null`;
+
+const SERVICE_FIELD_AFTER = `  private var mService: LocationTaskService? = null
+  /** ${SERVICE_STOP_MARKER}: held so stop can unbind (stopSelf alone leaves it bound). */
+  private var mServiceConnection: ServiceConnection? = null`;
+
+const SERVICE_BIND_BEFORE = `      context.bindService(
+        serviceIntent,
+        object : ServiceConnection {
+          override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            mService = (service as? ServiceBinder)?.service`;
+
+const SERVICE_BIND_AFTER = `      val connection = object : ServiceConnection {
+          override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            if (mServiceConnection !== this) {
+              // Unregistered before the bind landed (stop already ran), or a newer bind owns the
+              // service: let go of this binding and never go foreground from it.
+              if (mTask == null) (service as? ServiceBinder)?.service?.stop()
+              runCatching { context?.unbindService(this) }
+              return
+            }
+            mService = (service as? ServiceBinder)?.service`;
+
+const SERVICE_BIND_END_BEFORE = `          override fun onServiceDisconnected(name: ComponentName) {
+            mService?.stop()
+            mService = null
+          }
+        },
+        Context.BIND_AUTO_CREATE
+      )`;
+
+const SERVICE_BIND_END_AFTER = `          override fun onServiceDisconnected(name: ComponentName) {
+            mService?.stop()
+            mService = null
+          }
+        }
+      mServiceConnection = connection
+      context.bindService(serviceIntent, connection, Context.BIND_AUTO_CREATE)`;
+
+const SERVICE_STOP_BEFORE = `  private fun stopForegroundService() {
+    mService?.stop()
+  }`;
+
+const SERVICE_STOP_AFTER = `  private fun stopForegroundService() {
+    mService?.stop()
+    mService = null
+    val connection = mServiceConnection
+    mServiceConnection = null
+    val appContext = context ?: return
+    connection?.let { runCatching { appContext.unbindService(it) } }
+    runCatching { appContext.stopService(Intent(appContext, LocationTaskService::class.java)) }
+  }`;
+
 const replaceOnce = ({ filePath, before, after, label }) => {
   const contents = fs.readFileSync(filePath, 'utf8');
   if (!contents.includes(before)) {
@@ -624,6 +685,16 @@ const patchMotionSensors = (packageRoot) => {
   }
 };
 
+const patchServiceStop = (filePath) => {
+  if (fs.readFileSync(filePath, 'utf8').includes(SERVICE_STOP_MARKER)) return;
+  [
+    [SERVICE_FIELD_BEFORE, SERVICE_FIELD_AFTER, 'service field'],
+    [SERVICE_BIND_BEFORE, SERVICE_BIND_AFTER, 'service bind'],
+    [SERVICE_BIND_END_BEFORE, SERVICE_BIND_END_AFTER, 'service bind end'],
+    [SERVICE_STOP_BEFORE, SERVICE_STOP_AFTER, 'service stop'],
+  ].forEach(([before, after, label]) => replaceOnce({ filePath, before, after, label }));
+};
+
 const patchAndroid = (projectRoot) => {
   const packageRoot = path.join(projectRoot, 'node_modules', 'expo-location');
   const filePath = path.join(packageRoot, ...CONSUMER);
@@ -632,6 +703,7 @@ const patchAndroid = (projectRoot) => {
   patchWakeLockSafe(filePath);
   patchEveryFix(filePath);
   patchMotionSensors(packageRoot);
+  patchServiceStop(filePath);
 };
 
 /** @type {import('expo/config-plugins').ConfigPlugin} */
