@@ -70,6 +70,27 @@ class TrackingIndicatorModule : Module() {
       true
     }
 
+    /**
+     * Removes any notification left on the tracking channel. Once the FGS has stopped, an update
+     * that raced the stop re-posts a plain ongoing notification nothing else clears (4 Nov run).
+     * A running FGS's own notification is not removable this way, so this is safe while tracking.
+     */
+    AsyncFunction("dismissNotification") {
+      val context =
+        appContext.reactContext?.applicationContext
+          ?: return@AsyncFunction 0
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return@AsyncFunction 0
+      val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+          ?: return@AsyncFunction 0
+      val stale =
+        notificationManager.activeNotifications.filter { status ->
+          status.notification.channelId?.endsWith(LOCATION_TASK_CHANNEL_SUFFIX) == true
+        }
+      stale.forEach { status -> notificationManager.cancel(status.tag, status.id) }
+      stale.size
+    }
+
     Function("isIgnoringBatteryOptimizations") {
       val context = appContext.reactContext?.applicationContext ?: return@Function true
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return@Function true
